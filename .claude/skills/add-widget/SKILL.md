@@ -49,7 +49,7 @@ data class {Name}WidgetConfig(
 
 - The `key` value **must** match `"home/{Name}"` exactly — it is used by the frontend to locate the JS components.
 - If the widget has no configuration fields, keep the data class empty.
-- Add `val refreshInterval: Duration = Duration.ZERO` (and `import java.time.Duration`) if the widget should support auto-refresh.
+- Every config field must be read by the display component. In particular, do **not** add a `refreshInterval`: dashboards have no auto-refresh mechanism, and the Branch statuses widget lost its never-read one in 6.0 (#2104).
 - For complex configs, nest additional data classes inside `{Name}WidgetConfig` or extract them to the same file.
 
 **Examples:**
@@ -157,7 +157,6 @@ Key rules:
 - Each `Form.Item` `name` must exactly match the corresponding Kotlin config field name (camelCase).
 - Pass the current prop value as `initialValue` on each `Form.Item` so the form is pre-populated when opened.
 - For list-of-objects config fields, use `<Form.List>` (see `BranchStatusesWidgetForm.js` for an example).
-- Add a `refreshInterval` field with `<SelectInterval/>` from `@components/common/SelectInterval` if the config includes `refreshInterval`.
 
 **Examples:**
 - `ontrack-web-core/components/widgets/home/LastActiveProjectsWidgetForm.js` (simple)
