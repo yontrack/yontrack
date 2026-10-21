@@ -145,8 +145,14 @@ interface DemoBranch {
     fun createPromotionLevel(name: String, description: String, workflow: WorkflowSpec? = null)
     /**
      * @param chml CHML configuration of the stamp, or null for a stamp without any data type
+     * @param onPromotion Configuration of a validation on promotion stamp, or null
      */
-    fun createValidationStamp(name: String, description: String, chml: CHMLSpec? = null)
+    fun createValidationStamp(
+        name: String,
+        description: String,
+        chml: CHMLSpec? = null,
+        onPromotion: OnPromotionSpec? = null,
+    )
 
     /**
      * Configures what grants [promotionLevel] by itself.

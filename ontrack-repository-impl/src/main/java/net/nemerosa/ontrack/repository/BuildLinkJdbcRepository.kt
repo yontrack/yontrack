@@ -12,7 +12,7 @@ class BuildLinkJdbcRepository(
     private val buildJdbcRepositoryAccessor: BuildJdbcRepositoryAccessor,
 ) : AbstractJdbcRepository(dataSource), BuildLinkRepository {
 
-    override fun deleteBuildLink(fromBuild: Build, toBuild: Build, qualifier: String) {
+    override fun deleteBuildLink(fromBuild: Build, toBuild: Build, qualifier: String): Boolean =
         namedParameterJdbcTemplate!!.update(
             """
                 DELETE FROM BUILD_LINKS 
@@ -25,11 +25,10 @@ class BuildLinkJdbcRepository(
                 "toBuildId" to toBuild.id(),
                 "qualifier" to qualifier,
             )
-        )
-    }
+        ) > 0
 
-    override fun createBuildLink(fromBuild: Build, toBuild: Build, qualifier: String) {
-        deleteBuildLink(fromBuild, toBuild, qualifier)
+    override fun createBuildLink(fromBuild: Build, toBuild: Build, qualifier: String): Boolean {
+        val existing = deleteBuildLink(fromBuild, toBuild, qualifier)
         namedParameterJdbcTemplate!!.update(
             """
                 INSERT INTO BUILD_LINKS(BUILDID, TARGETBUILDID, QUALIFIER) 
@@ -42,6 +41,7 @@ class BuildLinkJdbcRepository(
                 "qualifier" to qualifier,
             )
         )
+        return !existing
     }
 
     override fun getCountQualifiedBuildsUsedBy(build: Build): Int =

@@ -231,6 +231,32 @@ fun DemoDataset.validate() {
         }
     }
 
+    // A validation on promotion stamp names a promotion of another project, which a typo would make
+    // a stamp the server never grants - silently, since nothing is wrong until a build should be validated
+    val promotionsPerProject = projects.associate { project ->
+        project.name to project.branches.flatMap { branch -> branch.promotionLevels.map { it.name } }.toSet()
+    }
+    projects.forEach { project ->
+        project.branches.forEach { branch ->
+            branch.validationStamps.forEach { stamp ->
+                val onPromotion = stamp.onPromotion ?: return@forEach
+                val where = "Validation stamp ${stamp.name} of ${project.name}/${branch.name}"
+                val promotions = promotionsPerProject[onPromotion.project]
+                if (promotions == null) {
+                    problems += "$where is granted by a promotion of ${onPromotion.project}, " +
+                            "which the dataset never creates."
+                } else if (onPromotion.promotion !in promotions) {
+                    problems += "$where is granted by the ${onPromotion.promotion} promotion of " +
+                            "${onPromotion.project}, which none of its branches declares."
+                }
+                if (stamp.chml != null) {
+                    problems += "$where is a validation on promotion stamp with another data type; " +
+                            "a stamp has one data type."
+                }
+            }
+        }
+    }
+
     val projectNames = projects.map { it.name }.toSet()
     environments.forEach { environment ->
         checkName(environment.name, "Environment")

@@ -176,10 +176,28 @@ data class WorkflowSpec(val yaml: String)
  * ever give a status, never CHML counts, so the thresholds are there for what the stamp *says* - its
  * configuration and, through [CHMLSpec.warningPassesAutoPromotion], how the auto promotion reads it.
  */
+/**
+ * @property onPromotion Whether this is a validation on promotion stamp (#2101), and which linked
+ * build's promotion grants it. Its runs are never declared by a build: the server creates them when a
+ * build linked by [BuildSpec.links] reaches the promotion, or when the link is created to a build which
+ * already has it.
+ */
 data class ValidationStampSpec(
     val name: String,
     val description: String,
     val chml: CHMLSpec? = null,
+    val onPromotion: OnPromotionSpec? = null,
+)
+
+/**
+ * Configuration of a validation on promotion stamp, as `OnPromotionValidationConfig` holds it on the
+ * server: the build linked to the validated one, in [project] and with [qualifier], reaching
+ * [promotion].
+ */
+data class OnPromotionSpec(
+    val project: String,
+    val promotion: String,
+    val qualifier: String = "",
 )
 
 /**

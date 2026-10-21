@@ -253,6 +253,8 @@ class InMemoryDemoTarget(
         val promotionLevels = mutableListOf<String>()
         val validationStamps = mutableListOf<String>()
         val chmlStamps = mutableMapOf<String, CHMLSpec>()
+        /** Configuration of the validation on promotion stamps, by name. */
+        val onPromotionStamps = mutableMapOf<String, OnPromotionSpec>()
         val builds = mutableListOf<InMemoryBuild>()
         var scmBranch: String? = null
         val autoPromotions = mutableMapOf<String, AutoPromotionSpec>()
@@ -290,11 +292,18 @@ class InMemoryDemoTarget(
             promotionLevels += name
         }
 
-        override fun createValidationStamp(name: String, description: String, chml: CHMLSpec?) {
+        override fun createValidationStamp(
+            name: String,
+            description: String,
+            chml: CHMLSpec?,
+            onPromotion: OnPromotionSpec?,
+        ) {
             checkName(name, "Validation stamp")
             require(name !in validationStamps) { "Validation stamp $name already exists in ${project.name}/${this.name}" }
+            require(chml == null || onPromotion == null) { "A validation stamp has one data type" }
             validationStamps += name
             chml?.let { chmlStamps[name] = it }
+            onPromotion?.let { onPromotionStamps[name] = it }
         }
 
         override fun setAutoPromotion(promotionLevel: String, spec: AutoPromotionSpec) {

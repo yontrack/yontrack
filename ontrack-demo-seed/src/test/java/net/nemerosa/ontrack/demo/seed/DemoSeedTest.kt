@@ -119,6 +119,7 @@ class DemoSeedTest {
                 DemoContent.LIBRARY,
                 DemoContent.SERVICE,
                 DemoContent.UI,
+                DemoContent.PORTAL,
                 DemoContent.CHANGELOG,
             ),
             target.projects().map { it.name },
@@ -508,6 +509,13 @@ class DemoSeedTest {
                 }
                 branch.promotionLevels.forEach { promotionLevel ->
                     val autoPromotion = promotionLevel.autoPromotion ?: return@forEach
+                    // A validation on promotion stamp is granted by the server when the links are
+                    // created, after the build is seeded: the promotion it completes is the server's
+                    // to grant, and a dataset declaring it would grant it by hand first - see
+                    // `the demo shows a build auto promoted on the promotions of the builds it uses`
+                    if (branch.validationStamps.any { it.onPromotion != null && autoPromotionSelectsStamp(it.name, autoPromotion) }) {
+                        return@forEach
+                    }
                     branch.builds.forEach { build ->
                         val satisfied =
                             branch.validationStamps
@@ -525,6 +533,49 @@ class DemoSeedTest {
                     }
                 }
             }
+        }
+    }
+
+    /**
+     * #2101 - the demo shows a consumer whose SILVER requires the SILVER of the builds it uses: one
+     * build uses two SILVER builds, and is granted both stamps and SILVER by the server; the other
+     * uses a service build which never reached SILVER. Neither declares SILVER, which is the server's
+     * to grant.
+     */
+    @Test
+    fun `the demo shows a build auto promoted on the promotions of the builds it uses`() {
+        val projects = DemoContent.dataset(changelog).projects
+        val promoted = { ref: BuildRef, promotion: String ->
+            projects.first { it.name == ref.project }
+                .branches.first { it.name == ref.branch }
+                .builds.first { it.name == ref.build }
+                .promotionLevels.contains(promotion)
+        }
+        val branch = projects.first { it.name == DemoContent.PORTAL }.branches.first { it.name == DemoContent.MAIN }
+        val onPromotionStamps = branch.validationStamps.mapNotNull { stamp -> stamp.onPromotion?.let { stamp.name to it } }
+        assertEquals(
+            setOf(DemoContent.LIBRARY_SILVER, DemoContent.SERVICE_SILVER),
+            onPromotionStamps.map { it.first }.toSet(),
+        )
+        val silver = branch.promotionLevels.first { it.name == DemoContent.SILVER }
+        onPromotionStamps.forEach { (stamp, _) ->
+            assertTrue(stamp in silver.autoPromotion!!.validationStamps, "SILVER requires $stamp")
+        }
+        // Stamps granted by the links of each build
+        val granted = branch.builds.associate { build ->
+            build.name to onPromotionStamps.filter { (_, config) ->
+                build.links.any { it.project == config.project && promoted(it, config.promotion) }
+            }.map { it.first }.toSet()
+        }
+        assertEquals(
+            mapOf(
+                "21" to setOf(DemoContent.LIBRARY_SILVER),
+                "22" to setOf(DemoContent.LIBRARY_SILVER, DemoContent.SERVICE_SILVER),
+            ),
+            granted,
+        )
+        branch.builds.forEach { build ->
+            assertFalse(DemoContent.SILVER in build.promotionLevels, "Build ${build.name} leaves SILVER to the server")
         }
     }
 
@@ -603,6 +654,24 @@ class DemoSeedTest {
             )
         }
         assertTrue("auto promoted by SMOKE" in error.message.orEmpty(), error.message.orEmpty())
+    }
+
+    @Test
+    fun `a validation on promotion stamp naming an unknown promotion is caught before anything is deleted`() {
+        val error = assertFailsWith<IllegalArgumentException> {
+            seed(InMemoryDemoTarget()).run(
+                datasetWithPromotionLevels(
+                    PromotionLevelSpec("SILVER", ""),
+                    validationStamps = listOf(
+                        ValidationStampSpec("ONE.GOLD", "", onPromotion = OnPromotionSpec(project = "one", promotion = "GOLD")),
+                        ValidationStampSpec("OTHER.SILVER", "", onPromotion = OnPromotionSpec(project = "other", promotion = "SILVER")),
+                    ),
+                )
+            )
+        }
+        val message = error.message.orEmpty()
+        assertTrue("the GOLD promotion of one, which none of its branches declares" in message, message)
+        assertTrue("a promotion of other, which the dataset never creates" in message, message)
     }
 
     /**

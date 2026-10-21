@@ -175,6 +175,46 @@ Value: a map of measurements (name --> double)
 
 Configuration: none
 
+### Validation on promotion
+
+A build is validated as soon as the build it links to, in a given project, reaches a given promotion. For example,
+a build of project A, linked to a build of project B, gets a `PASSED` run for its `B-SILVER` validation stamp when
+this build of B is promoted to `SILVER`. Together with the [auto promotion](auto-promotion.md#depending-on-the-promotions-of-linked-builds),
+this makes a promotion of A depend on the promotions of the builds A uses.
+
+Configuration:
+
+* `project` - required, name of the project of the linked build
+* `qualifier` - optional, qualifier of the [build link](build-links.md), empty by default, for the default link
+* `promotion` - required, name of the promotion level the linked build must reach, in its own branch
+
+Value: set by Yontrack only - the linked build (its ID, project, branch and name), the promotion it reached and the ID
+of the promotion run which granted the validation.
+
+The runs are created by Yontrack, never by the CI:
+
+* when a build reaches the promotion, every build linked to it with the configured qualifier is validated
+* when a build is linked to a build which already has the promotion, it is validated at once - a new build of A
+  keeping versions of B which are already `SILVER` does not need to wait for another promotion of B
+* a build which already has a passed run for the validation stamp is left alone
+
+The promotion must be exactly the configured one: a linked build promoted to `GOLD` but not to `SILVER` does not
+count.
+
+When the promotion of the linked build is deleted, and this build no longer has any run for this promotion, a
+`FAILED` run is added to the validation stamp of each build it had validated, naming the linked build and the
+promotion. With the [revocation of the auto promotion](auto-promotion.md#revoking-a-promotion) enabled, the promotion
+of A which relied on it is revoked in turn.
+
+!!! note
+
+    There is no backfill: the builds which existed before the validation stamp was configured, and whose linked
+    builds were already promoted, are not validated. Only a new promotion of a linked build, or a new link, validates
+    a build.
+
+A run can also be posted by hand, without any data, with an explicit status - to grant the validation for a build
+whose dependency is not tracked by Yontrack, for example.
+
 ## Run info
 
 Both [builds](#builds) and [validation runs](#validation-runs) can have some run information attached to them.

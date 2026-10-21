@@ -14,6 +14,31 @@ Auto promotion is configured by setting the "Auto promotion" property on a promo
 
     A [CHML](index.md#chml) validation stamp can also opt in, with `warningPassesAutoPromotion`, to having a last run in `WARNING` status count as passed. This applies to the auto promotion only — a `WARNING` run still shows as a warning everywhere else — and only to a last status of exactly `WARNING`: a warning later moved to another status, `INVESTIGATING` or `EXPLAINED` for example, does not count. With this option, a `WARNING` run both promotes a build and leaves an [auto revoked](#revoking-a-promotion) promotion standing.
 
+## Depending on the promotions of linked builds
+
+The promotions an auto promotion requires belong to the build's own branch. To depend on the promotions of the builds
+a build is [linked to](build-links.md), use a [validation on promotion](index.md#validation-on-promotion) stamp: it is
+validated as soon as the linked build reaches the promotion.
+
+For example, project A uses projects B and C, and is [auto-versioned](../../integrations/auto-versioning/auto-versioning.md) on
+their `BRONZE` builds for quick feedback. To go further, a build of A must be `SILVER` **and** the B and C builds it
+uses must be `SILVER` too:
+
+* the branch of A gets two validation on promotion stamps: `B-SILVER` (project `B`, promotion `SILVER`) and
+  `C-SILVER` (project `C`, promotion `SILVER`)
+* the `SILVER` promotion of A is auto promoted on its own validations, plus `B-SILVER` and `C-SILVER`
+
+Then:
+
+* when B and C reach `SILVER`, in any order, the build of A using them gets `B-SILVER` and `C-SILVER`, and is
+  promoted to `SILVER` as soon as its own validations have passed
+* a new build of A linked to builds of B and C which are already `SILVER` gets `B-SILVER` and `C-SILVER` as soon as
+  its links are created
+* with [revocation](#revoking-a-promotion) enabled on A's `SILVER`, deleting the `SILVER` promotion of the B build
+  fails A's `B-SILVER` validation, and revokes A's `SILVER`
+
+The builds of A which existed before the stamps were configured are not validated: there is no backfill.
+
 ## Selecting the validations
 
 The list of validation stamps can be defined by:

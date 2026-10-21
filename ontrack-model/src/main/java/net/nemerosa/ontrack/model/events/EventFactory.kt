@@ -49,6 +49,11 @@ interface EventFactory {
 
     fun deleteBuild(build: Build): Event
 
+    /**
+     * A link from the [from] build to the [to] build with [qualifier] has been created.
+     */
+    fun newBuildLink(from: Build, to: Build, qualifier: String): Event
+
     fun newPromotionLevel(promotionLevel: PromotionLevel): Event
 
     fun imagePromotionLevel(promotionLevel: PromotionLevel): Event
@@ -243,6 +248,21 @@ interface EventFactory {
                 eventProject("Build's project"),
                 eventBranch("Build's branch"),
                 eventValue("BUILD", "Name of the deleted build"),
+            ),
+        )
+
+        val NEW_BUILD_LINK: EventType = SimpleEventType(
+            id = "new_build_link",
+            template = "Build \${build} for branch \${branch} in \${project} has been linked to build \${xBuild} for branch \${xBranch} in \${xProject}.",
+            description = "When a link from a build to another build is added.",
+            context = eventContext(
+                eventProject("Project of the source build"),
+                eventBranch("Branch of the source build"),
+                eventBuild("Source build, which uses the target build"),
+                eventXProject("Project of the target build"),
+                eventXBranch("Branch of the target build"),
+                eventXBuild("Target build, used by the source build"),
+                eventValue(QUALIFIER, "Qualifier of the link, empty for the default link"),
             ),
         )
 
@@ -474,5 +494,6 @@ interface EventFactory {
         )
 
         const val DISPLAY_NAME = "DISPLAY_NAME"
+        const val QUALIFIER = "QUALIFIER"
     }
 }

@@ -23,6 +23,7 @@ import net.nemerosa.ontrack.kdsl.spec.extension.environments.Slot
 import net.nemerosa.ontrack.kdsl.spec.extension.environments.environments
 import net.nemerosa.ontrack.kdsl.spec.extension.environments.workflows.addWorkflow
 import net.nemerosa.ontrack.kdsl.connector.graphql.schema.type.SlotPipelineStatus
+import net.nemerosa.ontrack.kdsl.spec.extension.general.createOnPromotionValidationStamp
 import net.nemerosa.ontrack.kdsl.spec.extension.general.AutoPromotionProperty
 import net.nemerosa.ontrack.kdsl.spec.extension.general.autoPromotion
 import net.nemerosa.ontrack.kdsl.spec.extension.general.previousPromotionCondition
@@ -268,22 +269,37 @@ private class KdslDemoBranch(
         }
     }
 
-    override fun createValidationStamp(name: String, description: String, chml: CHMLSpec?) {
-        validationStamps[name] = branch.createValidationStamp(
-            name = name,
-            description = description,
-            dataType = chml?.let { KdslDemoTarget.CHML_DATA_TYPE },
-            // The form shape, which is what `createValidationStampById` parses
-            dataTypeConfig = chml?.let {
-                mapOf(
-                    "failedLevel" to it.failedLevel.name,
-                    "failedValue" to it.failedValue,
-                    "warningLevel" to it.warningLevel.name,
-                    "warningValue" to it.warningValue,
-                    "warningPassesAutoPromotion" to it.warningPassesAutoPromotion,
-                )
-            },
-        )
+    override fun createValidationStamp(
+        name: String,
+        description: String,
+        chml: CHMLSpec?,
+        onPromotion: OnPromotionSpec?,
+    ) {
+        validationStamps[name] = if (onPromotion != null) {
+            branch.createOnPromotionValidationStamp(
+                name = name,
+                description = description,
+                project = onPromotion.project,
+                qualifier = onPromotion.qualifier,
+                promotion = onPromotion.promotion,
+            )
+        } else {
+            branch.createValidationStamp(
+                name = name,
+                description = description,
+                dataType = chml?.let { KdslDemoTarget.CHML_DATA_TYPE },
+                // The form shape, which is what `createValidationStampById` parses
+                dataTypeConfig = chml?.let {
+                    mapOf(
+                        "failedLevel" to it.failedLevel.name,
+                        "failedValue" to it.failedValue,
+                        "warningLevel" to it.warningLevel.name,
+                        "warningValue" to it.warningValue,
+                        "warningPassesAutoPromotion" to it.warningPassesAutoPromotion,
+                    )
+                },
+            )
+        }
     }
 
     override fun setAutoPromotion(promotionLevel: String, spec: AutoPromotionSpec) {

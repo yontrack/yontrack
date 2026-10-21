@@ -405,8 +405,12 @@ class StructureServiceImpl(
     override fun createBuildLink(fromBuild: Build, toBuild: Build, qualifier: String) {
         securityService.checkProjectFunction(fromBuild, BuildConfig::class.java)
         securityService.checkProjectFunction(toBuild, ProjectView::class.java)
-        buildLinkRepository.createBuildLink(fromBuild, toBuild, qualifier)
+        val added = buildLinkRepository.createBuildLink(fromBuild, toBuild, qualifier)
         buildLinkListenerService.onBuildLinkAdded(fromBuild, toBuild, qualifier)
+        // Re-asserting an existing link changes nothing - no event
+        if (added) {
+            eventPostService.post(eventFactory.newBuildLink(fromBuild, toBuild, qualifier))
+        }
     }
 
     override fun deleteBuildLink(fromBuild: Build, toBuild: Build, qualifier: String) {

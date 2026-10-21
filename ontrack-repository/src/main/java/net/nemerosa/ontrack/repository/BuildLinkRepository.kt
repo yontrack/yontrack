@@ -9,8 +9,19 @@ interface BuildLinkRepository {
     fun getQualifiedBuildsUsedBy(build: Build): List<BuildLink>
     fun getQualifiedBuildsUsing(build: Build): List<BuildLink>
 
-    fun createBuildLink(fromBuild: Build, toBuild: Build, qualifier: String)
-    fun deleteBuildLink(fromBuild: Build, toBuild: Build, qualifier: String)
+    /**
+     * Creates a link, or keeps it if it exists already.
+     *
+     * @return `true` if the link did not exist before
+     */
+    fun createBuildLink(fromBuild: Build, toBuild: Build, qualifier: String): Boolean
+
+    /**
+     * Deletes a link, if it exists.
+     *
+     * @return `true` if the link existed and has been deleted
+     */
+    fun deleteBuildLink(fromBuild: Build, toBuild: Build, qualifier: String): Boolean
 
     fun isLinkedTo(build: Build, project: String, buildPattern: String? = null, qualifier: String? = null): Boolean
     fun isLinkedTo(build: Build, targetBuild: Build, qualifier: String? = null): Boolean

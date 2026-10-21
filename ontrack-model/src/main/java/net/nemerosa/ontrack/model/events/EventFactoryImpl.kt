@@ -4,6 +4,8 @@ import net.nemerosa.ontrack.model.events.Event.Companion.of
 import net.nemerosa.ontrack.model.events.EventFactory.Companion.AUTO_PROMOTION_REVOKED
 import net.nemerosa.ontrack.model.events.EventFactory.Companion.DELETE_BRANCH
 import net.nemerosa.ontrack.model.events.EventFactory.Companion.DELETE_BUILD
+import net.nemerosa.ontrack.model.events.EventFactory.Companion.NEW_BUILD_LINK
+import net.nemerosa.ontrack.model.events.EventFactory.Companion.QUALIFIER
 import net.nemerosa.ontrack.model.events.EventFactory.Companion.DELETE_CONFIGURATION
 import net.nemerosa.ontrack.model.events.EventFactory.Companion.DELETE_PROJECT
 import net.nemerosa.ontrack.model.events.EventFactory.Companion.DELETE_PROMOTION_LEVEL
@@ -66,6 +68,7 @@ class EventFactoryImpl : EventFactory {
         register(UPDATE_BUILD)
         register(UPDATE_BUILD_DISPLAY_NAME)
         register(DELETE_BUILD)
+        register(NEW_BUILD_LINK)
 
         register(NEW_PROMOTION_LEVEL)
         register(IMAGE_PROMOTION_LEVEL)
@@ -191,6 +194,19 @@ class EventFactoryImpl : EventFactory {
             .with("BUILD_ID", build.id.toString())
             .build()
     }
+
+    /**
+     * The source build is the main entity, the target build an extra one. The signature is the one of the
+     * caller, not the one of the build.
+     */
+    override fun newBuildLink(from: Build, to: Build, qualifier: String): Event =
+        of(NEW_BUILD_LINK)
+            .withBranch(from.branch)
+            .with(from)
+            .withExtra(to)
+            .withExtra(to.branch)
+            .with(QUALIFIER, qualifier)
+            .build()
 
     override fun newPromotionLevel(promotionLevel: PromotionLevel): Event {
         return of(NEW_PROMOTION_LEVEL)
