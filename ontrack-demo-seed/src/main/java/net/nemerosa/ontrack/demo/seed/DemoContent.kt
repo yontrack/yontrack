@@ -291,6 +291,12 @@ object DemoContent {
     /** The last builds widget of the demo dashboard - fixed, like [DASHBOARD_UUID]. */
     const val LAST_BUILDS_WIDGET_UUID = "1c1f9c3e-8bfa-4a1f-8a0b-4e2f0b0d1a20"
 
+    /** The highest promotions per branch widget of the demo dashboard - fixed, like [DASHBOARD_UUID]. */
+    const val HIGHEST_PROMOTIONS_WIDGET_UUID = "1c1f9c3e-8bfa-4a1f-8a0b-4e2f0b0d1a21"
+
+    /** The pattern of the highest promotions per branch widget, matching [MAINTENANCE]. */
+    const val RELEASE_BRANCHES_PATTERN = "release-.*"
+
     /** The manual admission rule of the staging slot of [VETS], which only a person can answer. */
     const val VETS_APPROVAL = "approval"
 
@@ -2678,6 +2684,23 @@ object DemoContent {
                     "validations" to listOf(BUILD, UNIT_TESTS, INTEGRATION_TESTS),
                 ).asJson(),
                 layout = DemoWidgetLayout(x = 0, y = 160, w = 12, h = 30),
+            ),
+            // Where each branch is right now (#2006), as a ladder: the main branch of the service, its
+            // head granted every level, its release branches through a pattern - the head of
+            // [MAINTENANCE] does not compile, so it is not promoted yet - and the UI at BRONZE, its
+            // SILVER not granted
+            DemoWidget(
+                uuid = HIGHEST_PROMOTIONS_WIDGET_UUID,
+                key = "home/HighestPromotionsPerBranch",
+                config = mapOf(
+                    "format" to "LADDER",
+                    "branches" to listOf(
+                        mapOf("project" to SERVICE, "branch" to MAIN),
+                        mapOf("project" to SERVICE, "pattern" to RELEASE_BRANCHES_PATTERN, "count" to 3),
+                        mapOf("project" to UI, "branch" to MAIN),
+                    ),
+                ).asJson(),
+                layout = DemoWidgetLayout(x = 0, y = 190, w = 12, h = 30),
             ),
         ),
     )
