@@ -8,6 +8,9 @@ const {waitUntilCondition} = require("../../support/timing");
 
 test('project creation', async ({page, ontrack}) => {
     await login(page, ontrack)
+    // The new project shows in the last active projects of the built-in default dashboard. Opened by
+    // its URL, because the dashboard of the user is whatever an earlier spec selected from the menu
+    await page.goto(`${ontrack.connection.ui}/?dashboard=0`)
 
     const homePage = new HomePage(page, ontrack)
     const projectName = generate("p-")
