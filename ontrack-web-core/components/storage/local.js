@@ -263,3 +263,25 @@ export function getLocalEnvironmentMatrixFilter() {
 export function setLocalEnvironmentMatrixFilter(filter) {
     localStorage.setItem(environmentMatrixFilter, JSON.stringify(filter))
 }
+
+const highestPromotionsFormat = (uuid) => `highest-promotions-format-${uuid}`
+const highestPromotionsFormats = ['TABLE', 'LADDER']
+
+/**
+ * The format a viewer switched a "Highest promotions per branch" widget to, keyed by the widget's
+ * uuid (#2006).
+ *
+ * Per browser and never written to the dashboard: switching the format is how one viewer is looking
+ * at the widget right now, needs no right to edit the dashboard, and must not change what anybody
+ * else sees. With nothing stored, the configured format applies.
+ *
+ * @returns `TABLE` or `LADDER`, or undefined when nothing usable is stored
+ */
+export function getLocalHighestPromotionsFormat(uuid) {
+    const value = localStorage.getItem(highestPromotionsFormat(uuid))
+    return highestPromotionsFormats.includes(value) ? value : undefined
+}
+
+export function setLocalHighestPromotionsFormat(uuid, format) {
+    localStorage.setItem(highestPromotionsFormat(uuid), format)
+}

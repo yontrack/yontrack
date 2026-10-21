@@ -12,6 +12,7 @@ Widgets are the building blocks of dashboards. Each widget displays a specific v
 | [Branch statuses](branch-statuses.md) | `home/BranchStatuses` | Promotion and validation status per branch |
 | [Last validations for a branch](last-validations-for-branch.md) | `home/LastValidationsForBranch` | Last validation results for a branch |
 | [Last builds for a branch](last-builds-for-branch.md) | `home/LastBuildsForBranch` | Last builds of a branch, with their promotions and validations |
+| [Highest promotions per branch](highest-promotions-per-branch.md) | `home/HighestPromotionsPerBranch` | Latest build of each branch of a list, and the highest promotion it reached |
 | [Validations of last promoted build](validations-last-promotion-build.md) | `home/ValidationsLastPromotionBuild` | Validations of the last promoted build |
 | [Project promotion](project-promotion.md) | `home/ProjectPromotion` | Promotion status for a project with dependencies |
 | [Build dependencies tree](build-dependencies-tree.md) | `home/BuildDependenciesTree` | Downstream build dependency tree |

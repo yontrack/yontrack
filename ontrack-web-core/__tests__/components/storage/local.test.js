@@ -1,6 +1,8 @@
 import {
     getLocalDeliveryMapVisibility,
+    getLocalHighestPromotionsFormat,
     setLocalDeliveryMapVisibility,
+    setLocalHighestPromotionsFormat,
 } from "@components/storage/local";
 
 describe('delivery map visibility preference', () => {
@@ -41,6 +43,29 @@ describe('delivery map visibility preference', () => {
     it('falls back to showing everything for an entry which is not an object', () => {
         localStorage.setItem('delivery-map-visibility', '"yes"')
         expect(getLocalDeliveryMapVisibility()).toEqual({})
+    })
+
+})
+
+describe('format of a highest promotions per branch widget', () => {
+
+    beforeEach(() => {
+        localStorage.clear()
+    })
+
+    it('has no format until the viewer picks one, so that the configured one applies', () => {
+        expect(getLocalHighestPromotionsFormat('widget-1')).toBeUndefined()
+    })
+
+    it('remembers the format picked for each widget on its own', () => {
+        setLocalHighestPromotionsFormat('widget-1', 'LADDER')
+        expect(getLocalHighestPromotionsFormat('widget-1')).toBe('LADDER')
+        expect(getLocalHighestPromotionsFormat('widget-2')).toBeUndefined()
+    })
+
+    it('ignores a stored value which is not a format', () => {
+        localStorage.setItem('highest-promotions-format-widget-1', 'PIE')
+        expect(getLocalHighestPromotionsFormat('widget-1')).toBeUndefined()
     })
 
 })

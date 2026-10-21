@@ -3,6 +3,8 @@ import {DashboardContext} from "@components/dashboards/DashboardContextProvider"
 import {Form} from "antd";
 
 export const DashboardWidgetCellContext = createContext({
+    // UUID of the widget instance, for what a widget keeps per instance (like a format kept in the browser)
+    uuid: undefined,
     // Widget title
     title: "",
     setTitle: (value) => {
@@ -106,6 +108,7 @@ export default function DashboardWidgetCellContextProvider({widget, children}) {
     }, [widgetEditionCallback, widget.uuid, widgetEditionForm, registerWidget]);
 
     const context = {
+        uuid: widget.uuid,
         title,
         setTitle,
         extra,
