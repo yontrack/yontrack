@@ -138,6 +138,8 @@ services:
       MANAGEMENT_ENDPOINT_ACCOUNT_ACCESS: unrestricted
       # ... configurations are not tested
       ONTRACK_CONFIG_CONFIGURATION_TEST: "false"
+      # ... a small cap on the links of the build link decoration, so the UI tests reach it (#2109)
+      ONTRACK_CONFIG_BUILDLINKS_DECORATIONMAXLINKS: "3"
       # ... GitHub ingestion specifics
       ONTRACK_EXTENSION_GITHUB_INGESTION_HOOK_SIGNATURE_DISABLED: true
       # ONTRACK_EXTENSION_GITHUB_INGESTION_PROCESSING_REPOSITORIES_TEST_REPOSITORY: "test-routing-repository"

@@ -151,12 +151,22 @@ interface StructureService {
     fun deleteBuildLink(fromBuild: Build, toBuild: Build, qualifier: String)
 
     /**
-     * Gets the total number of downstream links
+     * Gets the total number of downstream links, leaving out the builds the current user cannot see
      *
      * @param build  Source build
      * @return Number of downstream links
      */
     fun getCountQualifiedBuildsUsedBy(
+        build: Build,
+    ): Int
+
+    /**
+     * Gets the total number of upstream links, leaving out the builds the current user cannot see
+     *
+     * @param build  Target build
+     * @return Number of upstream links
+     */
+    fun getCountQualifiedBuildsUsing(
         build: Build,
     ): Int
 

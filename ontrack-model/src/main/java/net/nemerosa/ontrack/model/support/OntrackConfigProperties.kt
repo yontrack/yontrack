@@ -98,6 +98,12 @@ class OntrackConfigProperties {
     var database = DatabaseProperties()
 
     /**
+     * Build links settings
+     */
+    @Valid
+    var buildLinks = BuildLinksProperties()
+
+    /**
      * Key-store type
      */
     @APIDescription("Key store type to use to store encryption keys")
@@ -119,6 +125,7 @@ class OntrackConfigProperties {
         logger.info("[events] Export max rows = ${events.export.maxRows}")
         logger.info("[events] Cleanup batch size = ${events.cleanup.batchSize}")
         logger.info("[database] Contract migrations = ${database.contractMigrations}")
+        logger.info("[build-links] Decoration max links = ${buildLinks.decorationMaxLinks}")
         graphql.limits.run {
             logger.info("[graphql] Limits = $mode (aliases $maxAliases, directives per location $maxDirectivesPerLocation, depth $maxDepth, complexity $maxComplexity)")
         }
@@ -134,6 +141,15 @@ class OntrackConfigProperties {
 
         @APIDescription("When `true`, Yontrack does not start: it runs the pending expand migrations, then the pending contract migrations in version order, logs what it applied and exits, with code 0, or with code 1 when a migration fails. Used by the post-upgrade hook of the Helm chart, once the previous version is gone.")
         var runContractAndExit: Boolean = false
+    }
+
+    /**
+     * Build links settings
+     */
+    class BuildLinksProperties {
+        @Min(1)
+        @APIDescription("Maximum number of links listed, in each direction, by the hint of the link decoration of a build. The others are reached through the build's links page.")
+        var decorationMaxLinks: Int = 10
     }
 
     /**

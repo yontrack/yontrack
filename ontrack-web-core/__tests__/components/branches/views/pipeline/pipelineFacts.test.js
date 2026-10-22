@@ -224,7 +224,7 @@ describe('visibleDecorations', () => {
             // `BuildLinkDecorationExtension` carries an object; nothing about it can equal the
             // version, and a payload-shaped comparison must not trip over that
             const {shown} = visibleDecorations(
-                [{decorationType: "buildLink", data: {buildId: 1, linksCount: 0}}],
+                [{decorationType: "buildLink", data: {buildId: 1, linksCount: 1, upstreamCount: 0, maxLinks: 10}}],
                 {version: "1.4.4"},
             )
             expect(shown.map(it => it.decorationType)).toEqual(["buildLink"])
