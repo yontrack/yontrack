@@ -294,6 +294,12 @@ object DemoContent {
     /** The highest promotions per branch widget of the demo dashboard - fixed, like [DASHBOARD_UUID]. */
     const val HIGHEST_PROMOTIONS_WIDGET_UUID = "1c1f9c3e-8bfa-4a1f-8a0b-4e2f0b0d1a21"
 
+    /**
+     * The second highest promotions per branch widget of the demo dashboard (#2110), the service
+     * alone, without its project - fixed, like [DASHBOARD_UUID].
+     */
+    const val HIGHEST_PROMOTIONS_SERVICE_WIDGET_UUID = "1c1f9c3e-8bfa-4a1f-8a0b-4e2f0b0d1a22"
+
     /** The pattern of the highest promotions per branch widget, matching [MAINTENANCE]. */
     const val RELEASE_BRANCHES_PATTERN = "release-.*"
 
@@ -2688,12 +2694,13 @@ object DemoContent {
             // Where each branch is right now (#2006), as a ladder: the main branch of the service, its
             // head granted every level, its release branches through a pattern - the head of
             // [MAINTENANCE] does not compile, so it is not promoted yet - and the UI at BRONZE, its
-            // SILVER not granted
+            // SILVER not granted. Two projects, so the project stays shown; sorted by name (#2110)
             DemoWidget(
                 uuid = HIGHEST_PROMOTIONS_WIDGET_UUID,
                 key = "home/HighestPromotionsPerBranch",
                 config = mapOf(
                     "format" to "LADDER",
+                    "sort" to "NAME",
                     "branches" to listOf(
                         mapOf("project" to SERVICE, "branch" to MAIN),
                         mapOf("project" to SERVICE, "pattern" to RELEASE_BRANCHES_PATTERN, "count" to 3),
@@ -2701,6 +2708,22 @@ object DemoContent {
                     ),
                 ).asJson(),
                 layout = DemoWidgetLayout(x = 0, y = 190, w = 12, h = 30),
+            ),
+            // The same ladder for the service alone (#2110): one project, so its name is hidden, and
+            // the branches by last activity, the default
+            DemoWidget(
+                uuid = HIGHEST_PROMOTIONS_SERVICE_WIDGET_UUID,
+                key = "home/HighestPromotionsPerBranch",
+                config = mapOf(
+                    "title" to "Platform Status",
+                    "format" to "LADDER",
+                    "showProject" to false,
+                    "branches" to listOf(
+                        mapOf("project" to SERVICE, "branch" to MAIN),
+                        mapOf("project" to SERVICE, "pattern" to RELEASE_BRANCHES_PATTERN, "count" to 3),
+                    ),
+                ).asJson(),
+                layout = DemoWidgetLayout(x = 0, y = 220, w = 12, h = 30),
             ),
         ),
     )

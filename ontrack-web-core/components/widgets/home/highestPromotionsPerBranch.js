@@ -14,6 +14,17 @@ export const HIGHEST_PROMOTIONS_FORMATS = [
 
 export const DEFAULT_HIGHEST_PROMOTIONS_FORMAT = 'TABLE'
 
+/** The sorts of the branches, the first one being the default (#2110). */
+export const HIGHEST_PROMOTIONS_SORTS = [
+    {label: 'Last activity', value: 'LAST_ACTIVITY'},
+    {label: 'Name', value: 'NAME'},
+]
+
+export const DEFAULT_HIGHEST_PROMOTIONS_SORT = 'LAST_ACTIVITY'
+
+/** Whether the branches are shown with the name of their project, by default (#2110). */
+export const DEFAULT_HIGHEST_PROMOTIONS_SHOW_PROJECT = true
+
 /** The maximum number of branches a pattern brings when its entry gives none. */
 export const DEFAULT_PATTERN_COUNT = 5
 
@@ -125,4 +136,40 @@ export function promotionLadder(promotionLevels, promotionRuns) {
             highest: run !== null && run === highest,
         }
     })
+}
+
+/** Names compared ignoring the case, and their numbers as numbers: `release-5.9` before `release-5.10`. */
+const compareNames = (a, b) => (a ?? '').localeCompare(b ?? '', undefined, {numeric: true, sensitivity: 'base'})
+
+const compareBranchNames = (a, b) =>
+    compareNames(a.branch.name, b.branch.name) || compareNames(a.branch.project?.name, b.branch.project?.name)
+
+/** The most recent latest build first. */
+const compareLastActivity = (a, b) =>
+    (Date.parse(b.build.creation?.time) || 0) - (Date.parse(a.build.creation?.time) || 0)
+
+/**
+ * The rows of the widget in the order they are shown (#2110), without changing the array it is given.
+ *
+ * - The `BUILD` rows come first: the most recent latest build first by `LAST_ACTIVITY`, by branch
+ *   name then project name by `NAME`.
+ * - The `NO_BUILD` rows come next: by name by `NAME`, in the order they were resolved otherwise -
+ *   they have no activity to sort them by.
+ * - The `NOT_FOUND` and `NO_MATCH` rows come last, in the order of the configuration.
+ *
+ * Only the rows already selected are ordered: a pattern still brings its most recently active
+ * branches, whatever the sort.
+ *
+ * @param {Array<{type: string, branch?: any, build?: any}>} rows The rows from `highestPromotionsRows`.
+ * @param {'LAST_ACTIVITY'|'NAME'} [sort]
+ * @returns {Array<any>}
+ */
+export function sortHighestPromotionsRows(rows, sort = DEFAULT_HIGHEST_PROMOTIONS_SORT) {
+    const ofType = (...types) => (rows ?? []).filter(row => types.includes(row.type))
+    const byName = sort === 'NAME'
+    return [
+        ...ofType('BUILD').sort(byName ? compareBranchNames : compareLastActivity),
+        ...(byName ? ofType('NO_BUILD').sort(compareBranchNames) : ofType('NO_BUILD')),
+        ...ofType('NOT_FOUND', 'NO_MATCH'),
+    ]
 }

@@ -1,7 +1,7 @@
 import {useContext, useEffect, useState} from "react";
 import {gql} from "graphql-request";
 import Link from "next/link";
-import {Alert, Empty, Flex, Segmented, Space, theme, Typography} from "antd";
+import {Alert, Empty, Flex, Popover, Segmented, Space, theme, Typography} from "antd";
 import {DashboardWidgetCellContext} from "@components/dashboards/DashboardWidgetCellContextProvider";
 import {useQueries} from "@components/services/GraphQL";
 import LoadingContainer from "@components/common/LoadingContainer";
@@ -16,11 +16,14 @@ import {promotionRunUri} from "@components/common/Links";
 import {getLocalHighestPromotionsFormat, setLocalHighestPromotionsFormat} from "@components/storage/local";
 import {
     DEFAULT_HIGHEST_PROMOTIONS_FORMAT,
+    DEFAULT_HIGHEST_PROMOTIONS_SHOW_PROJECT,
+    DEFAULT_HIGHEST_PROMOTIONS_SORT,
     DEFAULT_PATTERN_COUNT,
     entryKind,
     HIGHEST_PROMOTIONS_FORMATS,
     highestPromotionsRows,
     promotionLadder,
+    sortHighestPromotionsRows,
 } from "@components/widgets/home/highestPromotionsPerBranch";
 
 const DEFAULT_TITLE = "Highest promotions per branch"
@@ -107,14 +110,27 @@ function EntryName({entry}) {
     return <Typography.Text>{entry.project} / {entry.branch ?? entry.pattern}</Typography.Text>
 }
 
-function BranchName({branch}) {
+function BranchName({branch, showProject}) {
     return (
         <Space>
-            <ProjectLink project={branch.project}/>
-            <span>/</span>
+            {
+                showProject &&
+                <>
+                    <ProjectLink project={branch.project}/>
+                    <span>/</span>
+                </>
+            }
             <BranchLink branch={branch}/>
         </Space>
     )
+}
+
+/**
+ * The branch of a row, or the entry of the configuration for a row with no branch to link to - which
+ * keeps its project, whether it is shown or not.
+ */
+function RowName({row, showProject}) {
+    return row.branch ? <BranchName branch={row.branch} showProject={showProject}/> : <EntryName entry={row.entry}/>
 }
 
 /**
@@ -147,7 +163,7 @@ function LatestBuild({build}) {
     )
 }
 
-function HighestPromotionsTable({rows}) {
+function HighestPromotionsTable({rows, showProject}) {
     // The message of a row with nothing to show takes the place of both the build and its promotion
     const emptyRowCell = (row, span) => ({colSpan: row.type === 'BUILD' ? 1 : span})
     return (
@@ -161,7 +177,7 @@ function HighestPromotionsTable({rows}) {
                 {
                     key: 'branch',
                     title: 'Branch',
-                    render: (_, row) => row.branch ? <BranchName branch={row.branch}/> : <EntryName entry={row.entry}/>,
+                    render: (_, row) => <RowName row={row} showProject={showProject}/>,
                 },
                 {
                     key: 'build',
@@ -186,43 +202,64 @@ function HighestPromotionsTable({rows}) {
     )
 }
 
+/**
+ * What the popover of a step says: when the latest build was granted the level, or that it was not.
+ */
+function LadderStepPopover({step}) {
+    const {promotionLevel, run, granted} = step
+    return (
+        <Flex vertical gap={2} data-testid={`highest-promotions-step-popover-${promotionLevel.id}`}>
+            <Typography.Text strong>{promotionLevel.name}</Typography.Text>
+            {
+                granted ?
+                    <>
+                        <Timestamp value={run.creation.time} prefix="promoted "/>
+                        {
+                            promotionLevel.description &&
+                            <Typography.Text type="secondary">{promotionLevel.description}</Typography.Text>
+                        }
+                    </> :
+                    <Typography.Text type="secondary">not granted to this build</Typography.Text>
+            }
+        </Flex>
+    )
+}
+
 function LadderStep({step}) {
     const {token} = theme.useToken()
     const {promotionLevel, run, granted, highest} = step
     const icon = <PromotionLevelImage promotionLevel={promotionLevel} size={24} disabled={!granted}/>
     return (
-        <Flex
-            vertical
-            align="center"
-            gap={4}
-            style={{minWidth: 64}}
-            data-testid={`highest-promotions-step-${promotionLevel.id}`}
-            data-granted={String(granted)}
-            data-highest={String(highest)}
-        >
-            <span style={{
-                display: 'inline-flex',
-                padding: 3,
-                borderRadius: '50%',
-                boxShadow: highest ? `0 0 0 2px ${token.colorPrimary}` : undefined,
-            }}>
-                {granted ? <Link href={promotionRunUri(run)}>{icon}</Link> : icon}
-            </span>
-            <Typography.Text strong={highest} type={granted ? undefined : 'secondary'} style={{fontSize: '85%'}}>
-                {promotionLevel.name}
-            </Typography.Text>
-        </Flex>
+        // On focus as well as on hover, for the keyboard: a granted step is reached through its link,
+        // a step not granted through itself
+        <Popover content={<LadderStepPopover step={step}/>} trigger={['hover', 'focus']}>
+            <Flex
+                vertical
+                align="center"
+                gap={4}
+                style={{minWidth: 64}}
+                tabIndex={granted ? undefined : 0}
+                data-testid={`highest-promotions-step-${promotionLevel.id}`}
+                data-granted={String(granted)}
+                data-highest={String(highest)}
+            >
+                <span style={{
+                    display: 'inline-flex',
+                    padding: 3,
+                    borderRadius: '50%',
+                    boxShadow: highest ? `0 0 0 2px ${token.colorPrimary}` : undefined,
+                }}>
+                    {granted ? <Link href={promotionRunUri(run)}>{icon}</Link> : icon}
+                </span>
+                <Typography.Text strong={highest} type={granted ? undefined : 'secondary'} style={{fontSize: '85%'}}>
+                    {promotionLevel.name}
+                </Typography.Text>
+            </Flex>
+        </Popover>
     )
 }
 
-const legendSwatch = {
-    display: 'inline-block',
-    width: 12,
-    height: 12,
-    borderRadius: '50%',
-}
-
-function HighestPromotionsLadder({rows}) {
+function HighestPromotionsLadder({rows, showProject}) {
     const {token} = theme.useToken()
     return (
         <Flex vertical>
@@ -235,24 +272,16 @@ function HighestPromotionsLadder({rows}) {
                         gap={16}
                         justify="space-between"
                         align="center"
-                        style={{padding: '8px 0', borderBottom: `1px solid ${token.colorBorderSecondary}`}}
+                        style={{padding: '4px 0', borderBottom: `1px solid ${token.colorBorderSecondary}`}}
                     >
                         <Flex vertical gap={2} style={{minWidth: 240}}>
-                            {row.branch ? <BranchName branch={row.branch}/> : <EntryName entry={row.entry}/>}
+                            <RowName row={row} showProject={showProject}/>
                             {
                                 row.type === 'BUILD' ?
                                     <>
                                         <LatestBuild build={row.build}/>
-                                        {
-                                            row.highestRun ?
-                                                <Space>
-                                                    <Typography.Text strong>
-                                                        {row.highestRun.promotionLevel.name}
-                                                    </Typography.Text>
-                                                    <Timestamp value={row.highestRun.creation.time}/>
-                                                </Space> :
-                                                <NotPromotedYet/>
-                                        }
+                                        {/* The ring of the ladder marks the highest promotion, if any */}
+                                        {!row.highestRun && <NotPromotedYet/>}
                                     </> :
                                     <EmptyRowMessage row={row}/>
                             }
@@ -270,22 +299,6 @@ function HighestPromotionsLadder({rows}) {
                     </Flex>
                 ))
             }
-            <Space size={16} wrap style={{paddingTop: 8, paddingLeft: 2}}>
-                <Space size={6}>
-                    <span style={{
-                        ...legendSwatch,
-                        boxShadow: `0 0 0 2px ${token.colorPrimary}`,
-                    }}/>
-                    <Typography.Text type="secondary">highest promotion of the latest build</Typography.Text>
-                </Space>
-                <Space size={6}>
-                    <span style={{
-                        ...legendSwatch,
-                        background: token.colorTextDisabled,
-                    }}/>
-                    <Typography.Text type="secondary">not granted to that build</Typography.Text>
-                </Space>
-            </Space>
         </Flex>
     )
 }
@@ -295,11 +308,15 @@ function HighestPromotionsLadder({rows}) {
  *
  * @param title Overrides the default title
  * @param format `TABLE` or `LADDER`, shown until the viewer switches it in the widget
+ * @param showProject Whether the branches are shown with the name of their project
+ * @param sort `LAST_ACTIVITY` or `NAME`, how the branches are sorted (#2110)
  * @param branches Entries naming a branch, or a pattern on the names of the branches of a project
  */
 export default function HighestPromotionsPerBranchWidget({
                                                              title,
                                                              format = DEFAULT_HIGHEST_PROMOTIONS_FORMAT,
+                                                             showProject = DEFAULT_HIGHEST_PROMOTIONS_SHOW_PROJECT,
+                                                             sort = DEFAULT_HIGHEST_PROMOTIONS_SORT,
                                                              branches = [],
                                                          }) {
 
@@ -346,7 +363,7 @@ export default function HighestPromotionsPerBranchWidget({
         return data ? entryQuery.branches(data) : []
     })
     const loaded = queries.length === 0 || results?.length === queries.length
-    const rows = loaded ? highestPromotionsRows(branches, branchesPerEntry) : []
+    const rows = loaded ? sortHighestPromotionsRows(highestPromotionsRows(branches, branchesPerEntry), sort) : []
 
     return (
         <div data-testid="highest-promotions-per-branch" data-format={actualFormat}>
@@ -360,8 +377,8 @@ export default function HighestPromotionsPerBranchWidget({
                         <Empty description="No branch is configured for this widget."/> :
                         (
                             actualFormat === 'LADDER' ?
-                                <HighestPromotionsLadder rows={rows}/> :
-                                <HighestPromotionsTable rows={rows}/>
+                                <HighestPromotionsLadder rows={rows} showProject={showProject}/> :
+                                <HighestPromotionsTable rows={rows} showProject={showProject}/>
                         )
                 }
             </LoadingContainer>

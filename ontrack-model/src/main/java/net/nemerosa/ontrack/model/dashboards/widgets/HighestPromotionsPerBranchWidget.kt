@@ -17,7 +17,11 @@ data class HighestPromotionsPerBranchWidgetConfig(
     val title: String? = null,
     @APIDescription("The format shown until a viewer switches it in the widget")
     val format: HighestPromotionsPerBranchWidgetFormat = HighestPromotionsPerBranchWidgetFormat.TABLE,
-    @APIDescription("The branches to show, in this order")
+    @APIDescription("Whether the branches are shown with the name of their project")
+    val showProject: Boolean = true,
+    @APIDescription("How the branches are sorted")
+    val sort: HighestPromotionsPerBranchWidgetSort = HighestPromotionsPerBranchWidgetSort.LAST_ACTIVITY,
+    @APIDescription("The branches to show")
     val branches: List<HighestPromotionsPerBranchWidgetConfigBranch> = emptyList(),
 ) : WidgetConfig
 
@@ -27,6 +31,14 @@ enum class HighestPromotionsPerBranchWidgetFormat {
 
     @APIDescription("One line per branch, with all the promotion levels of the branch")
     LADDER,
+}
+
+enum class HighestPromotionsPerBranchWidgetSort {
+    @APIDescription("By the creation time of the latest build of the branch, the most recent first")
+    LAST_ACTIVITY,
+
+    @APIDescription("By the name of the branch, then by the name of its project, ignoring the case and comparing the numbers as numbers")
+    NAME,
 }
 
 data class HighestPromotionsPerBranchWidgetConfigBranch(
