@@ -1,4 +1,9 @@
-import {highestPromotionRun, highestPromotionsRows, promotionLadder} from "@components/widgets/home/highestPromotionsPerBranch";
+import {
+    highestPromotionRun,
+    highestPromotionsRows,
+    promotionLadder,
+    sortHighestPromotionsRows,
+} from "@components/widgets/home/highestPromotionsPerBranch";
 
 const BRONZE = {id: 30, name: 'BRONZE'}
 const SILVER = {id: 10, name: 'SILVER'}
@@ -128,5 +133,99 @@ describe('promotionLadder', () => {
 
     it('marks no level as granted nor highest when the build is not promoted', () => {
         expect(promotionLadder(levels, []).some(step => step.granted || step.highest)).toBe(false)
+    })
+})
+
+describe('sortHighestPromotionsRows', () => {
+
+    const project = name => ({id: name, name})
+    const service = project('service')
+    const buildRow = (id, name, time, p = service) => ({
+        key: `branch-${id}`,
+        type: 'BUILD',
+        branch: {id, name, project: p},
+        build: {id: id * 100, creation: {time}},
+    })
+    const noBuildRow = (id, name, p = service) => ({key: `branch-${id}`, type: 'NO_BUILD', branch: {id, name, project: p}})
+    const notFoundRow = index => ({key: `entry-${index}`, type: 'NOT_FOUND', entry: {project: 'service', branch: 'x'}})
+    const noMatchRow = index => ({key: `entry-${index}`, type: 'NO_MATCH', entry: {project: 'service', pattern: 'x'}})
+
+    const keys = rows => rows.map(row => row.key)
+
+    it('sorts by last activity by default, the most recent latest build first', () => {
+        const rows = [
+            buildRow(1, 'main', '2026-10-01T10:00:00Z'),
+            buildRow(2, 'release-1', '2026-10-03T10:00:00Z'),
+            buildRow(3, 'release-2', '2026-10-02T10:00:00Z'),
+        ]
+        expect(keys(sortHighestPromotionsRows(rows))).toEqual(['branch-2', 'branch-3', 'branch-1'])
+        expect(keys(sortHighestPromotionsRows(rows, 'LAST_ACTIVITY'))).toEqual(['branch-2', 'branch-3', 'branch-1'])
+    })
+
+    it('does not change the rows it is given', () => {
+        const rows = [buildRow(1, 'a', '2026-10-01T10:00:00Z'), buildRow(2, 'b', '2026-10-02T10:00:00Z')]
+        sortHighestPromotionsRows(rows, 'LAST_ACTIVITY')
+        expect(keys(rows)).toEqual(['branch-1', 'branch-2'])
+    })
+
+    it('sorts by name, ignoring the case and comparing the numbers as numbers', () => {
+        const rows = [
+            buildRow(1, 'release-5.10', '2026-10-05T10:00:00Z'),
+            buildRow(2, 'Main', '2026-10-01T10:00:00Z'),
+            buildRow(3, 'release-5.9', '2026-10-04T10:00:00Z'),
+            buildRow(4, 'feature', '2026-10-03T10:00:00Z'),
+        ]
+        expect(sortHighestPromotionsRows(rows, 'NAME').map(row => row.branch.name))
+            .toEqual(['feature', 'Main', 'release-5.9', 'release-5.10'])
+    })
+
+    it('breaks the ties between branches of the same name by the name of their project', () => {
+        const rows = [
+            buildRow(1, 'main', '2026-10-05T10:00:00Z', project('web')),
+            buildRow(2, 'main', '2026-10-01T10:00:00Z', project('Service')),
+            buildRow(3, 'main', '2026-10-03T10:00:00Z', project('api')),
+        ]
+        expect(keys(sortHighestPromotionsRows(rows, 'NAME'))).toEqual(['branch-3', 'branch-2', 'branch-1'])
+    })
+
+    it('puts the branches without any build after the ones with a build, in resolution order by last activity', () => {
+        const rows = [
+            noBuildRow(1, 'z-empty'),
+            buildRow(2, 'old', '2026-10-01T10:00:00Z'),
+            noBuildRow(3, 'a-empty'),
+            buildRow(4, 'new', '2026-10-02T10:00:00Z'),
+        ]
+        expect(keys(sortHighestPromotionsRows(rows, 'LAST_ACTIVITY'))).toEqual(['branch-4', 'branch-2', 'branch-1', 'branch-3'])
+    })
+
+    it('puts the branches without any build after the ones with a build, by name when sorting by name', () => {
+        const rows = [
+            noBuildRow(1, 'z-empty'),
+            buildRow(2, 'old', '2026-10-01T10:00:00Z'),
+            noBuildRow(3, 'a-empty'),
+            buildRow(4, 'new', '2026-10-02T10:00:00Z'),
+        ]
+        expect(keys(sortHighestPromotionsRows(rows, 'NAME'))).toEqual(['branch-4', 'branch-2', 'branch-3', 'branch-1'])
+    })
+
+    it('puts the entries with nothing to show last, in the order of the configuration', () => {
+        for (const sort of ['LAST_ACTIVITY', 'NAME']) {
+            const rows = [
+                noMatchRow(0),
+                buildRow(1, 'main', '2026-10-01T10:00:00Z'),
+                notFoundRow(2),
+                noBuildRow(3, 'empty'),
+            ]
+            expect(keys(sortHighestPromotionsRows(rows, sort))).toEqual(['branch-1', 'branch-3', 'entry-0', 'entry-2'])
+        }
+    })
+
+    it('only orders the branches a pattern selected, sorting by name', () => {
+        const entry = {project: 'service', pattern: 'release-.*', count: 2}
+        // The query brings the 2 most recently active branches: release-3 and release-1, not release-2
+        const release3 = {id: 3, name: 'release-3', project: service, promotionLevels: levels, builds: [{id: 300, creation: {time: '2026-10-03T10:00:00Z'}, promotionRuns: []}]}
+        const release1 = {id: 1, name: 'release-1', project: service, promotionLevels: levels, builds: [{id: 100, creation: {time: '2026-10-02T10:00:00Z'}, promotionRuns: []}]}
+        const rows = highestPromotionsRows([entry], [[release3, release1]])
+        expect(sortHighestPromotionsRows(rows, 'NAME').map(row => row.branch.name)).toEqual(['release-1', 'release-3'])
     })
 })

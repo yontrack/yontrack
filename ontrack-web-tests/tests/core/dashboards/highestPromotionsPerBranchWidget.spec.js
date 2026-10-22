@@ -44,9 +44,19 @@ const displayDashboard = async (page, ontrack, config) => {
 
 const row = (widget, key) => widget.getByTestId(`highest-promotions-row-${key}`)
 
+/** The keys of the rows, in the order they are shown. */
+const expectRowOrder = async (widget, keys) => {
+    const rows = widget.locator('[data-testid^="highest-promotions-row-"]')
+    await expect(rows).toHaveCount(keys.length)
+    for (const [index, key] of keys.entries()) {
+        await expect(rows.nth(index)).toHaveAttribute('data-testid', `highest-promotions-row-${key}`)
+    }
+}
+
 /**
  * A branch whose latest build has BRONZE and GOLD but not SILVER, and a branch whose latest build
- * has no promotion at all, while an older one has SILVER.
+ * has no promotion at all, while an older one has SILVER. The latest build of the second branch is
+ * the most recent one.
  */
 const provision = async (ontrack) => {
     const project = await ontrack.createProject()
@@ -54,7 +64,7 @@ const provision = async (ontrack) => {
     const promoted = await project.createBranch()
     const bronze = await promoted.createPromotionLevel()
     const silver = await promoted.createPromotionLevel()
-    const gold = await promoted.createPromotionLevel()
+    const gold = await promoted.createPromotionLevel(undefined, {description: 'Ready for production'})
     await (await promoted.createBuild()).promote(silver)
     const latest = await promoted.createBuild()
     await latest.promote(bronze)
@@ -91,6 +101,9 @@ test('the table format shows the latest build of each branch and its highest pro
     const notPromotedRow = row(widget, `branch-${notPromoted.id}`)
     await expect(notPromotedRow.getByRole('link', {name: notPromotedBuild.name, exact: true})).toBeVisible()
     await expect(notPromotedRow).toContainText('Not promoted yet')
+
+    // By last activity by default, not in the order of the configuration
+    await expectRowOrder(widget, [`branch-${notPromoted.id}`, `branch-${promoted.id}`])
 })
 
 test('the ladder format shows all the levels of the branch, granted or not, and the highest one', async ({page, ontrack}) => {
@@ -113,12 +126,94 @@ test('the ladder format shows all the levels of the branch, granted or not, and 
     await expect(step(silver)).toHaveAttribute('data-granted', 'false')
     await expect(step(gold)).toHaveAttribute('data-granted', 'true')
     await expect(step(gold)).toHaveAttribute('data-highest', 'true')
-    await expect(row(widget, `branch-${promoted.id}`)).toContainText(gold.name)
+    // The name of the highest level shows under its step only, without a line of its own
+    await expect(row(widget, `branch-${promoted.id}`).getByText(gold.name, {exact: true})).toHaveCount(1)
 
     await expect(row(widget, `branch-${notPromoted.id}`)).toContainText('Not promoted yet')
 
-    await expect(widget).toContainText('highest promotion of the latest build')
-    await expect(widget).toContainText('not granted to that build')
+    // No legend: the popovers of the steps say what they mean
+    await expect(widget).not.toContainText('highest promotion of the latest build')
+    await expect(widget).not.toContainText('not granted to that build')
+})
+
+test('the popover of a ladder step says when the level was granted, or that it was not', async ({page, ontrack}) => {
+    const {project, promoted, silver, gold} = await provision(ontrack)
+
+    const {widget} = await displayDashboard(page, ontrack, [
+        `format: LADDER`,
+        `branches:`,
+        `  - project: "${project.name}"`,
+        `    branch: "${promoted.name}"`,
+    ])
+
+    const step = level => row(widget, `branch-${promoted.id}`).getByTestId(`highest-promotions-step-${level.id}`)
+    const popover = level => page.getByTestId(`highest-promotions-step-popover-${level.id}`)
+
+    await step(gold).hover()
+    await expect(popover(gold)).toBeVisible()
+    await expect(popover(gold)).toContainText(gold.name)
+    await expect(popover(gold)).toContainText('promoted ')
+    await expect(popover(gold)).toContainText('Ready for production')
+
+    await step(silver).hover()
+    await expect(popover(silver)).toBeVisible()
+    await expect(popover(silver)).toContainText(silver.name)
+    await expect(popover(silver)).toContainText('not granted to this build')
+})
+
+test('the popover of a ladder step not granted opens from the keyboard', async ({page, ontrack}) => {
+    const {project, promoted, silver} = await provision(ontrack)
+
+    const {widget} = await displayDashboard(page, ontrack, [
+        `format: LADDER`,
+        `branches:`,
+        `  - project: "${project.name}"`,
+        `    branch: "${promoted.name}"`,
+    ])
+
+    await row(widget, `branch-${promoted.id}`).getByTestId(`highest-promotions-step-${silver.id}`).focus()
+    await expect(page.getByTestId(`highest-promotions-step-popover-${silver.id}`)).toContainText('not granted to this build')
+})
+
+test('the project of the branches can be hidden, but not for a branch which is not found', async ({page, ontrack}) => {
+    const {project, promoted} = await provision(ontrack)
+
+    const {widget} = await displayDashboard(page, ontrack, [
+        `showProject: false`,
+        `branches:`,
+        `  - project: "${project.name}"`,
+        `    branch: "${promoted.name}"`,
+        `  - project: "${project.name}"`,
+        `    branch: "unknown-branch"`,
+    ])
+
+    const promotedRow = row(widget, `branch-${promoted.id}`)
+    await expect(promotedRow.getByRole('link', {name: promoted.name, exact: true})).toBeVisible()
+    await expect(promotedRow.getByRole('link', {name: project.name, exact: true})).toHaveCount(0)
+
+    await expect(row(widget, 'entry-1')).toContainText(`${project.name} / unknown-branch`)
+})
+
+test('the branches can be sorted by name, the numbers compared as numbers', async ({page, ontrack}) => {
+    const project = await ontrack.createProject()
+    const release9 = await project.createBranch('release-9')
+    const main = await project.createBranch('Main')
+    const release10 = await project.createBranch('release-10')
+    // Built in this order: by last activity, release-10, Main, release-9
+    for (const branch of [release9, main, release10]) {
+        await branch.createBuild()
+    }
+
+    const {widget} = await displayDashboard(page, ontrack, [
+        `sort: NAME`,
+        `branches:`,
+        ...[release10, release9, main].flatMap(branch => [
+            `  - project: "${project.name}"`,
+            `    branch: "${branch.name}"`,
+        ]),
+    ])
+
+    await expectRowOrder(widget, [main, release9, release10].map(branch => `branch-${branch.id}`))
 })
 
 test('the format switched in the widget is kept after a reload, without changing the saved configuration', async ({page, ontrack}) => {
@@ -175,9 +270,7 @@ test('a pattern entry shows the most recently active branches it matches, up to 
     await expect(row(widget, `branch-${release1.id}`)).toHaveCount(0)
     await expect(row(widget, `branch-${main.id}`)).toHaveCount(0)
     // The most recently active first
-    const rows = widget.locator('[data-testid^="highest-promotions-row-"]')
-    await expect(rows).toHaveCount(2)
-    await expect(rows.nth(0)).toHaveAttribute('data-testid', `highest-promotions-row-branch-${release3.id}`)
+    await expectRowOrder(widget, [`branch-${release3.id}`, `branch-${release2.id}`])
 })
 
 test('the rows with nothing to show say why', async ({page, ontrack}) => {
