@@ -161,6 +161,22 @@ assert_eq "1" "$(ds_next_slot 0)" "ds_next_slot bumps a taken slot 0 into the ha
 assert_eq "2" "$(ds_next_slot 1)" "ds_next_slot advances within the range"
 assert_eq "1" "$(ds_next_slot 9)" "ds_next_slot wraps around to 1, never back to 0"
 
+# --- ds_dev_license_key ----------------------------------------------------
+
+# An explicit template: a bare `mktemp -d` ignores $TMPDIR on macOS.
+license_home="$(mktemp -d "${TMPDIR:-/tmp}/dev-stack-test.XXXXXX")"
+mkdir -p "$license_home/.yontrack"
+
+assert_eq "" "$(HOME="$license_home" YONTRACK_DEV_LICENSE_KEY='' ds_dev_license_key)" \
+    "ds_dev_license_key is empty with neither the variable nor the file"
+printf 'from-file\n' > "$license_home/.yontrack/dev-license.key"
+assert_eq "from-file" "$(HOME="$license_home" YONTRACK_DEV_LICENSE_KEY='' ds_dev_license_key)" \
+    "ds_dev_license_key reads the file when the variable is not set"
+assert_eq "from-variable" "$(HOME="$license_home" YONTRACK_DEV_LICENSE_KEY='from-variable' ds_dev_license_key)" \
+    "ds_dev_license_key prefers the variable to the file"
+
+rm -rf "$license_home"
+
 # --- report ----------------------------------------------------------------
 
 echo

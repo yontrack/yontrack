@@ -1,5 +1,6 @@
 import com.avast.gradle.dockercompose.ComposeExtension
 import net.nemerosa.ontrack.build.Coverage
+import net.nemerosa.ontrack.build.DevLicenseKey
 import net.nemerosa.ontrack.build.KdslStack
 import net.nemerosa.ontrack.build.KdslStackInstance
 
@@ -57,7 +58,11 @@ val ontrackVersion: String = System.getenv("ONTRACK_VERSION")?.takeIf { it.isNot
 // therefore reports a failure against the task that asked for it.
 val kdslNames = KdslStack.names(rootDir)
 val kdslStack: KdslStackInstance by lazy { KdslStack.resolve(rootDir) }
-val kdslComposeEnvironment: Provider<Map<String, String>> = provider { kdslStack.composeEnvironment }
+// The development key (#2107) goes with the ports: every variant runs the `dev` profile, which
+// enables no licensed feature without it. Kept out of `instance.env`, see DevLicenseKey.
+val kdslComposeEnvironment: Provider<Map<String, String>> = provider {
+    kdslStack.composeEnvironment + DevLicenseKey.composeEnvironment()
+}
 
 // The remotes of the Git tests of the `-ha` variant (#2085): bare repositories which the tests write
 // and both backends mount. Created before the stack starts, or Docker creates it, owned by root.

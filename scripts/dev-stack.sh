@@ -93,6 +93,19 @@ ds_storage_env() {
         "ONTRACK_EXTENSION_AUDITTRAIL_STORAGE_SECRETKEY=$DS_MINIO_SECRET_KEY"
 }
 
+# The development key (#2107): YONTRACK_DEV_LICENSE_KEY, else the file
+# ~/.yontrack/dev-license.key -- the order of DevLicenseKey in buildSrc, which
+# does the same for the KDSL stacks. Empty when there is none: the "dev"
+# profile then enables no licensed feature.
+ds_dev_license_key() {
+    local key
+    key="$(printf '%s' "${YONTRACK_DEV_LICENSE_KEY:-}" | tr -d '[:space:]')"
+    if [ -z "$key" ] && [ -f "$HOME/.yontrack/dev-license.key" ]; then
+        key="$(tr -d '[:space:]' < "$HOME/.yontrack/dev-license.key")"
+    fi
+    printf '%s' "$key"
+}
+
 ds_project() {
     printf '%s' "yontrack-dev-$1"
 }
@@ -383,6 +396,14 @@ ds_backend_up() {
     fi
     ds_kill_tier "$DS_BACKEND_PID" "backend" "$DS_PORT_APP" "$DS_PORT_MGMT"
 
+    local license_key
+    license_key="$(ds_dev_license_key)"
+    if [ -n "$license_key" ]; then
+        ds_log "development key found: the licensed features it grants are enabled"
+    else
+        ds_warn "no development key (YONTRACK_DEV_LICENSE_KEY or ~/.yontrack/dev-license.key): licensed features are disabled"
+    fi
+
     # ONTRACK_CONFIG_EXTENSION_SCM_MOCK_PERSISTENT is set here rather than in the "dev"
     # profile because the acceptance tests run on that same profile, create their mock SCM
     # data inside the test, and would only pay for the writes. Here it means that a
@@ -395,6 +416,7 @@ ds_backend_up() {
     ds_spawn "$DS_BACKEND_PID" "$DS_BACKEND_LOG" \
         env \
             SPRING_PROFILES_ACTIVE=dev \
+            ONTRACK_CONFIG_LICENSE_KEY="$license_key" \
             SERVER_PORT="$DS_PORT_APP" \
             MANAGEMENT_SERVER_PORT="$DS_PORT_MGMT" \
             SPRING_DATASOURCE_URL="jdbc:postgresql://localhost:$DS_PORT_POSTGRES/ontrack" \

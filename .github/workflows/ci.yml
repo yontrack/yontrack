@@ -1190,6 +1190,18 @@ jobs:
         id: job_start
         run: echo "started=$(date +%s)" >> "$GITHUB_OUTPUT"
 
+      # The stack runs the `dev` profile, which enables no licensed feature without the development
+      # key (#2107). A run without the secret stops here, saying why, rather than failing every
+      # licensed test one by one.
+      - name: Check the development key
+        env:
+          YONTRACK_DEV_LICENSE_KEY: ${{ secrets.YONTRACK_DEV_LICENSE_KEY }}
+        run: |
+          if [ -z "${YONTRACK_DEV_LICENSE_KEY:-}" ]; then
+            echo "::error::YONTRACK_DEV_LICENSE_KEY is not available"
+            exit 1
+          fi
+
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
@@ -1238,6 +1250,8 @@ jobs:
       # include compose/docker-compose-coverage.yml, which mounts the agent into the backend
       # container and publishes its port. Without it on *this* step there is no agent to dump from.
       - name: Start the environment
+        env:
+          YONTRACK_DEV_LICENSE_KEY: ${{ secrets.YONTRACK_DEV_LICENSE_KEY }}
         run: |
           coverage_args=""
           if [ "${COVERAGE:-false}" = "true" ]; then
@@ -1249,6 +1263,8 @@ jobs:
 
       - name: KDSL acceptance tests
         id: kdsl
+        env:
+          YONTRACK_DEV_LICENSE_KEY: ${{ secrets.YONTRACK_DEV_LICENSE_KEY }}
         run: |
           coverage_args=""
           if [ "${COVERAGE:-false}" = "true" ]; then
@@ -1385,6 +1401,20 @@ jobs:
           yontrack-token: ${{ secrets.YONTRACK_TOKEN }}
           version: ${{ env.YONTRACK_CLI_VERSION }}
 
+      # How long the development key of the KDSL and Playwright stacks is still valid (#2107):
+      # PASSED, a WARNING from 30 days before its end - posted on Slack, see .yontrack/ci.yaml - and
+      # FAILED once expired. In no promotion: an expired key already reddens KDSL.ACCEPTANCE. The
+      # judgement lives in scripts/dev-license-validate.sh, where it is tested.
+      - name: Validate LICENSE.DEV
+        if: ${{ !cancelled() }}
+        # A record, not a gate: failing to send it must not redden the run.
+        continue-on-error: true
+        env:
+          YONTRACK_DEV_LICENSE_KEY: ${{ secrets.YONTRACK_DEV_LICENSE_KEY }}
+        run: |
+          # shellcheck disable=SC2086  # deliberate: see YONTRACK_RUN_INFO
+          scripts/dev-license-validate.sh $YONTRACK_RUN_INFO
+
       # If the reports never made it here the stamp still has to say so, rather than the job dying
       # quietly and leaving KDSL.ACCEPTANCE absent from the build.
       - name: Validate KDSL.ACCEPTANCE
@@ -1449,6 +1479,18 @@ jobs:
         id: job_start
         run: echo "started=$(date +%s)" >> "$GITHUB_OUTPUT"
 
+      # The stack runs the `dev` profile, which enables no licensed feature without the development
+      # key (#2107). A run without the secret stops here, saying why, rather than failing every
+      # licensed test one by one.
+      - name: Check the development key
+        env:
+          YONTRACK_DEV_LICENSE_KEY: ${{ secrets.YONTRACK_DEV_LICENSE_KEY }}
+        run: |
+          if [ -z "${YONTRACK_DEV_LICENSE_KEY:-}" ]; then
+            echo "::error::YONTRACK_DEV_LICENSE_KEY is not available"
+            exit 1
+          fi
+
       - uses: actions/checkout@v7
 
       - uses: actions/setup-java@v6
@@ -1484,11 +1526,15 @@ jobs:
 
       # As in `kdsl`: under CI=true the Gradle build leaves bringing the stack up to the workflow.
       - name: Start the environment
+        env:
+          YONTRACK_DEV_LICENSE_KEY: ${{ secrets.YONTRACK_DEV_LICENSE_KEY }}
         run: |
           ./gradlew :ontrack-kdsl-acceptance:kdslHaComposeUp --stacktrace --console plain
 
       - name: KDSL cross-replica tests
         id: test
+        env:
+          YONTRACK_DEV_LICENSE_KEY: ${{ secrets.YONTRACK_DEV_LICENSE_KEY }}
         run: |
           ./gradlew :ontrack-kdsl-acceptance:kdslHaTest --stacktrace --console plain
 
@@ -1617,6 +1663,18 @@ jobs:
         id: job_start
         run: echo "started=$(date +%s)" >> "$GITHUB_OUTPUT"
 
+      # The stack runs the `dev` profile, which enables no licensed feature without the development
+      # key (#2107). A run without the secret stops here, saying why, rather than failing every
+      # licensed test one by one.
+      - name: Check the development key
+        env:
+          YONTRACK_DEV_LICENSE_KEY: ${{ secrets.YONTRACK_DEV_LICENSE_KEY }}
+        run: |
+          if [ -z "${YONTRACK_DEV_LICENSE_KEY:-}" ]; then
+            echo "::error::YONTRACK_DEV_LICENSE_KEY is not available"
+            exit 1
+          fi
+
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
@@ -1683,6 +1741,8 @@ jobs:
       # it belongs on this step as much as on the test one.
       - name: Start the environment
         if: matrix.variant == 'main'
+        env:
+          YONTRACK_DEV_LICENSE_KEY: ${{ secrets.YONTRACK_DEV_LICENSE_KEY }}
         run: |
           coverage_args=""
           if [ "${COVERAGE:-false}" = "true" ]; then
@@ -1697,6 +1757,8 @@ jobs:
       # the whole suite runs, exactly as before.
       - name: UI tests
         id: test
+        env:
+          YONTRACK_DEV_LICENSE_KEY: ${{ secrets.YONTRACK_DEV_LICENSE_KEY }}
         run: |
           coverage_args=""
           if [ "${COVERAGE:-false}" = "true" ]; then

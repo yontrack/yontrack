@@ -662,7 +662,8 @@ the job.
 
 Environments are a **licensed** feature, and the mobile deploy journeys run in CI anyway: the
 Playwright stack (`compose/docker-compose-kdsl.yml`) runs the backend under the `dev` profile,
-and `DevLicenseService` enables every licensed feature. That is why the whole of
+and `DevLicenseService` enables every licensed feature its development key grants (#2107) -
+all of them, in CI. That is why the whole of
 `tests/extensions/environments` already runs there. `mobile.spec.js` drives both journeys end
 to end — an eligible slot and an ineligible one with its reason, the approval, the run, and the
 override with its reason — against real slots and real rules, which is also where the shared

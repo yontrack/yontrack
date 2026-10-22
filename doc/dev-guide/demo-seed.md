@@ -72,18 +72,20 @@ A licensed feature is needed as well, for the same reason:
 
 | Feature | Licensed feature | Where it comes from |
 |---------|------------------|---------------------|
-| **Native scanner formats**, which the SARIF code scan of `petclinic-billing` is posted in | `extension.findings.native-formats` | The development licence enables it; a production licence has to include it |
+| **Native scanner formats**, which the SARIF code scan of `petclinic-billing` is posted in | `extension.findings.native-formats` | The development licence enables it when the stack has the development key; a production licence has to include it |
 | **Delivery scorecard**, which the two estates are | `extension.scorecard` | Same |
 | **Environments**, which the "Demo production" estate reads up to | `extension.environments` | Same |
 
 Unlike the two properties, a missing licence is caught before the reset: the seed reads the
 licence of the instance through `licenseInfo` and stops with "Nothing was deleted" when a
-feature is not enabled, as it does when the mock SCM is off.
+feature is not enabled, as it does when the mock SCM is off. On the development stack, that is
+what happens without the development key (#2107): the `dev` profile then enables no licensed
+feature. `DEVELOPMENT.md`, *The development key*, says where the stack looks for it.
 
 The agent governance (`extension.agents`) is not checked: what it gates - *Assisted builds
 require*, *Evidence from non-agents only*, the agent activity views - is configured whatever the
 licence says, does nothing without it, and the views show their licence notice. The development
-licence enables it; the demo's needs yontrack/yontrack-infra-gitops#208. See [The agents](#the-agents).
+licence enables it, given the development key; the demo's needs yontrack/yontrack-infra-gitops#208. See [The agents](#the-agents).
 
 The audit trail is the exception: what it needs does **not** stop the reset. Each piece is asked
 before anything is deleted, and when the instance cannot offer it the part of the demo needing it

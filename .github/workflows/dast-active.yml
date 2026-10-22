@@ -260,12 +260,20 @@ jobs:
           } >> "$GITHUB_OUTPUT"
           echo "DAST_TOKEN_DIR=$work/tokens" >> "$GITHUB_ENV"
 
+      # The backend runs the `dev` profile, which enables no licensed feature without the development
+      # key (#2107): the licensed surfaces would then answer "not allowed by the license" instead of
+      # being scanned.
       - name: Start the throwaway stack
         env:
           ONTRACK_VERSION: ${{ steps.image.outputs.ontrack_version }}
           DAST_CASC_DIR: ${{ steps.prepare.outputs.cascdir }}
+          YONTRACK_DEV_LICENSE_KEY: ${{ secrets.YONTRACK_DEV_LICENSE_KEY }}
         run: |
           set -euo pipefail
+          if [ -z "${YONTRACK_DEV_LICENSE_KEY:-}" ]; then
+            echo "::error::YONTRACK_DEV_LICENSE_KEY is not available"
+            exit 1
+          fi
           docker compose -f security/dast/compose/docker-compose-dast.yml up -d
 
           # 1. Keycloak: the realm and its USERS must be imported, not just the container started.

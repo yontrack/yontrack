@@ -2,8 +2,11 @@
 
 Every stack a test runs against — the integration tests, the KDSL acceptance tests, the
 Playwright tests — runs the backend under the `dev` profile, where `DevLicenseService` enables
-every licensed feature. Testing a feature is therefore the default; testing its *absence* needs
-the feature disabled, for the duration of the test only.
+what the development key grants (#2107, ADR 0022): every licensed feature. The integration tests
+get it from `ITDevLicenseKeyConfiguration` in `ontrack-it-utils`, with no key; the KDSL and
+Playwright stacks from the key itself (`DEVELOPMENT.md`, *The development key*), without which
+they run with no licensed feature. Testing a feature is therefore the default; testing its
+*absence* needs the feature disabled, for the duration of the test only.
 
 ## Integration tests
 
@@ -14,7 +17,8 @@ test configuration of the module, and disable the feature around the code under 
 ## KDSL acceptance tests
 
 The development licence exposes, under the `dev` profile only, an endpoint to enable or disable
-one of its features, restricted to `ApplicationManagement`:
+one of its features, restricted to `ApplicationManagement`. Enabling a feature the development key
+does not grant is refused with a `403`:
 
 ```
 PUT /extension/license/dev/features/{featureId}

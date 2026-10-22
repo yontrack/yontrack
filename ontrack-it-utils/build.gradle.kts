@@ -17,6 +17,10 @@ dependencies {
     testFixturesImplementation(project(":ontrack-repository"))
     testFixturesImplementation(project(":ontrack-extension-support"))
     testFixturesImplementation(project(":ontrack-ui-support"))
+    // ITDevLicenseKeyConfiguration: the licence extension, when a module's tests have it, gets every
+    // licensed feature without a development key (#2107). Compile-only, so that it-utils does not
+    // put the extension into the tests of the modules which do not use it.
+    testFixturesCompileOnly(project(":ontrack-extension-license"))
     testFixturesImplementation("org.springframework:spring-context")
     testFixturesImplementation("org.springframework.boot:spring-boot-starter-jdbc")
     testFixturesImplementation("org.slf4j:slf4j-api")

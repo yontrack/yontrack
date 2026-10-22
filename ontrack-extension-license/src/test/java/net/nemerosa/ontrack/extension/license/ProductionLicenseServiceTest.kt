@@ -2,6 +2,7 @@ package net.nemerosa.ontrack.extension.license
 
 import net.nemerosa.ontrack.extension.license.signature.SignatureLicense
 import net.nemerosa.ontrack.extension.license.signature.SignatureLicenseException
+import net.nemerosa.ontrack.extension.license.signature.TestLicenseSigner
 import net.nemerosa.ontrack.model.support.NameValue
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
@@ -56,8 +57,51 @@ class ProductionLicenseServiceTest {
         assertEquals(true, license.isFeatureEnabled("extension.environments"))
     }
 
+    @Test
+    fun `A development key is refused by a production instance`() {
+        val service = ProductionLicenseService(
+            licenseConfigurationProperties = LicenseConfigurationProperties().apply {
+                key = TestLicenseSigner.sign(license(usage = SignatureLicense.USAGE_DEV))
+            },
+            licenseKeyPath = TestLicenseSigner.PUBLIC_KEY_PATH
+        )
+        val ex = assertFailsWith<SignatureLicenseException> {
+            service.license
+        }
+        assertEquals("A development key cannot be used by a production instance", ex.message)
+    }
+
+    @Test
+    fun `A key of an unknown usage is refused by a production instance`() {
+        val service = ProductionLicenseService(
+            licenseConfigurationProperties = LicenseConfigurationProperties().apply {
+                key = TestLicenseSigner.sign(license(usage = "other"))
+            },
+            licenseKeyPath = TestLicenseSigner.PUBLIC_KEY_PATH
+        )
+        val ex = assertFailsWith<SignatureLicenseException> {
+            service.license
+        }
+        assertEquals("Unknown license usage: other", ex.message)
+    }
+
+    @Test
+    fun `A key with no usage is a production key`() {
+        val service = ProductionLicenseService(
+            licenseConfigurationProperties = LicenseConfigurationProperties().apply {
+                key = TestLicenseSigner.sign(license())
+            },
+            licenseKeyPath = TestLicenseSigner.PUBLIC_KEY_PATH
+        )
+        assertEquals(
+            license().toLicense("Production"),
+            service.license
+        )
+    }
+
     private fun license(
         message: String? = null,
+        usage: String? = null,
     ) = SignatureLicense(
         name = "XL",
         assignee = "Nemerosa Local",
@@ -73,6 +117,7 @@ class ProductionLicenseServiceTest {
             )
         ),
         message = message,
+        usage = usage,
     )
 
 }

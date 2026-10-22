@@ -15,6 +15,7 @@ object LicenseFixtures {
     fun testLicense(
         active: Boolean = true,
         message: String? = null,
+        features: List<LicenseFeatureData> = emptyList(),
     ) = License(
         type = "test",
         name = "Test",
@@ -22,7 +23,7 @@ object LicenseFixtures {
         active = active,
         validUntil = null,
         maxProjects = 10,
-        features = emptyList(),
+        features = features,
         message = message,
     )
 

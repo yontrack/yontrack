@@ -44,6 +44,34 @@ scripts/dev-stack.sh logs backend -f  # follow a tier's log
 `./gradlew devStackUp` and `./gradlew devStackDown` delegate to the same
 script for anyone who prefers the Gradle entry point.
 
+### The development key
+
+The development stack, the KDSL acceptance and Playwright stacks and the DAST
+stack run the `dev` profile, which enables the licensed features only through
+a **development key** (#2107, ADR 0022): a licence key issued by the licence
+service with *Development key* checked. Without one, Yontrack starts with no
+licensed feature and says so in a banner -- the core works, but environments,
+scorecard estates, the audit trail, native finding formats and agent
+governance do not.
+
+`scripts/dev-stack.sh` and the Gradle tasks starting the KDSL and Playwright
+stacks look for the key in the `YONTRACK_DEV_LICENSE_KEY` variable, then in
+`~/.yontrack/dev-license.key`. The CI reads the repository secret of the same
+name. The integration tests need none.
+
+The key is valid for a year. The `LICENSE.DEV` validation stamp of every CI
+build says how long it has left, and warns on Slack 30 days before its end. To
+renew it, issue a new development key -- all features enabled, `maxProjects`
+and `environmentMax` at 0, `validUntil` a year out -- then:
+
+```bash
+pbpaste > ~/.yontrack/dev-license.key && chmod 600 ~/.yontrack/dev-license.key
+```
+
+```bash
+gh secret set YONTRACK_DEV_LICENSE_KEY -R yontrack/yontrack < ~/.yontrack/dev-license.key
+```
+
 ### Several stacks at once
 
 Each checkout runs its own stack, so two worktrees can be developed against at

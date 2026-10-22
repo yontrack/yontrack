@@ -10,11 +10,10 @@ import kotlin.test.assertTrue
 class EnvironmentsLicenseIT : AbstractDSLTestSupport() {
 
     @Autowired
-    private lateinit var licensedFeatureProviders: List<LicensedFeatureProvider>
+    private lateinit var devLicenseService: DevLicenseService
 
     @Test
-    fun `Environments feature is enabled for the development license`() {
-        val devLicenseService = DevLicenseService(licensedFeatureProviders)
+    fun `Environments feature is enabled for the development license of the integration tests`() {
         val license = devLicenseService.license
         assertTrue(license.isFeatureEnabled(EnvironmentsLicensedFeatureProvider.FEATURE_ENVIRONMENTS))
     }

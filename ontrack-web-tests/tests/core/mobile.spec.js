@@ -644,7 +644,8 @@ test.describe('the mobile UI on a phone', () => {
         //
         // Environments are a licensed feature. The Playwright stack runs the
         // backend under the `dev` profile (`compose/docker-compose-kdsl.yml`),
-        // and `DevLicenseService` enables every licensed feature - which is why
+        // and `DevLicenseService` enables every licensed feature the development
+        // key of the CI grants (#2107) - all of them - which is why
         // the whole of `tests/extensions/environments` runs in CI, and why this
         // journey can too.
         const project = await ontrack.createProject()

@@ -2,7 +2,8 @@
 
 Yontrack is open core: most of it needs no license, and a few features are under license. Each of
 them is a **licensed feature** of the license, identified by an ID, which the license enables or
-not. A development instance enables all of them.
+not. A development instance - the `dev` profile - enables them only with a development key, which a
+production instance refuses.
 
 The page *License* of the user menu shows the license of the instance and, for each licensed
 feature, whether it is enabled. Through the API, the same is in `licenseInfo` in GraphQL:

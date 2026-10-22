@@ -21,6 +21,8 @@ x-ontrack: &ontrack
   environment:
     # Development configuration
     SPRING_PROFILES_ACTIVE: dev
+    # The development key (#2107): without it, the "dev" profile enables no licensed feature.
+    ONTRACK_CONFIG_LICENSE_KEY: "${YONTRACK_DEV_LICENSE_KEY:-}"
 
     ############################################################
     # Configuration of Ontrack

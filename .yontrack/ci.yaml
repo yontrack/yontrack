@@ -19,6 +19,12 @@ configuration:
           tests: {}
         PLAYWRIGHT:
           tests: {}
+        # How long the development key of the KDSL and Playwright stacks is still valid (#2107),
+        # reported by the `kdsl-report` job in ci.yml through scripts/dev-license-validate.sh:
+        # PASSED, WARNING from 30 days before its end - posted on Slack, below - and FAILED once
+        # expired. In no promotion: an expired key already reddens KDSL.ACCEPTANCE, which BRONZE
+        # requires.
+        LICENSE.DEV: {}
         # The six SECURITY stamps are `security-findings` stamps (#1875): each run carries the
         # findings themselves - a Trivy report, or the neutral `findings` format - and Yontrack
         # counts them by severity, accepted findings apart, against the thresholds below, which
@@ -395,6 +401,19 @@ configuration:
               type: 'ERROR'
             contentTemplate: |
               Build ${build} has failed on ${validationStamp}.
+          # The development key of the CI ends within 30 days (#2107). Once it has, LICENSE.DEV is
+          # FAILED, which "On validation error" above already posts. The keywords are the status
+          # of the run and the name of its stamp.
+          - name: On LICENSE.DEV warning
+            events:
+              - new_validation_run
+            keywords: warning LICENSE.DEV
+            channel: slack
+            channelConfig:
+              channel: '#notifications'
+              type: 'WARNING'
+            contentTemplate: |
+              The development key of the CI ends soon: ${validationRun.description}. Issue a new one and replace the YONTRACK_DEV_LICENSE_KEY secret, see DEVELOPMENT.md.
           - name: On BRONZE
             promotion: BRONZE
             events:
