@@ -680,6 +680,57 @@ class BuildLinkIT : AbstractDSLTestSupport() {
     }
 
     @Test
+    fun `Counting the upstream links`() {
+        val target = doCreateBuild()
+        val source1 = doCreateBuild()
+        val source2 = doCreateBuild()
+        val other = doCreateBuild()
+        asAdmin {
+            structureService.createBuildLink(source1, target)
+            structureService.createBuildLink(source1, target, "dep")
+            structureService.createBuildLink(source2, target)
+            // Downstream of the target, not counted as upstream
+            structureService.createBuildLink(target, other)
+        }
+        asUserWithView(target, source1, source2).call {
+            assertEquals(3, structureService.getCountQualifiedBuildsUsing(target))
+            assertEquals(0, structureService.getCountQualifiedBuildsUsing(source1))
+        }
+    }
+
+    @Test
+    fun `Counting the upstream links leaves out the builds the user cannot see`() {
+        withNoGrantViewToAll {
+            val target = doCreateBuild()
+            val visible = doCreateBuild()
+            val hidden = doCreateBuild()
+            asAdmin {
+                structureService.createBuildLink(visible, target)
+                structureService.createBuildLink(hidden, target)
+            }
+            asUserWithView(target, visible).call {
+                assertEquals(1, structureService.getCountQualifiedBuildsUsing(target))
+            }
+        }
+    }
+
+    @Test
+    fun `Counting the downstream links leaves out the builds the user cannot see`() {
+        withNoGrantViewToAll {
+            val source = doCreateBuild()
+            val visible = doCreateBuild()
+            val hidden = doCreateBuild()
+            asAdmin {
+                structureService.createBuildLink(source, visible)
+                structureService.createBuildLink(source, hidden)
+            }
+            asUserWithView(source, visible).call {
+                assertEquals(1, structureService.getCountQualifiedBuildsUsedBy(source))
+            }
+        }
+    }
+
+    @Test
     fun `Getting first level builds by default`() {
         forRecursiveLinks { _, p, builds ->
             val links = structureService.getQualifiedBuildsUsedBy(p)

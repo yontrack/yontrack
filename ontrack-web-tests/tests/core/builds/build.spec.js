@@ -319,3 +319,71 @@ test('filtering the upstream links', async ({page, ontrack}) => {
     await links.isProjectLinkVisible({project: sourceBuilds[1].branch.project.name, visible: true})
     await links.isProjectLinkVisible({project: sourceBuilds[2].branch.project.name, visible: true})
 })
+
+test('hovering the link decoration lists the downstream and upstream links', async ({page, ontrack}) => {
+    // The build in the middle
+    const project = await ontrack.createProject()
+    const branch = await project.createBranch()
+    const build = await branch.createBuild()
+    // Four downstream links: one more than the cap of the test stack (3)
+    const targets = []
+    for (const i of [1, 2, 3, 4]) {
+        const targetProject = await ontrack.createProject()
+        const targetBranch = await targetProject.createBranch()
+        const target = await targetBranch.createBuild()
+        await build.linkTo(target, i === 4 ? "extra" : "")
+        targets.push(target)
+    }
+    // The most recent target is promoted
+    const promotionLevel = await targets[3].branch.createPromotionLevel(generate("pl_"))
+    const promotionRun = await targets[3].promote(promotionLevel)
+    // One upstream link
+    const sourceProject = await ontrack.createProject()
+    const sourceBranch = await sourceProject.createBranch()
+    const source = await sourceBranch.createBuild()
+    await source.linkTo(build)
+
+    await login(page, ontrack)
+    const buildPage = new BuildPage(page, build)
+    await buildPage.goTo()
+
+    const popover = await buildPage.hoverLinkDecoration()
+
+    // Downstream: the three most recent links, then one more
+    const downstream = popover.getByTestId('build-link-decoration-downstream')
+    await expect(downstream.getByText('Downstream')).toBeVisible()
+    await expect(downstream.getByText('4', {exact: true})).toBeVisible()
+    for (const target of targets.slice(1)) {
+        await expect(downstream.getByRole('link', {name: target.name, exact: true})).toBeVisible()
+    }
+    await expect(downstream.getByRole('link', {name: targets[0].name, exact: true})).toHaveCount(0)
+    await expect(downstream.getByText('extra', {exact: true})).toBeVisible()
+    await expect(downstream.getByTestId(`promotion-run-link-${promotionRun.id}`)).toBeVisible()
+    const more = downstream.getByTestId('build-link-decoration-downstream-more')
+    await expect(more).toContainText('1 more')
+    await expect(more.getByRole('link', {name: 'All links →'})).toHaveAttribute('href', `/build/${build.id}/links`)
+
+    // Upstream: the one link, and no "more" line
+    const upstream = popover.getByTestId('build-link-decoration-upstream')
+    await expect(upstream.getByText('Upstream')).toBeVisible()
+    await expect(upstream.getByText(source.branch.project.name, {exact: true})).toBeVisible()
+    await expect(upstream.getByTestId('build-link-decoration-upstream-more')).toHaveCount(0)
+
+    // Esc closes the popover
+    await page.keyboard.press('Escape')
+    await expect(popover).toBeHidden()
+
+    // Focusing the tag opens it too
+    await page.mouse.move(0, 0)
+    await page.getByTestId(`build-link-decoration-${build.id}`).first().getByRole('link').focus()
+    await expect(popover).toBeVisible()
+    await page.keyboard.press('Escape')
+    await expect(popover).toBeHidden()
+
+    // Clicking a build opens its page
+    const reopened = await buildPage.hoverLinkDecoration()
+    await reopened.getByTestId('build-link-decoration-upstream')
+        .getByRole('link', {name: source.name, exact: true})
+        .click()
+    await new BuildPage(page, source).checkOnBuildPage()
+})

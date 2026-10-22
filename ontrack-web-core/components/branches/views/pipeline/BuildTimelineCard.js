@@ -148,11 +148,10 @@ const BuildTimelineCard = forwardRef(function BuildTimelineCard({
             </button>
             {
                 // Guards the case where the backend sends no decorations at all - an older instance,
-                // or one running no decorating extension. It is NOT the empty-looking-row case:
-                // `BuildLinkDecorationExtension` contributes a decoration for EVERY build and then
-                // renders nothing when the build has no links, and core cannot tell the two apart
+                // a build with nothing to decorate, or one running no decorating extension. A
+                // decoration which renders nothing still gets the row, and core cannot tell it apart
                 // without reading an extension's data. Such a row costs its own padding and no more,
-                // equally on every card, which is why that is left alone rather than guessed at.
+                // which is why that is left alone rather than guessed at.
                 decorations.length > 0 &&
                 <Space
                     data-testid={`timeline-build-decorations-${build.id}`}

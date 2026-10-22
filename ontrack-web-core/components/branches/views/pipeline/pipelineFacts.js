@@ -126,12 +126,12 @@ export function nextPromotionLevel(promotionLevels, promotionRuns) {
  * row was added for - would be the first thing dropped by any extension contributing a fourth, and
  * it sorts last so it would be dropped first. Four is headroom, not a limit anyone reasoned to.
  *
- * It counts decorations CONTRIBUTED, not glyphs drawn, and the two differ: `BuildLinkDecorationExtension`
- * contributes one for every build and draws nothing when the build has no links. So a link-less build
- * spends a slot on an invisible decoration, and `+1` can name something that would have drawn nothing.
+ * It counts decorations CONTRIBUTED, not glyphs drawn. An extension contributing a decoration which
+ * draws nothing would spend a slot on it, and `+1` could name something that would have drawn nothing.
  * Counting glyphs instead would mean core interpreting each extension's `data` to guess what it will
  * render, which is exactly the coupling the decoration seam exists to prevent - so it counts what it
- * can honestly see.
+ * can honestly see, and an extension with nothing to show contributes nothing (as
+ * `BuildLinkDecorationExtension` does for a build without links, #2109).
  *
  * A decoration whose WHOLE payload is a string the card already prints - in practice the release
  * decoration, whose data is the version on the card's first line - is dropped before any of that.

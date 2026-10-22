@@ -44,16 +44,39 @@ class BuildLinkJdbcRepository(
         return !existing
     }
 
-    override fun getCountQualifiedBuildsUsedBy(build: Build): Int =
-        namedParameterJdbcTemplate!!.queryForObject(
+    override fun getCountQualifiedBuildsUsedBy(build: Build): Map<Int, Int> =
+        countLinksPerProject(
             """
-                SELECT COUNT(BL.ID)
+                SELECT BR.PROJECTID, COUNT(BL.ID) AS LINKS
                 FROM BUILD_LINKS BL
+                INNER JOIN BUILDS B ON B.ID = BL.TARGETBUILDID
+                INNER JOIN BRANCHES BR ON BR.ID = B.BRANCHID
                 WHERE BL.BUILDID = :buildId
+                GROUP BY BR.PROJECTID
             """,
-            mapOf("buildId" to build.id()),
-            Int::class.java
-        ) ?: 0
+            build,
+        )
+
+    override fun getCountQualifiedBuildsUsing(build: Build): Map<Int, Int> =
+        countLinksPerProject(
+            """
+                SELECT BR.PROJECTID, COUNT(BL.ID) AS LINKS
+                FROM BUILD_LINKS BL
+                INNER JOIN BUILDS B ON B.ID = BL.BUILDID
+                INNER JOIN BRANCHES BR ON BR.ID = B.BRANCHID
+                WHERE BL.TARGETBUILDID = :buildId
+                GROUP BY BR.PROJECTID
+            """,
+            build,
+        )
+
+    private fun countLinksPerProject(sql: String, build: Build): Map<Int, Int> {
+        val counts = mutableMapOf<Int, Int>()
+        namedParameterJdbcTemplate!!.query(sql, mapOf("buildId" to build.id())) { rs ->
+            counts[rs.getInt("PROJECTID")] = rs.getInt("LINKS")
+        }
+        return counts
+    }
 
     override fun getQualifiedBuildsUsedBy(build: Build): List<BuildLink> {
         return namedParameterJdbcTemplate!!.query(

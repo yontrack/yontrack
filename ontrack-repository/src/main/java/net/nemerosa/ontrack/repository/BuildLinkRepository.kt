@@ -5,7 +5,20 @@ import net.nemerosa.ontrack.model.structure.BuildLink
 
 interface BuildLinkRepository {
 
-    fun getCountQualifiedBuildsUsedBy(build: Build): Int
+    /**
+     * Counts the downstream links of a build.
+     *
+     * @return Number of links per project ID of the target builds
+     */
+    fun getCountQualifiedBuildsUsedBy(build: Build): Map<Int, Int>
+
+    /**
+     * Counts the upstream links of a build.
+     *
+     * @return Number of links per project ID of the source builds
+     */
+    fun getCountQualifiedBuildsUsing(build: Build): Map<Int, Int>
+
     fun getQualifiedBuildsUsedBy(build: Build): List<BuildLink>
     fun getQualifiedBuildsUsing(build: Build): List<BuildLink>
 

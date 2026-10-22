@@ -422,8 +422,22 @@ class StructureServiceImpl(
 
     override fun getCountQualifiedBuildsUsedBy(build: Build): Int {
         securityService.checkProjectFunction(build, ProjectView::class.java)
-        return buildLinkRepository.getCountQualifiedBuildsUsedBy(build)
+        return countVisibleLinks(buildLinkRepository.getCountQualifiedBuildsUsedBy(build))
     }
+
+    override fun getCountQualifiedBuildsUsing(build: Build): Int {
+        securityService.checkProjectFunction(build, ProjectView::class.java)
+        return countVisibleLinks(buildLinkRepository.getCountQualifiedBuildsUsing(build))
+    }
+
+    /**
+     * Sums the links of the projects the current user can see.
+     */
+    private fun countVisibleLinks(countsPerProject: Map<Int, Int>): Int =
+        countsPerProject
+            .filterKeys { projectId -> securityService.isProjectFunctionGranted(projectId, ProjectView::class.java) }
+            .values
+            .sum()
 
     override fun getQualifiedBuildsUsedBy(
         build: Build,

@@ -103,6 +103,20 @@ export class BuildPage {
         return popover
     }
 
+    /**
+     * Hovers the link decoration of the build, in the page header, and returns the popover
+     * listing its links, once loaded.
+     */
+    async hoverLinkDecoration() {
+        const tag = this.page.getByTestId(`build-link-decoration-${this.build.id}`).first()
+        await expect(tag).toBeVisible()
+        await tag.hover()
+        const popover = this.page.getByTestId(`build-link-decoration-popover-${this.build.id}`)
+        await expect(popover).toBeVisible()
+        await expect(popover).toHaveAttribute('data-loaded', 'true')
+        return popover
+    }
+
     async getPromotionInfoSection() {
         const section = this.page.getByTestId('promotions')
         await expect(section).toBeVisible()

@@ -81,6 +81,12 @@ class OntrackConfigProperties {
     var tx = TransactionProperties()
 
     /**
+     * Build links settings
+     */
+    @Valid
+    var buildLinks = BuildLinksProperties()
+
+    /**
      * Key-store type
      */
     @APIDescription("Key store type to use to store encryption keys")
@@ -99,6 +105,16 @@ class OntrackConfigProperties {
         logger.info("[search] Index creation error ignoring = ${search.index.ignoreExisting}")
         logger.info("[document] Documents engine = ${documents.engine}")
         logger.info("[templating] Errors = ${templating.errors}")
+        logger.info("[build-links] Decoration max links = ${buildLinks.decorationMaxLinks}")
+    }
+
+    /**
+     * Build links settings
+     */
+    class BuildLinksProperties {
+        @Min(1)
+        @APIDescription("Maximum number of links listed, in each direction, by the hint of the link decoration of a build. The others are reached through the build's links page.")
+        var decorationMaxLinks: Int = 10
     }
 
     /**
