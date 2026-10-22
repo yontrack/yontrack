@@ -28,6 +28,7 @@ import BuildDeleteCommand from "@components/builds/BuildDeleteCommand";
 import {isAuthorized} from "@components/common/authorizations";
 import PreviousBuildCommand from "@components/builds/PreviousBuildCommand";
 import NextBuildCommand from "@components/builds/NextBuildCommand";
+import BuildChangeLogCommand from "@components/builds/BuildChangeLogCommand";
 import {buildVisit, useRecordVisit} from "@components/search/palette/recentlyVisited";
 import {gqlSignatureActorFields} from "@components/common/actors/actors";
 import ActorBadge from "@components/common/actors/ActorBadge";
@@ -77,6 +78,9 @@ export default function BuildView({id}) {
                         project {
                             id
                             name
+                        }
+                        scmBranchInfo {
+                            changeLogs
                         }
                     }
                     authorizations {
@@ -144,6 +148,10 @@ export default function BuildView({id}) {
                 href={buildLinksUri(build)}
                 text="Links"
                 title="Displays downstream and upstream dependencies"
+            />,
+            <BuildChangeLogCommand
+                key={`change-log-${build.id}`}
+                build={build}
             />,
         )
         // Granted when the build has a trail to read: the licence is folded in on the server

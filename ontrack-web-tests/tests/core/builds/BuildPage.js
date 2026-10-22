@@ -144,6 +144,13 @@ export class BuildPage {
         await expect(this.page.getByRole('button', {name: 'Next build'})).toBeVisible({visible})
     }
 
+    /**
+     * The "Change log" command, to the change log since the previous build of the branch.
+     */
+    changeLogCommand() {
+        return this.page.getByTestId('build-change-log-command')
+    }
+
     async nextBuild() {
         await this.page.getByRole('button', {name: 'Next build'}).click()
     }
