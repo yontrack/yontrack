@@ -3,6 +3,7 @@ const {BuildPage} = require("../builds/BuildPage");
 const {BranchPage} = require("../branches/branch");
 const {test} = require("../../fixtures/connection");
 const {generate} = require("@ontrack/utils");
+const {expect} = require("@playwright/test");
 
 test('build page', async ({page, ontrack}) => {
     // Provisioning
