@@ -352,6 +352,14 @@ export default function BranchBuilds({
                             }
                         />
                     }
+                    {/*
+                        Takes whatever width the page has beyond the columns, so that every other
+                        column keeps the width of its content (#2108). Stretched, each stamp column
+                        got a fractional width, which the sticky header only copies again when it
+                        changes by a whole pixel: the stale fractions added up from one stamp
+                        header to the next, out of line with their runs.
+                    */}
+                    <Column key="filler" width="100%"/>
                 </Table>
             </Space>
         </>
