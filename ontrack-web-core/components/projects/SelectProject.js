@@ -1,6 +1,7 @@
-import {useState} from "react";
+import {useEffect, useMemo, useRef, useState} from "react";
 import {Select} from "antd";
 import {gql} from "graphql-request";
+import debounce from "lodash.debounce";
 import {callGraphQL} from "@components/services/GraphQL";
 
 export default function SelectProject({
@@ -10,41 +11,50 @@ export default function SelectProject({
                                           idAsValue = false,
                                           multiple = false,
                                           width = '16em',
+                                          debounceTimeout = 300,
                                       }) {
 
     const [projects, setProjects] = useState([])
-    const [searching, setSearching] = useState(false)
+    // Latest token typed, so that a response for an earlier token never overwrites a later one
+    const latestToken = useRef('')
 
     const handleChange = (newValue) => {
         if (onChange) onChange(newValue)
     }
 
-    const handleSearch = (token) => {
-        if (token && token.length > 2) {
-            if (!searching) {
-                setSearching(true)
-                callGraphQL({
-                    query: gql`
-                        query SearchProjects($token: String!) {
-                            projects(pattern: $token) {
-                                id
-                                name
-                            }
-                        }
-                    `,
-                    variables: {token},
-                }).then(data => {
-                    setProjects(data.projects)
-                }).finally(() => {
-                    setSearching(false)
-                })
+    const searchProjects = useMemo(() => debounce((token) => {
+        callGraphQL({
+            query: gql`
+                query SearchProjects($token: String!) {
+                    projects(pattern: $token) {
+                        id
+                        name
+                    }
+                }
+            `,
+            variables: {token},
+        }).then(data => {
+            if (token === latestToken.current) {
+                setProjects(data.projects)
             }
+        })
+    }, debounceTimeout), [debounceTimeout])
+
+    useEffect(() => () => searchProjects.cancel(), [searchProjects])
+
+    const handleSearch = (token) => {
+        latestToken.current = token
+        if (token && token.length > 2) {
+            searchProjects(token)
         } else {
+            searchProjects.cancel()
             setProjects([])
         }
     }
 
     const handleClear = () => {
+        latestToken.current = ''
+        searchProjects.cancel()
         setProjects([])
         if (onChange) onChange(null)
     }
