@@ -142,6 +142,11 @@ gh run watch <run-id>
 A cherry-pick that does not apply cleanly is not resolved by guessing: stop and report it. The base in
 the close comment below is then `main`, cherry-picked to `release/5.5`.
 
+A green `release/5.5` build reaches `BRONZE` and becomes eligible on the v5.dev.yontrack.com slot,
+which is how a 5.x fix is checked by hand before `GOLD` (`doc/dev-guide/patch-release.md`). The
+deployment is Damien's to start, not yours: `status:ready` waits for CI only. Say in the summary
+that the build is ready to deploy to v5.dev.
+
 Only when the run's `conclusion` is `success` for the commit you pushed — both runs, for a
 cherry-pick — move the issue to ready and close it, provided it has a milestone:
 
@@ -169,5 +174,6 @@ After implementing, provide a concise summary:
 - What tests cover the fix
 - The branch name, whether it landed on `<base>` (and was cherry-picked to `release/5.5`), and the
   resulting issue status label
+- For a fix on `release/5.5`, that its build is ready to deploy to v5.dev by hand
 
 **Never open a pull request** — leave that to the user.

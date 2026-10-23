@@ -161,6 +161,10 @@ Dispatched by a slot's `RUNNING` workflow through the `github-workflow` notifica
 The demo slot passes only the version: `project` and `branch` come from the workflow's own
 defaults, `yontrack` and `main`, which is what that slot is scoped to anyway.
 
+The v5.dev.yontrack.com slot dispatches it too, with `reference: release/5.5`, so what runs is
+`release/5.5`'s copy of this workflow, which has a `v5` target that this copy does not need (#2120).
+It passes `target: v5` and `branch: release-5.5`. That copy of this page describes the target.
+
 It can also be dispatched by hand from the Actions tab with a version and a target.
 
 ### The `id` input

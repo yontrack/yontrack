@@ -20,7 +20,7 @@ These were settled in a design review. The rationale matters as much as the choi
 | # | Rule | Why |
 |---|------|-----|
 | 1 | **Patch the previous minor only**, until the next minor ships. One live release branch at a time. | Bounds the work: no N-branch fan-out whose `.yontrack/ci.yaml` drifts from main's. |
-| 2 | **`SILVER` means "green" on a release branch**, not "verified on the demo". | Keeps `GOLD` meaningful — a human still decides — without a manual `DEMO.SMOKE` stamp asserting something that never happened. |
+| 2 | **`SILVER` means "green" on a release branch**, not "verified on the demo" — except on `release/5.5`, which is verified on v5.dev.yontrack.com (#2119, #2120). | Keeps `GOLD` meaningful — a human still decides — without a manual `DEMO.SMOKE` stamp asserting something that never happened. |
 | 3 | **Release branches are cut lazily**, from the released tag, when a defect appears. | An always-on release branch pays a full CI run per push for a branch that may ship nothing. |
 | 4 | **Fixes land on `main` first, then are cherry-picked** to the release branch. | A fix living only on the patch branch is a regression in the next minor waiting to happen. |
 | 5 | **A patch must not contain a Flyway migration.** | If 5.3.2 adds `V82` and `main` independently adds `V82`, a user upgrading 5.3.2 → 5.4.0 hits a checksum conflict. If a fix needs a schema change, it is not a patch. |
@@ -108,6 +108,22 @@ archives the docs artefact, and grants `BRONZE`. `SILVER` then auto-promotes on 
 announces itself in `#notifications` with the release-branch message: *"… is green on `release-5.3`.
 Verify the fix, then decide on GOLD."*
 
+On `release/5.5` it does not (#2119). `SILVER` there also requires `DEMO.SMOKE`, so a 5.5 patch
+cannot reach `GOLD` until it has been deployed to v5.dev.yontrack.com and smoke-tested there.
+`BRONZE` only makes the build eligible for the v5 slot (#2120): nothing deploys it automatically.
+To deploy it, in Yontrack:
+
+1. **Environments** page → `v5.dev.yontrack.com` → the `yontrack` slot.
+2. Deploy the eligible build — the `release-5.5` build carrying the fix. This creates a pipeline,
+   which stays a candidate.
+3. **Start the deployment** on that pipeline.
+
+The slot then opens and merges a PR in `yontrack/yontrack-infra-gitops` setting the build's rc
+version in `values/yontrack-v5/yontrack.yaml`, ArgoCD rolls v5.dev to it, the slot dispatches
+`release/5.5`'s `demo-smoke.yml` with `target: v5`, and Slack `#notifications` says the deployment
+is finished. `DEMO.SMOKE` landing green grants `SILVER`, whose message names v5. A build registered
+before `release/5.5`'s `ci.yml` recorded the `rc-version` item cannot be deployed there.
+
 A freshly cut release branch produces a `-rc-1` build with **no fix in it** — the branch is the tag
 until the cherry-pick lands. It reaches `SILVER` and announces itself all the same. That is expected,
 not a bug: leave it, and grant `GOLD` on the build that carries the fix.
@@ -153,17 +169,27 @@ declare the weakest form, and each branch kind adds what it can actually satisfy
 
 Deploying a patch to the demo is not the alternative — it would roll the demo back off 5.4 — and
 stamping `DEMO.SMOKE` by hand would assert a verification that never happened. So `SILVER` means
-"green" on a release branch, and `GOLD` stays the human gate either way.
+"green" on a release branch, and `GOLD` stays the human gate either way. The one release branch with
+an instance of its own, `release/5.5`, adds `DEMO.SMOKE` back in a `^release/5\.5$` block of its own
+copy of the file, exactly as `^main$` does (#2119).
 
 `CoreConfigurationServiceIT.The demo verification is added to SILVER on main and not on a release
 branch` pins that behaviour of the merge engine, in the shape this config uses it. Note what it
-cannot do: no test reads `.yontrack/ci.yaml`, so nothing mechanically catches someone moving the
-`^main$` block back into the defaults. The comment in the file is what has to hold that line — and
+cannot do: it does not read `.yontrack/ci.yaml`, so nothing mechanically catches someone moving the
+`^main$` block's `SILVER` back into the defaults. (`RepositoryCIConfigurationIT` does read the file,
+for the environments and slots only — see below.) The comment in the file is what has to hold that line — and
 the IT is what shows the tidied version could never have worked.
 
 Notifications behave differently, and that is what makes the message swap possible:
 `NotificationsCIConfigExtension` merges them **by name with override**, so a same-named `On SILVER`
 in the `^release/.*$` block *replaces* the default's rather than adding a second subscription.
+
+Environments and slots are declared from `main` only, in its `^main$` block (#2120): slots are
+synced forward, so a release branch declaring any would resync them from its own, older copy of the
+file — deleting the slots it does not know and rewriting the rules of the others.
+`RepositoryCIConfigurationIT` computes `main`'s `.yontrack/ci.yaml` for `main`, `release/5.5` and a
+feature branch, and fails if `release/5.5` or the feature branch declares them. It checks no other
+branch: a `^v7$` or `^release/6\..*$` block declaring environments would pass it.
 
 ## See also
 

@@ -51,8 +51,9 @@ Everything below lands on **`main`**, and reaches the major branch through the n
 
 ### The environment
 
-An environment of its own — `v6.dev.yontrack.com` for 6.0 — defined in `.yontrack/ci.yaml`
-alongside the demo and self environments, with a slot on the `yontrack` project admitting **the
+An environment of its own — `v6.dev.yontrack.com` for 6.0 — defined in the `^main$` block of
+`.yontrack/ci.yaml` alongside the demo and self environments (see
+[Keeping it in step](#keeping-it-in-step)), with a slot on the `yontrack` project admitting **the
 major branch at BRONZE**, anchored (`^v7$`): the eligible-builds query uses PostgreSQL's unanchored
 `~`, so a bare `v7` would also admit `v7-spring-boot-5`. Deployment is immediate, as on the demo
 slot: a `CANDIDATE` workflow moves the pipeline to running, and the `RUNNING` workflow
@@ -140,12 +141,15 @@ self.dev ran 6.0.
 * **Few conflicting spots.** `VERSION` differs by design — take the major branch's side, every
   time. Anything else landed on the major branch alone conflicts there too, so keep that list
   short.
-* **The slots are synchronised, not merged.** `EnvironmentsInjection.defineSlots` uses
+* **The slots are declared from `main` only.** `EnvironmentsInjection.defineSlots` uses
   `syncForward` over the slots of the project: a slot the incoming configuration does not mention
-  is **deleted**. A slot declared only on the major branch would therefore be torn down by the next
-  `main` build and rebuilt by the next major-branch build, endlessly. Environments are safe
-  (`keepEnvironments = true`), slots are not. Whatever the environments block says has to say the
-  same thing on every branch that builds.
+  is **deleted**. So `.yontrack/ci.yaml` declares `project.environments` in its `^main$` block, not
+  in the defaults, and a build of any other branch — `v7`, `release/*`, a feature branch — leaves
+  environments and slots as `main` last set them (#2120). The next-major environment and its `^v7$`
+  slot are declared on `main` like everything else in this section; the major branch's copy of the
+  block is never read, so it may drift without harm until the cutover, when the major branch's copy
+becomes `main`'s — bring the block in step before then. `RepositoryCIConfigurationIT` reads the file
+  and pins both halves.
 
 ## Deprecations and removals
 
@@ -185,7 +189,11 @@ decided in [the cutover grilling](../../docs/grilling/2026-10-v6-cutover/README.
    dependency bumps — is not a 5.5 fix, and a fix it holds is cherry-picked like any other. The
    branch keeps the previous major alive, and [Patch releases](patch-release.md) has the exception
    that allows it. The git branch of the previous patch line, `release/5.4`, is deleted; its
-   Yontrack branch is kept.
+   Yontrack branch is kept. The maintenance branch gets a maintenance environment of its own —
+   v5.dev.yontrack.com for `release/5.5` (#2120), a v6.dev for 6.x once v7 reaches `main` — whose
+   slot, declared on `main`, admits the branch's `BRONZE` builds, deploys one only when someone
+   starts it, and smoke-tests it with the maintenance branch's own copy of `demo-smoke.yml`; that
+   is what its `SILVER` waits for. See [Patch releases](patch-release.md#4-push-and-let-ci-run).
 3. **Fast-forward `main` to `v6`, and then to the cutover commit**, in one push, so CI runs once.
 4. **Retire `v6`**: delete the branch, its secrets and variable, its environment in the gitops
    repository, and its Yontrack branch; rewrite the `**Base branch:** v6` lines of the open issues.

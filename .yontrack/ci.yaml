@@ -466,206 +466,6 @@ configuration:
               Have a look, then decide on GOLD.
 
               ${promotionRun.semanticChangelog?issues=true&emojis=true}
-    project:
-      environments:
-        environments:
-          - name: demo.dev.yontrack.com
-            description: Public demo, running the last BRONZE build on main
-            order: 50
-            tags:
-              - release
-          - name: self.dev.yontrack.com
-            order: 100
-            tags:
-              - release
-        slots:
-          - project: yontrack
-            environments:
-              - name: demo.dev.yontrack.com
-                admissionRules:
-                  # Anchored: a bare `main` also matches any branch whose name contains it, and
-                  # `lastBranchOnly` then picks the last of those, so a branch like
-                  # `claude-ci-build-performance-main-pipeline` won and no build of `main` could be
-                  # deployed to the demo.
-                  - name: "branchPattern"
-                    ruleId: "branchPattern"
-                    ruleConfig:
-                      includes:
-                        - "^main$"
-                      lastBranchOnly: true
-                  - name: "promotion"
-                    ruleId: "promotion"
-                    ruleConfig:
-                      promotion: "BRONZE"
-                workflows:
-                  # A pipeline is created in CANDIDATE and stays there until something
-                  # asks for the deployment to start. Without this, the RUNNING workflow
-                  # below never triggers and the pipeline sits as a candidate forever.
-                  - trigger: "CANDIDATE"
-                    name: "Starting the deployment"
-                    nodes:
-                      - id: "deploying"
-                        description: "Moving the pipeline to running"
-                        executorId: "slot-pipeline-deploying"
-                        data: {}
-                  - trigger: "RUNNING"
-                    name: "Deploying"
-                    nodes:
-                      - id: "auto-versioning"
-                        description: "Updating version"
-                        executorId: "auto-versioning"
-                        data:
-                          targetProject: "yontrack-infra-gitops"
-                          targetBranch: "main"
-                          targetPath: "yontrack-helmfile.d/values/yontrack-demo/yontrack.yaml"
-                          targetPropertyType: "yaml-path"
-                          targetProperty: "image.tag"
-                          # The build NAME is a timestamp-run pair (20260901055547-36), never
-                          # a tag. The rc version - 6.0.1-rc.36 on main - IS the durable GHCR tag
-                          # pushed by #1661, and ci.yml records it on every build twice: as the
-                          # `release` property and as the `rc-version` meta-info item.
-                          #
-                          # The meta-info item, not `${build.release}`: release.yml rewrites the
-                          # release property to the base version when the build goes GOLD, and
-                          # GHCR never carries that tag - so a GOLD build deployed here, by the
-                          # nightly or by hand, left the demo in ImagePullBackOff (#1999). The
-                          # self slot, below, pulls from Docker Hub, where the base version is
-                          # the tag, and keeps `${build.release}`.
-                          #
-                          # A build registered before CI recorded the item has nothing to render
-                          # here: `error=true` turns that into a templating error, which the default
-                          # `ontrack.config.templating.errors`, IGNORE, renders as
-                          # `#error` - no better a tag than an empty one. demo-deploy.sh refuses
-                          # such a build before starting the pipeline; a deployment started from
-                          # the slot UI is not checked.
-                          targetVersion: "${build.meta?name=rc-version&error=true}"
-                          autoApproval: true
-                          prTitleTemplate: "Deploying ${sourceProject} version ${VERSION} to the demo"
-                          prBodyTemplateFormat: "markdown"
-                          prBodyTemplate: |
-                            Deployment of ${sourceProject} version ${VERSION} to the demo environment.
-
-                            ${av.semanticChangelog?issues=true&emojis=true}
-                      - id: "deploy"
-                        description: "Marking the deployment as finished"
-                        executorId: "slot-pipeline-deployed"
-                        data: {}
-                        parents:
-                          - id: "auto-versioning"
-                      # "Deployed" here means the gitops PR merged, not that the pods are
-                      # serving - ArgoCD has not even synced yet. demo-smoke.yml starts by
-                      # polling the demo until the version it is given is the version
-                      # answering, which is the check that closes that gap. See #1666.
-                      #
-                      # Only the version is passed: `${build}` would render the build's
-                      # display name rather than its name, so the workflow resolves the build
-                      # itself. `project` and `branch` are left to the workflow's own defaults
-                      # (yontrack/main), which is also what this slot is scoped to.
-                      #
-                      # The rc version, as for `image.tag` above: it is what the image reports
-                      # as `info.version.full`, which the workflow waits for, and what it
-                      # resolves the build by. The base version would match neither once the
-                      # build is GOLD (#1999).
-                      - id: "smoke"
-                        description: "Smoke-testing the demo deployment"
-                        parents:
-                          - id: "deploy"
-                        executorId: "notification"
-                        data:
-                          channel: "github-workflow"
-                          channelConfig:
-                            config: github.com
-                            owner: yontrack
-                            repository: yontrack
-                            workflowId: demo-smoke.yml
-                            reference: main
-                            callMode: ASYNC
-                            inputs:
-                              - name: version
-                                value: "${build.meta?name=rc-version&error=true}"
-              - name: self.dev.yontrack.com
-                admissionRules:
-                  # A RELEASE build is deployable from `main` and from a patch branch alike. The
-                  # pattern reads the Yontrack branch name, so `release-6.1`, not `release/6.1`.
-                  #
-                  # One regex rather than two `includes` entries: the eligible-builds query ANDs
-                  # its entries, so `main` and `release-.*` listed separately match no branch.
-                  # Anchored because that query uses PostgreSQL's unanchored `~`.
-                  #
-                  # No `lastBranchOnly`: it orders branches by the version in their name, so any
-                  # `release-*` branch would win over `main`, and no build of `main` could be
-                  # deployed again while one exists.
-                  #
-                  # `release-6.*` only, not every `release-*`: self.dev runs 6.x, its database
-                  # migrated past what 5.x knows, and a 5.5.x RELEASE from `release/5.5` deployed
-                  # there would downgrade onto that schema (#1875, decision 6 of
-                  # docs/grilling/2026-10-v6-cutover/README.md).
-                  - name: "branchPattern"
-                    ruleId: "branchPattern"
-                    ruleConfig:
-                      includes:
-                        - "^(main|release-6\\..*)$"
-                  - name: "promotion"
-                    ruleId: "promotion"
-                    ruleConfig:
-                      promotion: "RELEASE"
-                  # A beta and a GA, never an alpha: every release is granted RELEASE (#2070), so
-                  # the stage is told apart by the version. At RELEASE the display name is the
-                  # base version - `6.0.0-beta.6`, `6.0.1` - release.yml having rewritten it from
-                  # the rc version before the last stamp. A full, case-insensitive match (#2069).
-                  - name: "versionPattern"
-                    ruleId: "versionPattern"
-                    ruleConfig:
-                      includes:
-                        - "\\d+\\.\\d+\\.\\d+(-beta\\.\\d+)?"
-                workflows:
-                  # No CANDIDATE workflow, unlike the demo slot, and on purpose: self.dev is never
-                  # deployed automatically (#2074). The admission rules above only make a build
-                  # eligible. Deploying it from the slot creates a pipeline in CANDIDATE, and with
-                  # nothing here to move it on, it stays a candidate until someone clicks "Start
-                  # the deployment". Deploying a release here is a human step, like GOLD.
-                  #
-                  # Starting it moves the pipeline to RUNNING, and the workflow below then does
-                  # the rest: the gitops change, the end of the deployment, the notification.
-                  # `autoApproval` stays true - the human decision is starting the pipeline, not
-                  # merging its PR.
-                  - trigger: "RUNNING"
-                    name: "Deploying"
-                    nodes:
-                      - id: "auto-versioning"
-                        description: "Updating version"
-                        executorId: "auto-versioning"
-                        data:
-                          targetProject: "yontrack-infra-gitops"
-                          targetBranch: "main"
-                          targetPath: "yontrack-helmfile.d/values/yontrack-self/yontrack.yaml"
-                          targetPropertyType: "yaml-path"
-                          targetProperty: "image.tag"
-                          targetVersion: "${build.release}"
-                          autoApproval: true
-                          prTitleTemplate: "Deploying ${sourceProject} version ${VERSION}"
-                          prBodyTemplateFormat: "markdown"
-                          prBodyTemplate: |
-                            Deployment of ${sourceProject} version ${VERSION}.
-
-                            ${av.semanticChangelog?issues=true&emojis=true}
-                      - id: "deploy"
-                        description: "Marking the deployment as finished"
-                        executorId: "slot-pipeline-deployed"
-                        data: {}
-                        parents:
-                          - id: "auto-versioning"
-                      - id: "end"
-                        parents:
-                          - id: "deploy"
-                        description: "Notification"
-                        executorId: "notification"
-                        data:
-                          channel: "slack"
-                          template: "Deployment of ${build} in Production is finished"
-                          channelConfig:
-                            type: "INFO"
-                            channel: "#notifications"
   custom:
     configs:
       # Keeps the public release announcement off feature branches, whose versions carry a branch
@@ -724,6 +524,316 @@ configuration:
       - conditions:
           - name: branch
             config: '^main$'
+        # The environments and their slots, declared from main only (#2120) - every slot of every
+        # environment, the maintenance line's v5.dev included.
+        #
+        # Not in the defaults, where they used to be: whatever the defaults declare, every branch
+        # that builds applies from its own copy of this file, and `EnvironmentsInjection.defineSlots`
+        # resyncs the slots of every project it lists with `syncForward`, deleting any slot of
+        # those projects the incoming configuration does not mention. A release or feature branch carrying an older copy then
+        # tore slots down or rewrote their rules on every build - which is how `release/5.5`
+        # brought the v6 slot back and undid #1875 (#2119). Declared only here, the extension
+        # reaches `EnvironmentsCIConfigExtension.configure` on main alone, and any other branch
+        # leaves environments and slots as main last set them.
+        #
+        # `RepositoryCIConfigurationIT` reads this very file and checks both halves of that.
+        project:
+          environments:
+            environments:
+              # The 5.5 maintenance line (#2120): an internal environment to check a 5.5 patch
+              # candidate before GOLD, and to reproduce a 5.x issue. Not a public demo. Ordered
+              # before the current major's environments. Retired at 5.5 end of life.
+              - name: v5.dev.yontrack.com
+                description: "5.5 maintenance line: a BRONZE build of release/5.5, deployed by hand"
+                order: 30
+                tags:
+                  - release
+              - name: demo.dev.yontrack.com
+                description: Public demo, running the last BRONZE build on main
+                order: 50
+                tags:
+                  - release
+              - name: self.dev.yontrack.com
+                order: 100
+                tags:
+                  - release
+            slots:
+              - project: yontrack
+                environments:
+                  - name: v5.dev.yontrack.com
+                    admissionRules:
+                      # The Yontrack branch name, so `release-5.5`, not `release/5.5`. Anchored
+                      # because the eligible-builds query uses PostgreSQL's unanchored `~`.
+                      - name: "branchPattern"
+                        ruleId: "branchPattern"
+                        ruleConfig:
+                          includes:
+                            - "^release-5\\.5$"
+                      - name: "promotion"
+                        ruleId: "promotion"
+                        ruleConfig:
+                          promotion: "BRONZE"
+                    workflows:
+                      # No CANDIDATE workflow, on purpose and as on self.dev (#2074): a BRONZE
+                      # build of release/5.5 only becomes eligible. Deploying it from the slot
+                      # creates a pipeline in CANDIDATE, which stays there until someone clicks
+                      # "Start the deployment" - to check a 5.5 patch before GOLD, or to
+                      # reproduce a 5.x issue (doc/dev-guide/patch-release.md).
+                      - trigger: "RUNNING"
+                        name: "Deploying"
+                        nodes:
+                          - id: "auto-versioning"
+                            description: "Updating version"
+                            executorId: "auto-versioning"
+                            data:
+                              targetProject: "yontrack-infra-gitops"
+                              targetBranch: "main"
+                              targetPath: "yontrack-helmfile.d/values/yontrack-v5/yontrack.yaml"
+                              targetPropertyType: "yaml-path"
+                              targetProperty: "image.tag"
+                              # The rc version, the GHCR tag, as on the demo slot below - see
+                              # there (#1999). release/5.5's ci.yml records the item since #2119;
+                              # a build registered before that cannot be deployed here.
+                              targetVersion: "${build.meta?name=rc-version&error=true}"
+                              autoApproval: true
+                              prTitleTemplate: "Deploying ${sourceProject} version ${VERSION} to v5"
+                              prBodyTemplateFormat: "markdown"
+                              prBodyTemplate: |
+                                Deployment of ${sourceProject} version ${VERSION} to the v5 environment.
+
+                                ${av.semanticChangelog?issues=true&emojis=true}
+                          - id: "deploy"
+                            description: "Marking the deployment as finished"
+                            executorId: "slot-pipeline-deployed"
+                            data: {}
+                            parents:
+                              - id: "auto-versioning"
+                          # The demo slot's smoke tests, against v5. `reference: release/5.5`, so
+                          # that the 5.5 copy of demo-smoke.yml runs, with the 5.5 seed and the
+                          # 5.5 Playwright spec - main's copy has no `v5` target and need not have
+                          # one. The workflow file exists on the default branch, which is what
+                          # lets it be dispatched at all.
+                          #
+                          # `branch` is passed, unlike on the demo: the workflow defaults to
+                          # `main`, where a 5.5 version does not resolve. It reports DEMO.SMOKE,
+                          # which SILVER requires on release/5.5 (#2119).
+                          - id: "smoke"
+                            description: "Smoke-testing the v5 deployment"
+                            parents:
+                              - id: "deploy"
+                            executorId: "notification"
+                            data:
+                              channel: "github-workflow"
+                              channelConfig:
+                                config: github.com
+                                owner: yontrack
+                                repository: yontrack
+                                workflowId: demo-smoke.yml
+                                reference: release/5.5
+                                callMode: ASYNC
+                                inputs:
+                                  - name: version
+                                    value: "${build.meta?name=rc-version&error=true}"
+                                  - name: target
+                                    value: v5
+                                  - name: branch
+                                    value: release-5.5
+                          - id: "notification"
+                            description: "Notification"
+                            parents:
+                              - id: "deploy"
+                            executorId: "notification"
+                            data:
+                              channel: "slack"
+                              template: "Deployment of ${build} on v5.dev is finished"
+                              channelConfig:
+                                type: "INFO"
+                                channel: "#notifications"
+                  - name: demo.dev.yontrack.com
+                    admissionRules:
+                      # Anchored: a bare `main` also matches any branch whose name contains it, and
+                      # `lastBranchOnly` then picks the last of those, so a branch like
+                      # `claude-ci-build-performance-main-pipeline` won and no build of `main` could be
+                      # deployed to the demo.
+                      - name: "branchPattern"
+                        ruleId: "branchPattern"
+                        ruleConfig:
+                          includes:
+                            - "^main$"
+                          lastBranchOnly: true
+                      - name: "promotion"
+                        ruleId: "promotion"
+                        ruleConfig:
+                          promotion: "BRONZE"
+                    workflows:
+                      # A pipeline is created in CANDIDATE and stays there until something
+                      # asks for the deployment to start. Without this, the RUNNING workflow
+                      # below never triggers and the pipeline sits as a candidate forever.
+                      - trigger: "CANDIDATE"
+                        name: "Starting the deployment"
+                        nodes:
+                          - id: "deploying"
+                            description: "Moving the pipeline to running"
+                            executorId: "slot-pipeline-deploying"
+                            data: {}
+                      - trigger: "RUNNING"
+                        name: "Deploying"
+                        nodes:
+                          - id: "auto-versioning"
+                            description: "Updating version"
+                            executorId: "auto-versioning"
+                            data:
+                              targetProject: "yontrack-infra-gitops"
+                              targetBranch: "main"
+                              targetPath: "yontrack-helmfile.d/values/yontrack-demo/yontrack.yaml"
+                              targetPropertyType: "yaml-path"
+                              targetProperty: "image.tag"
+                              # The build NAME is a timestamp-run pair (20260901055547-36), never
+                              # a tag. The rc version - 6.0.1-rc.36 on main - IS the durable GHCR tag
+                              # pushed by #1661, and ci.yml records it on every build twice: as the
+                              # `release` property and as the `rc-version` meta-info item.
+                              #
+                              # The meta-info item, not `${build.release}`: release.yml rewrites the
+                              # release property to the base version when the build goes GOLD, and
+                              # GHCR never carries that tag - so a GOLD build deployed here, by the
+                              # nightly or by hand, left the demo in ImagePullBackOff (#1999). The
+                              # self slot, below, pulls from Docker Hub, where the base version is
+                              # the tag, and keeps `${build.release}`.
+                              #
+                              # A build registered before CI recorded the item has nothing to render
+                              # here: `error=true` turns that into a templating error, which the default
+                              # `ontrack.config.templating.errors`, IGNORE, renders as
+                              # `#error` - no better a tag than an empty one. demo-deploy.sh refuses
+                              # such a build before starting the pipeline; a deployment started from
+                              # the slot UI is not checked.
+                              targetVersion: "${build.meta?name=rc-version&error=true}"
+                              autoApproval: true
+                              prTitleTemplate: "Deploying ${sourceProject} version ${VERSION} to the demo"
+                              prBodyTemplateFormat: "markdown"
+                              prBodyTemplate: |
+                                Deployment of ${sourceProject} version ${VERSION} to the demo environment.
+
+                                ${av.semanticChangelog?issues=true&emojis=true}
+                          - id: "deploy"
+                            description: "Marking the deployment as finished"
+                            executorId: "slot-pipeline-deployed"
+                            data: {}
+                            parents:
+                              - id: "auto-versioning"
+                          # "Deployed" here means the gitops PR merged, not that the pods are
+                          # serving - ArgoCD has not even synced yet. demo-smoke.yml starts by
+                          # polling the demo until the version it is given is the version
+                          # answering, which is the check that closes that gap. See #1666.
+                          #
+                          # Only the version is passed: `${build}` would render the build's
+                          # display name rather than its name, so the workflow resolves the build
+                          # itself. `project` and `branch` are left to the workflow's own defaults
+                          # (yontrack/main), which is also what this slot is scoped to.
+                          #
+                          # The rc version, as for `image.tag` above: it is what the image reports
+                          # as `info.version.full`, which the workflow waits for, and what it
+                          # resolves the build by. The base version would match neither once the
+                          # build is GOLD (#1999).
+                          - id: "smoke"
+                            description: "Smoke-testing the demo deployment"
+                            parents:
+                              - id: "deploy"
+                            executorId: "notification"
+                            data:
+                              channel: "github-workflow"
+                              channelConfig:
+                                config: github.com
+                                owner: yontrack
+                                repository: yontrack
+                                workflowId: demo-smoke.yml
+                                reference: main
+                                callMode: ASYNC
+                                inputs:
+                                  - name: version
+                                    value: "${build.meta?name=rc-version&error=true}"
+                  - name: self.dev.yontrack.com
+                    admissionRules:
+                      # A RELEASE build is deployable from `main` and from a patch branch alike. The
+                      # pattern reads the Yontrack branch name, so `release-6.1`, not `release/6.1`.
+                      #
+                      # One regex rather than two `includes` entries: the eligible-builds query ANDs
+                      # its entries, so `main` and `release-.*` listed separately match no branch.
+                      # Anchored because that query uses PostgreSQL's unanchored `~`.
+                      #
+                      # No `lastBranchOnly`: it orders branches by the version in their name, so any
+                      # `release-*` branch would win over `main`, and no build of `main` could be
+                      # deployed again while one exists.
+                      #
+                      # `release-6.*` only, not every `release-*`: self.dev runs 6.x, its database
+                      # migrated past what 5.x knows, and a 5.5.x RELEASE from `release/5.5` deployed
+                      # there would downgrade onto that schema (#1875, decision 6 of
+                      # docs/grilling/2026-10-v6-cutover/README.md).
+                      - name: "branchPattern"
+                        ruleId: "branchPattern"
+                        ruleConfig:
+                          includes:
+                            - "^(main|release-6\\..*)$"
+                      - name: "promotion"
+                        ruleId: "promotion"
+                        ruleConfig:
+                          promotion: "RELEASE"
+                      # A beta and a GA, never an alpha: every release is granted RELEASE (#2070), so
+                      # the stage is told apart by the version. At RELEASE the display name is the
+                      # base version - `6.0.0-beta.6`, `6.0.1` - release.yml having rewritten it from
+                      # the rc version before the last stamp. A full, case-insensitive match (#2069).
+                      - name: "versionPattern"
+                        ruleId: "versionPattern"
+                        ruleConfig:
+                          includes:
+                            - "\\d+\\.\\d+\\.\\d+(-beta\\.\\d+)?"
+                    workflows:
+                      # No CANDIDATE workflow, unlike the demo slot, and on purpose: self.dev is never
+                      # deployed automatically (#2074). The admission rules above only make a build
+                      # eligible. Deploying it from the slot creates a pipeline in CANDIDATE, and with
+                      # nothing here to move it on, it stays a candidate until someone clicks "Start
+                      # the deployment". Deploying a release here is a human step, like GOLD.
+                      #
+                      # Starting it moves the pipeline to RUNNING, and the workflow below then does
+                      # the rest: the gitops change, the end of the deployment, the notification.
+                      # `autoApproval` stays true - the human decision is starting the pipeline, not
+                      # merging its PR.
+                      - trigger: "RUNNING"
+                        name: "Deploying"
+                        nodes:
+                          - id: "auto-versioning"
+                            description: "Updating version"
+                            executorId: "auto-versioning"
+                            data:
+                              targetProject: "yontrack-infra-gitops"
+                              targetBranch: "main"
+                              targetPath: "yontrack-helmfile.d/values/yontrack-self/yontrack.yaml"
+                              targetPropertyType: "yaml-path"
+                              targetProperty: "image.tag"
+                              targetVersion: "${build.release}"
+                              autoApproval: true
+                              prTitleTemplate: "Deploying ${sourceProject} version ${VERSION}"
+                              prBodyTemplateFormat: "markdown"
+                              prBodyTemplate: |
+                                Deployment of ${sourceProject} version ${VERSION}.
+
+                                ${av.semanticChangelog?issues=true&emojis=true}
+                          - id: "deploy"
+                            description: "Marking the deployment as finished"
+                            executorId: "slot-pipeline-deployed"
+                            data: {}
+                            parents:
+                              - id: "auto-versioning"
+                          - id: "end"
+                            parents:
+                              - id: "deploy"
+                            description: "Notification"
+                            executorId: "notification"
+                            data:
+                              channel: "slack"
+                              template: "Deployment of ${build} in Production is finished"
+                              channelConfig:
+                                type: "INFO"
+                                channel: "#notifications"
         branch:
           promotions:
             SILVER:
