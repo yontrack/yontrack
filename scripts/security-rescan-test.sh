@@ -168,6 +168,19 @@ out="$(srs_select "$WORK/builds-prereleases-only.json")"; rc=$?
 assert_eq "5.5.8" "$(printf '%s' "$out" | jq -r '.[0].version')" "select: betas alone do not make 6.0 the current minor"
 assert_eq "5.4.3" "$(printf '%s' "$out" | jq -r '.[1].version')" "select: the previous minor is the GA before it"
 
+out="$(SECURITY_RESCAN_OLDEST_MINOR=5.5 srs_select "$WORK/builds-prereleases-only.json")"; rc=$?
+assert_eq "0" "$rc" "select: succeeds with an oldest supported minor"
+assert_eq "1" "$(printf '%s' "$out" | jq 'length')" "select: a minor older than the oldest supported one is no target"
+assert_eq "5.5.8" "$(printf '%s' "$out" | jq -r '.[0].version')" "select: the oldest supported minor itself is still a target"
+
+out="$(SECURITY_RESCAN_OLDEST_MINOR=5.5 srs_select "$WORK/builds-majors.json")"; rc=$?
+assert_eq "6.0.0" "$(printf '%s' "$out" | jq -r 'map(.version) | join(",")')" "select: a newer major is above the floor, the older minors of the previous one are not"
+out="$(SECURITY_RESCAN_OLDEST_MINOR=5.10 srs_select "$WORK/builds-unordered.json")"; rc=$?
+assert_eq "0" "$(printf '%s' "$out" | jq 'length')" "select: 5.4 is older than a 5.10 floor, not newer as text would say"
+
+out="$(SECURITY_RESCAN_OLDEST_MINOR=5 srs_select "$WORK/builds.json" 2>&1)"; rc=$?
+assert_eq "1" "$rc" "select: an oldest supported minor which is not MAJOR.MINOR is an error"
+
 out="$(srs_select "$WORK/builds-one-minor.json")"; rc=$?
 assert_eq "1" "$(printf '%s' "$out" | jq 'length')" "select: one minor gives one target"
 assert_eq "5.4.1" "$(printf '%s' "$out" | jq -r '.[0].version')" "select: that target is the highest patch of it"

@@ -39,6 +39,8 @@ for it, and the others hold:
   only in the previous major, in code the new major removed. That one lands on `release/5.5`
   directly: there is nothing on `main` to fix. Its issue says so on its `**Base branch:**` line.
 * **Rule 6:** it is not retired at the next minor cutover. Retiring it is Damien's call.
+  Retiring it includes raising `SECURITY_RESCAN_OLDEST_MINOR` in
+  `.github/workflows/security-rescan.yml`, so that the nightly rescan stops scanning 5.5.
 
 Rule 5 holds in full: no Flyway migration on `release/5.5`, whatever the fix.
 

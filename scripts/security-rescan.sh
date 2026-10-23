@@ -37,6 +37,9 @@
 #                                  to this workflow (#1747) - ci.yml must never see it.
 #   SECURITY_RESCAN_CI_CONFIG      CI configuration to read the stamps from (default:
 #                                  .yontrack/ci.yaml at the root of the repository)
+#   SECURITY_RESCAN_OLDEST_MINOR   oldest supported minor, `MAJOR.MINOR` (e.g. `5.5`): an older
+#                                  minor is never rescanned, previous minor or not. Unset, no
+#                                  minor is left out on that ground.
 #
 # Which builds, and why by version:
 #
@@ -48,6 +51,9 @@
 #     promotion says it was released; the display name says which version it is.
 #   * A promoted build whose display name is not a version has no release property, so nothing
 #     was published under it and there is no image tag to scan. It is skipped.
+#   * Supported minors only. Until a new major ships its first GA, "the previous minor" is the
+#     one before the last minor of the previous major - 5.4 while 6.0 is in beta - which is no
+#     longer supported. SECURITY_RESCAN_OLDEST_MINOR is the floor that leaves it out.
 #   * GA releases only. A pre-release - `6.0.0-beta.7`, or the legacy `6.0-beta.5` - is granted
 #     RELEASE like a GA (#2070), but it is not what users are asked to run: it is skipped, and the
 #     latest RELEASE of a minor is its latest GA. Only an `X.Y.Z` display name is selected.
@@ -163,15 +169,20 @@ srs_fetch_released() {
 # An answer that cannot be read is an error, never an empty list: a failed call must not read as
 # "nothing has been released", which would exit the workflow successfully having scanned nothing.
 srs_select() {
-    local input="${1:--}"
+    local input="${1:--}" oldest="${SECURITY_RESCAN_OLDEST_MINOR:-}"
     if [ "$input" != "-" ] && [ ! -f "$input" ]; then
         srs_fail "No builds file at $input"
         return 1
     fi
+    if [ -n "$oldest" ] && ! [[ "$oldest" =~ ^[0-9]+\.[0-9]+$ ]]; then
+        srs_fail "SECURITY_RESCAN_OLDEST_MINOR must be MAJOR.MINOR, not $oldest"
+        return 1
+    fi
     # `-s` slurps: an empty answer is a list of no documents rather than no output at all, which
     # is the difference between an error and jq 1.6 quietly exiting 0 on an empty file.
-    jq -e -c -s '
-        if length != 1 or (.[0] | type) != "array" then
+    jq -e -c -s --arg oldest "$oldest" '
+        (if $oldest == "" then null else ($oldest | split(".") | map(tonumber)) end) as $floor
+        | if length != 1 or (.[0] | type) != "array" then
             error("not a list of builds")
         else
             [
@@ -193,6 +204,8 @@ srs_select() {
             # The highest patch of each minor...
             | group_by([.major, .minor])
             | map(sort_by(.patch) | last)
+            # ... no older than the oldest supported minor...
+            | map(select($floor == null or ([.major, .minor] >= $floor)))
             # ... and of those, the current minor and the one before it.
             | sort_by([.major, .minor])
             | reverse

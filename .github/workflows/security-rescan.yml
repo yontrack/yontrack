@@ -10,6 +10,7 @@
 # also the tag users are running.
 #
 # Which builds: the latest RELEASE-promoted build of the current minor and of the previous one,
+# provided it is still supported (SECURITY_RESCAN_OLDEST_MINOR below),
 # resolved by promotion and by version rather than by branch name - per
 # doc/dev-guide/patch-release.md a release branch is cut on demand and usually none exists, so a
 # released build lives on `main` just as often as on a `release/X.Y`. See
@@ -50,6 +51,10 @@ env:
   YONTRACK_CLI_VERSION: "5.8.0"
   # The Yontrack project ci.yml registers its builds in.
   YONTRACK_PROJECT: yontrack
+  # Oldest supported minor: an older one is never rescanned, even as "the previous minor". Until
+  # 6.0 ships its first GA, the previous minor of 5.5 is 5.4, which is no longer supported. Raise
+  # it when a minor stops being supported - when release/5.5 is retired, for one.
+  SECURITY_RESCAN_OLDEST_MINOR: "5.5"
   # The published images, by the version tag the release pushed. Deliberately Docker Hub and not
   # the durable `:<rc version>` GHCR tag: these are the bytes users actually pull. The legacy
   # `nemerosa/ontrack*` tags are re-tags of these same digests, so scanning one organisation
