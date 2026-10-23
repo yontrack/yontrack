@@ -35,6 +35,12 @@ class InMemoryDemoTarget(
      * by default, as on the local dev stack with its storage and the tampering switch on.
      */
     private val unavailableCapabilities: Map<DemoCapability, String> = emptyMap(),
+    /**
+     * Workflow node executors and notification channels the instance does not run - `mock-jenkins`
+     * on an instance which never enabled the mock Jenkins. Everything is run by default, as on the
+     * local dev stack.
+     */
+    private val missingWorkflowParts: Set<String> = emptySet(),
 ) : DemoTarget {
 
     /**
@@ -189,6 +195,13 @@ class InMemoryDemoTarget(
 
     override fun checkNativeFindingsFormats() {
         check(nativeFindingsFormats) { "The native scanner formats are not licensed on this instance. Nothing was deleted." }
+    }
+
+    override fun checkWorkflowsAvailable(executorIds: Set<String>, notificationChannels: Set<String>) {
+        val missing = (executorIds + notificationChannels).filter { it in missingWorkflowParts }
+        check(missing.isEmpty()) {
+            "The dataset has workflows needing $missing, which this instance does not run. Nothing was deleted."
+        }
     }
 
     override fun checkScorecardLicensed() {
@@ -452,6 +465,8 @@ class InMemoryDemoTarget(
     ) : DemoBranch {
 
         val promotionLevels = mutableListOf<String>()
+        /** The workflows of the promotion levels, run by every promotion to their level. */
+        val workflows = mutableMapOf<String, WorkflowSpec>()
         val validationStamps = mutableListOf<String>()
         val deletedValidationStamps = mutableListOf<String>()
         /** Thresholds of the `security-findings` stamps, by name. */
@@ -502,6 +517,13 @@ class InMemoryDemoTarget(
         override fun createPromotionLevel(name: String, description: String, workflow: WorkflowSpec?) {
             checkName(name, "Promotion level")
             require(name !in promotionLevels) { "Promotion level $name already exists in ${project.name}/${this.name}" }
+            // Refused as the workflow is saved, as the server refuses it
+            workflow?.let { spec ->
+                (spec.executorIds + spec.notificationChannels).filter { it in missingWorkflowParts }.forEach {
+                    error("Workflow of $name in ${project.name}/${this.name}: \"$it\" not found")
+                }
+                workflows[name] = spec
+            }
             promotionLevels += name
         }
 
@@ -785,6 +807,26 @@ class InMemoryDemoTarget(
             promotions += promotionLevel to at
             promotionActors += promoter
             entry("promotion.added", "promotionLevel" to promotionLevel, actor = promoter)
+            // As the server does it, whoever promotes: the subscription of the level fires
+            branch.workflows[promotionLevel]?.let { workflow ->
+                workflowRuns[promotionLevel] = runWorkflow(this, promotionLevel, workflow, at)
+            }
+        }
+
+        /** The runs of the workflows the promotions of the build started, by promotion level. */
+        val workflowRuns = mutableMapOf<String, WorkflowRun>()
+
+        /** Synchronous here: the workflow has run by the time [promote] returns. */
+        override fun promoteThroughWorkflow(
+            promotionLevel: String,
+            description: String,
+            at: LocalDateTime,
+            byPerson: Boolean,
+        ): WorkflowRun {
+            promote(promotionLevel, description, at, byPerson)
+            return checkNotNull(workflowRuns[promotionLevel]) {
+                "$promotionLevel of ${branch.project.name}/${branch.name} carries no workflow"
+            }
         }
 
         /** `NonAgentEvidenceCheck`: an agent's run on such a stamp is refused, never ignored. */
@@ -1081,6 +1123,7 @@ class InMemoryDemoTarget(
                 admissionRules.filter { it.name !in overridden }.forEach { rule -> check(rule, build) }
             }
             deployments += InMemoryDeployment(build, stopAt, times, message, overrides, deployer)
+            journal += "deploy ${environment.name}/${project.name}${qualifierSuffix(qualifier)} ${build.name} $stopAt"
             // As `DeploymentTrailEventMapper` writes them, by whoever runs the deployment
             val deployment = "${environment.name}/${project.name}${qualifierSuffix(qualifier)}"
             fun entry(type: String, vararg payload: Pair<String, Any?>) =
@@ -1292,6 +1335,81 @@ class InMemoryDemoTarget(
         }
 
     }
+}
+
+/**
+ * Runs [workflow] for the promotion of [build] to [promotionLevel], node by node as the server would:
+ * a node runs once all of its parents have succeeded, and never after one of them failed. Only the
+ * executors and channels the demo uses are known; any other node fails, as one the server does not
+ * run would.
+ *
+ * @param at What the promotions of the workflow are dated with - the server stamps them with the
+ * moment they are made, which a test has no other way to tell.
+ */
+private fun InMemoryDemoTarget.runWorkflow(
+    build: InMemoryDemoTarget.InMemoryBuild,
+    promotionLevel: String,
+    workflow: WorkflowSpec,
+    at: LocalDateTime,
+): WorkflowRun {
+    val project = build.branch.project
+    journal += "workflow $promotionLevel of ${project.name}/${build.branch.name}/${build.name}"
+    val succeeded = mutableSetOf<String>()
+    val done = mutableSetOf<String>()
+    val errors = mutableListOf<String>()
+    // The slot the pipeline of the workflow was created on, for the nodes after it
+    var slot: InMemoryDemoTarget.InMemorySlot? = null
+    while (true) {
+        val ready = workflow.nodes.filter { it.id !in done && succeeded.containsAll(it.parents) }
+        if (ready.isEmpty()) break
+        ready.forEach { node ->
+            done += node.id
+            val error: String? = try {
+                when (node.executorId) {
+                    "mock" -> "Simulated failure".takeIf { node.data.path("error").asBoolean(false) }
+                    WorkflowSpec.SLOT_PIPELINE_CREATION_EXECUTOR -> {
+                        val environment = node.data.path("environment").asString()
+                        val qualifier = node.data.path("qualifier").takeIf { !it.isMissingNode }?.asString().orEmpty()
+                        slot = environments()
+                            .map { it as InMemoryDemoTarget.InMemoryEnvironment }
+                            .singleOrNull { it.name == environment }
+                            ?.slots?.singleOrNull { it.project == project && it.qualifier == qualifier }
+                        if (slot == null) "Cannot find slot for environment = $environment, project = ${project.name}, qualifier = $qualifier" else null
+                    }
+                    "slot-pipeline-deploying" -> {
+                        checkNotNull(slot) { "Cannot find any pipeline in the workflow context" }
+                            .deploy(build, DeploymentStop.DONE, null, null, emptyList(), null)
+                        null
+                    }
+                    "slot-pipeline-deployed" -> null
+                    WorkflowSpec.NOTIFICATION_EXECUTOR -> {
+                        val config = node.data.path("channelConfig")
+                        when (val channel = node.notificationChannel) {
+                            "mock-jenkins" -> {
+                                val result = config.path("parameters")
+                                    .firstOrNull { it.path("name").asString() == "result" }
+                                    ?.path("value")?.asString() ?: "SUCCESS"
+                                "Jenkins build was not reported successful.".takeIf { result != "SUCCESS" }
+                            }
+                            WorkflowSpec.YONTRACK_PROMOTION_CHANNEL -> {
+                                build.promote(config.path("promotion").asString(), "", at, byPerson = true)
+                                null
+                            }
+                            else -> "Notification channel not found: $channel"
+                        }
+                    }
+                    else -> "Workflow node executor ID \"${node.executorId}\" not found"
+                }
+            } catch (ex: Exception) {
+                ex.message ?: ex.toString()
+            }
+            if (error == null) succeeded += node.id else errors += "${node.id}: $error"
+        }
+    }
+    return WorkflowRun(
+        outcome = if (succeeded.size == workflow.nodes.size) WorkflowOutcome.SUCCESS else WorkflowOutcome.ERROR,
+        errors = errors,
+    )
 }
 
 /**

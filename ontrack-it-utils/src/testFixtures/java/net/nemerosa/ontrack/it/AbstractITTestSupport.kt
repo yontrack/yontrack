@@ -42,11 +42,12 @@ import javax.sql.DataSource
         "spring.rabbitmq.username=ontrack",
         "spring.rabbitmq.password=ontrack",
         "spring.graphql.schema.locations=classpath:graphql/",
-        // The "Simulated gate" workflow node executor and the mock SCM are off by default and are
-        // not picked up from application-dev.yml here: these tests boot their own configuration,
-        // not the UI application.
+        // The "Simulated gate" workflow node executor, the mock SCM and the mock Jenkins are off by
+        // default and are not picked up from application-dev.yml here: these tests boot their own
+        // configuration, not the UI application.
         "ontrack.config.extension.workflows.mock.enabled=true",
         "ontrack.config.extension.scm.mock.enabled=true",
+        "ontrack.config.extension.jenkins.mock.enabled=true",
         // Nothing to wait for: no other instance runs side by side
         "ontrack.config.search.index.startup-delay=0",
         // The assisted changes and the search renames are processed at once, after the commit which

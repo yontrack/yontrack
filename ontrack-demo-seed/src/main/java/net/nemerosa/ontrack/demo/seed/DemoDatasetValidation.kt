@@ -228,6 +228,29 @@ fun DemoDataset.validate() {
                     }
                 }
             }
+            // What a workflow promotes to is the workflow's to grant: the dataset granting it as well
+            // would show it granted twice, or granted where the workflow was meant to fail (see
+            // `WorkflowSpec`)
+            val levelNames = branch.promotionLevels.map { it.name }.toSet()
+            val grantedByWorkflows = branch.promotionLevels.flatMap { it.workflow?.promotions.orEmpty() }.toSet()
+            branch.promotionLevels.forEach { promotionLevel ->
+                val workflow = promotionLevel.workflow ?: return@forEach
+                val where = "The workflow of ${promotionLevel.name} of ${project.name}/${branch.name}"
+                // The server refuses the workflow as it is saved, after the reset
+                workflow.nodes.filter { it.data.isMissingNode || it.data.isNull }.forEach { node ->
+                    problems += "$where has a node ${node.id} without data, which Yontrack requires - " +
+                            "`data: {}` when it has nothing to configure."
+                }
+                workflow.promotions.filter { it !in levelNames }.forEach { promotion ->
+                    problems += "$where promotes to $promotion, which the branch does not declare."
+                }
+            }
+            branch.builds.forEach { build ->
+                val where = "Build ${build.name} of ${project.name}/${branch.name}"
+                build.promotionLevels.filter { it in grantedByWorkflows }.forEach { promotionLevel ->
+                    problems += "$where is promoted to $promotionLevel, which only a workflow of the branch grants."
+                }
+            }
             val nonAgentStamps = branch.validationStamps.filter { it.nonAgentEvidence }.map { it.name }.toSet()
             branch.builds.forEach { build ->
                 checkName(build.name, "Build")
@@ -445,6 +468,24 @@ fun DemoDataset.validate() {
     }
 
     val projectNames = projects.map { it.name }.toSet()
+    // A workflow deploying to a slot the dataset never creates fails at its first node, after the reset
+    val slotKeys = environments.flatMap { environment ->
+        environment.slots.map { Triple(environment.name, it.project, it.qualifier) }
+    }.toSet()
+    projects.forEach { project ->
+        project.branches.forEach { branch ->
+            branch.promotionLevels.forEach { promotionLevel ->
+                promotionLevel.workflow?.deploymentSlots?.forEach { (environment, qualifier) ->
+                    if (Triple(environment, project.name, qualifier) !in slotKeys) {
+                        problems += "The workflow of ${promotionLevel.name} of ${project.name}/${branch.name} " +
+                                "deploys to the $environment/${project.name}" +
+                                (qualifier.takeIf { it.isNotBlank() }?.let { " [$it]" } ?: "") +
+                                " slot, which the dataset never creates."
+                    }
+                }
+            }
+        }
+    }
     environments.forEach { environment ->
         checkName(environment.name, "Environment")
         environment.slots

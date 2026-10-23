@@ -88,6 +88,18 @@ interface DemoTarget {
     fun checkScorecardLicensed()
 
     /**
+     * Checks the instance has enabled every workflow node executor and every notification channel the
+     * workflows of the dataset name, and fails if it has not.
+     *
+     * Called before the reset, for the same reason as [checkScmAvailable]: the server refuses a
+     * workflow naming an executor or a channel it does not run when the workflow is SAVED - on a
+     * promotion level, after every project has been deleted. Several of them are off by default and
+     * switched on by a property (`mock`, `mock-jenkins`), and the deployment ones need a licensed
+     * feature.
+     */
+    fun checkWorkflowsAvailable(executorIds: Set<String>, notificationChannels: Set<String>)
+
+    /**
      * Why the instance cannot offer [capability], or `null` when it can.
      *
      * Asked before the reset, and read-only: unlike [checkScmAvailable], a missing capability does
@@ -349,6 +361,22 @@ interface DemoBuild {
      * admit agents
      */
     fun promote(promotionLevel: String, description: String, at: LocalDateTime, byPerson: Boolean = false)
+
+    /**
+     * Promotes the build to a level carrying a [workflow][WorkflowSpec], as [promote] does, and waits
+     * for the run of the workflow the promotion starts to finish.
+     *
+     * The server runs a workflow in the background, and its nodes deploy and promote: a seed going on
+     * without waiting would race them, and the demo would differ from one reset to the next.
+     *
+     * @throws IllegalStateException When the workflow does not finish in time
+     */
+    fun promoteThroughWorkflow(
+        promotionLevel: String,
+        description: String,
+        at: LocalDateTime,
+        byPerson: Boolean = false,
+    ): WorkflowRun
 
     /**
      * Records a run of [validationStamp] at [at].

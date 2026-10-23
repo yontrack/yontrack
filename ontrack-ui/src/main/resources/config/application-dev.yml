@@ -12,6 +12,12 @@ ontrack:
           # seed. It is off by default everywhere else and must be switched on explicitly -
           # see SCMExtensionConfigProperties.MockSCMConfigProperties.
           enabled: true
+      jenkins:
+        mock:
+          # The `mock-jenkins` notification channel, used by the KDSL acceptance tests and by the
+          # demo seed. It is off by default everywhere else and must be switched on explicitly -
+          # see JenkinsExtensionConfigProperties.MockJenkinsConfigProperties.
+          enabled: true
       workflows:
         mock:
           # The "Simulated gate" node executor, used by the integration and KDSL acceptance

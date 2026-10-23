@@ -7,17 +7,18 @@ import net.nemerosa.ontrack.extension.jenkins.client.JenkinsClientFactory
 import org.springframework.context.annotation.Profile
 import org.springframework.stereotype.Component
 
+/**
+ * In the `dev` profile, every Jenkins client is a mock one - the `jenkins` channel's, the
+ * configurations' connection test, the post-processing. Only there: outside of it, the
+ * `mock-jenkins` channel uses [MockJenkinsClients] directly, and leaves the real Jenkins alone.
+ */
 @Component
 @Profile(RunProfile.DEV)
-class MockJenkinsClientFactory : JenkinsClientFactory {
-
-    private val clients = mutableMapOf<String, MockJenkinsClient>()
-
-    fun findClient(config: String) = clients[config]
+class MockJenkinsClientFactory(
+    private val mockJenkinsClients: MockJenkinsClients,
+) : JenkinsClientFactory {
 
     override fun getClient(configuration: JenkinsConfiguration): JenkinsClient =
-        clients.getOrPut(configuration.name) {
-            MockJenkinsClient(configuration)
-        }
+        mockJenkinsClients.getClient(configuration)
 
 }

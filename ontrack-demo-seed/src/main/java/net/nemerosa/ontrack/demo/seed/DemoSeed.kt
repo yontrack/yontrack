@@ -52,6 +52,15 @@ class DemoSeed(
         if (dataset.estates.isNotEmpty()) {
             target.checkScorecardLicensed()
         }
+        // And the workflows: the server refuses one naming what it does not run as the workflow is
+        // saved, after the reset
+        val workflows = dataset.workflows()
+        if (workflows.isNotEmpty()) {
+            target.checkWorkflowsAvailable(
+                executorIds = workflows.flatMap { it.executorIds }.toSet(),
+                notificationChannels = workflows.flatMap { it.notificationChannels }.toSet(),
+            )
+        }
         val now = LocalDateTime.now(clock)
         reset(dataset)
         create(dataset, now, evidence)
@@ -105,6 +114,14 @@ class DemoSeed(
             deployments = dataset.deployments.filter { it.build.project in left },
         )
     }
+
+    /** Every workflow of the dataset, on its promotion levels and on its slots. */
+    private fun DemoDataset.workflows(): List<WorkflowSpec> =
+        projects.flatMap { project ->
+            project.branches.flatMap { branch -> branch.promotionLevels.mapNotNull { it.workflow } }
+        } + environments.flatMap { environment ->
+            environment.slots.flatMap { slot -> slot.workflows.map { WorkflowSpec(it.yaml) } }
+        }
 
     private fun DemoDataset.declaresEvidence(): Boolean =
         projects.any { project ->
@@ -204,6 +221,8 @@ class DemoSeed(
         val projects = mutableMapOf<String, DemoProject>()
         val branches = mutableMapOf<Pair<String, String>, DemoBranch>()
         val builds = mutableMapOf<BuildRef, DemoBuild>()
+        // Left out of the ladders of their builds, and made once the deployments have run - see below
+        val heldLadders = mutableListOf<HeldLadder>()
 
         // Before the projects: a project is given its labels as it is created, and the
         // assignment is written with label *ids*, so every label has to exist first.
@@ -227,7 +246,7 @@ class DemoSeed(
             }
             spec.branches.forEach { branchSpec ->
                 branches[spec.name to branchSpec.name] =
-                    createBranch(spec, branchSpec, project, now, builds, tokens, evidence)
+                    createBranch(spec, branchSpec, project, now, builds, tokens, evidence, heldLadders)
             }
         }
 
@@ -276,7 +295,7 @@ class DemoSeed(
 
         // After every slot exists, and in declaration order: an `environment` admission rule asks
         // what is deployed in another slot at that moment
-        dataset.deployments.forEach { spec ->
+        fun deploy(spec: DeploymentSpec) {
             val ref = spec.build
             log("Deploying ${ref.build} of ${ref.project}/${ref.branch} to ${spec.environment} (${spec.stopAt})")
             slots.getValue(Triple(spec.environment, ref.project, spec.qualifier))
@@ -289,6 +308,32 @@ class DemoSeed(
                     token = spec.agent?.let { tokens.getValue(sessionKey(it)) },
                 )
         }
+        dataset.deployments.filterNot { it.afterPromotionWorkflows }.forEach(::deploy)
+
+        // The promotions to a level carrying a workflow, once the deployments have run - a workflow
+        // deploying to a slot needs the slot, and its admission rules read what the others hold - and
+        // one at a time, waiting for each workflow to finish: its nodes deploy and promote, and a seed
+        // going on without waiting would race them. Oldest build first, as a real pipeline would have
+        // run them, so that a slot both deploy to ends up holding the newer one.
+        heldLadders.sortedBy { it.creation }.forEach { promotion ->
+            promotion.ladder.forEach { rung ->
+                val expected = rung.expected
+                if (expected == null) {
+                    promotion.build.promote(rung.promotionLevel, "", rung.at, byPerson = rung.byPerson)
+                } else {
+                    log("Promoting ${promotion.where} to ${rung.promotionLevel}, and waiting for its workflow")
+                    val run = promotion.build.promoteThroughWorkflow(rung.promotionLevel, "", rung.at, byPerson = rung.byPerson)
+                    check(run.outcome == expected) {
+                        "The workflow of ${rung.promotionLevel} ended ${run.outcome} on ${promotion.where}, " +
+                                "where the dataset expects $expected" +
+                                run.errors.takeIf { it.isNotEmpty() }?.joinToString(prefix = ": ", separator = "; ").orEmpty()
+                    }
+                }
+            }
+        }
+
+        // The deployments reading what a workflow deployed
+        dataset.deployments.filter { it.afterPromotionWorkflows }.forEach(::deploy)
 
         // AFTER the deployments, unlike the admission rules. A `CANDIDATE` or `RUNNING` workflow is
         // a hard gate: the deployment cannot start, or cannot finish, until it has passed, and a
@@ -373,6 +418,7 @@ class DemoSeed(
         builds: MutableMap<BuildRef, DemoBuild>,
         tokens: Map<String, DemoToken>,
         evidence: Boolean,
+        heldLadders: MutableList<HeldLadder>,
     ): DemoBranch {
         val branch = project.createBranch(spec.name, spec.description)
         spec.scmBranch?.let { branch.configureScmBranch(it) }
@@ -408,6 +454,8 @@ class DemoSeed(
         val gated = spec.promotionLevels.filter { it.assistedBuildsRequire.isNotEmpty() }.map { it.name }.toSet()
         // Only where an auto promotion can fire - see below
         val promotionsFirst = spec.promotionLevels.any { it.autoPromotion != null }
+        // Promoted to once the deployments have run - see `create`
+        val workflows = spec.promotionLevels.mapNotNull { level -> level.workflow?.let { level.name to it } }.toMap()
         spec.builds.forEach { buildSpec ->
             val creation = buildSpec.creation.resolve(now)
             val build = branch.createBuild(
@@ -467,12 +515,27 @@ class DemoSeed(
                 if (buildSpec.commits.isNotEmpty() && buildSpec.promotionLevels.any { it in gated }) {
                     build.awaitAssistedChange()
                 }
+                // From the first level carrying a workflow on, the ladder is held back: the rest of
+                // it comes after what the workflow does, as in a real pipeline. Dated on their rungs
+                // all the same - the promotions are what the build reached then, and only what the
+                // workflow does is of the reset.
+                val held = mutableListOf<HeldLadder.Rung>()
                 buildSpec.promotionLevels.forEachIndexed { index, promotionLevel ->
-                    build.promote(
-                        promotionLevel,
-                        "",
-                        creation.plus(step.multipliedBy(validationCount + index + 1L)),
-                        byPerson = byAgent && promotionLevel !in agentsAdmitted,
+                    val at = creation.plus(step.multipliedBy(validationCount + index + 1L))
+                    val byPerson = byAgent && promotionLevel !in agentsAdmitted
+                    val workflow = workflows[promotionLevel]
+                    if (workflow != null || held.isNotEmpty()) {
+                        held += HeldLadder.Rung(promotionLevel, at, byPerson, workflow?.expected)
+                    } else {
+                        build.promote(promotionLevel, "", at, byPerson = byPerson)
+                    }
+                }
+                if (held.isNotEmpty()) {
+                    heldLadders += HeldLadder(
+                        build = build,
+                        where = "${projectSpec.name}/${spec.name}/${buildSpec.name}",
+                        creation = creation,
+                        ladder = held,
                     )
                 }
             }
@@ -522,6 +585,30 @@ class DemoSeed(
             if (!promotionsFirst) promote()
         }
         return branch
+    }
+
+    /**
+     * The ladder of a build from its first level carrying a workflow on, held back until the
+     * deployments have run.
+     *
+     * @property creation Creation of the build, which orders the held ladders
+     */
+    private class HeldLadder(
+        val build: DemoBuild,
+        val where: String,
+        val creation: LocalDateTime,
+        val ladder: List<Rung>,
+    ) {
+        /**
+         * @property expected How the workflow of the level is expected to end, `null` for a level
+         * carrying none
+         */
+        class Rung(
+            val promotionLevel: String,
+            val at: LocalDateTime,
+            val byPerson: Boolean,
+            val expected: WorkflowOutcome?,
+        )
     }
 
     // validate() has already ruled out a reference the dataset does not create.

@@ -5,6 +5,7 @@ import net.nemerosa.ontrack.json.asJson
 import net.nemerosa.ontrack.kdsl.connector.Connected
 import net.nemerosa.ontrack.kdsl.connector.Connector
 import net.nemerosa.ontrack.kdsl.connector.graphql.convert
+import net.nemerosa.ontrack.kdsl.connector.graphql.schema.NotificationChannelsQuery
 import net.nemerosa.ontrack.kdsl.connector.graphql.schema.NotificationRecordsQuery
 import net.nemerosa.ontrack.kdsl.connector.graphql.schema.SubscribeToEntityEventsMutation
 import net.nemerosa.ontrack.kdsl.connector.graphql.schema.SubscriptionsByEntityQuery
@@ -83,6 +84,17 @@ class NotificationsMgt(connector: Connector) : Connected(connector) {
     val inMemory: InMemoryMgt by lazy {
         InMemoryMgt(connector)
     }
+
+    /**
+     * Types of the notification channels the instance has enabled
+     */
+    val enabledChannels: Set<String>
+        get() = graphqlConnector.query(NotificationChannelsQuery())
+            ?.notificationChannels
+            ?.filter { it.enabled == true }
+            ?.map { it.type }
+            ?.toSet()
+            ?: emptySet()
 
     /**
      * Gets the last notification record for a given channel

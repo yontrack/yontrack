@@ -1,0 +1,6 @@
+query NotificationChannels {
+    notificationChannels {
+        type
+        enabled
+    }
+}

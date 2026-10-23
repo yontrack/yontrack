@@ -81,6 +81,19 @@ object DemoContent {
     const val GOLD = "GOLD"
     const val CANARY = "CANARY"
 
+    /**
+     * Granted by the [CANARY] workflow alone, once the canary verification passed: no build of the
+     * dataset is promoted to it, and on the maintenance branch, whose verification fails, no build
+     * reaches it.
+     */
+    const val RELEASABLE = "RELEASABLE"
+
+    /**
+     * The mock Jenkins the [CANARY] workflow runs its jobs on. No Jenkins configuration of the
+     * instance has this name, and none is needed: the `mock-jenkins` channel stands for one.
+     */
+    const val CANARY_JENKINS = "demo-jenkins"
+
     const val BUILD = "BUILD"
     const val UNIT_TESTS = "UNIT.TESTS"
     const val INTEGRATION_TESTS = "INTEGRATION.TESTS"
@@ -391,40 +404,70 @@ object DemoContent {
     private val gold = PromotionLevelSpec(GOLD, "A human approved the build for release.")
 
     /**
-     * Same shape for both variants — one starting node, two parallel checks and a node
-     * joining them — so the demo shows what a passing and a failing workflow run each look
-     * like on a promotion run.
+     * Same shape for both variants, and real nodes all the way (#2114): the build is deployed to the
+     * staging canary, two Jenkins jobs check it in parallel, in SYNC mode so that the workflow waits
+     * for their outcome, and a node joining them promotes the build to [RELEASABLE] - so the demo shows
+     * what a passing and a failing workflow run each look like on a promotion run, and what each node
+     * leaves behind: a deployment, two Jenkins builds, a promotion.
      *
-     * @param performanceGateFails Whether the performance-gate node reports failure, which
-     * blocks the join node from running.
+     * The Jenkins jobs run on the mock Jenkins ([CANARY_JENKINS]), which takes `waiting` and `result`
+     * as parameters: the demo calls no real Jenkins, and the reset stays fast and reproducible.
+     *
+     * @param performanceGateFails Whether the performance-gate job fails, which blocks the join node
+     * from running - the build then stays deployed to the canary, and short of [RELEASABLE].
      */
     private fun canaryWorkflow(performanceGateFails: Boolean) = WorkflowSpec(
-        """
+        yaml = """
             name: Canary verification
             nodes:
-              - id: start
-                executorId: mock
+              - id: deploy-canary
+                executorId: slot-pipeline-creation
                 data:
-                    text: Start canary verification
+                    environment: $STAGING
+                    qualifier: $CANARY_QUALIFIER
+              - id: deploying
+                parents: [{id: deploy-canary}]
+                executorId: slot-pipeline-deploying
+                data: {}
+              - id: deployed
+                parents: [{id: deploying}]
+                executorId: slot-pipeline-deployed
+                data: {}
               - id: smoke-tests
-                parents: [{id: start}]
-                executorId: mock
+                parents: [{id: deployed}]
+                executorId: notification
                 data:
-                    text: Run smoke tests
-                    waitMs: 500
+                    channel: mock-jenkins
+                    channelConfig:
+                        config: $CANARY_JENKINS
+                        job: canary/smoke-tests
+                        callMode: SYNC
+                        parameters:
+                          - name: waiting
+                            value: "1500"
               - id: performance-gate
-                parents: [{id: start}]
-                executorId: mock
+                parents: [{id: deployed}]
+                executorId: notification
                 data:
-                    text: Check performance budget
-                    waitMs: 500
-                    error: $performanceGateFails
+                    channel: mock-jenkins
+                    channelConfig:
+                        config: $CANARY_JENKINS
+                        job: canary/performance-gate
+                        callMode: SYNC
+                        parameters:
+                          - name: waiting
+                            value: "1500"
+                          - name: result
+                            value: ${if (performanceGateFails) "FAILURE" else "SUCCESS"}
               - id: promote-canary
                 parents: [{id: smoke-tests}, {id: performance-gate}]
-                executorId: mock
+                executorId: notification
                 data:
-                    text: Promote canary to full rollout
-        """.trimIndent()
+                    channel: yontrack-promotion
+                    channelConfig:
+                        promotion: $RELEASABLE
+        """.trimIndent(),
+        expected = if (performanceGateFails) WorkflowOutcome.ERROR else WorkflowOutcome.SUCCESS,
     )
 
     /** Used on [MAIN]: the performance gate passes and the canary is promoted. */
@@ -440,6 +483,14 @@ object DemoContent {
         "Automated canary verification workflow.",
         workflow = canaryWorkflow(performanceGateFails = true),
     )
+
+    /**
+     * Granted by the canary verification - see [RELEASABLE]. Last of the branch's order, after
+     * [CANARY], rather than between [CANARY] and [GOLD]: [CANARY] already comes after [GOLD] there,
+     * and [goldAfterSilver] reads its predecessor off that order - a level slotted in before [GOLD]
+     * would become what every GOLD build of the branch has to carry first.
+     */
+    private val releasable = PromotionLevelSpec(RELEASABLE, "The canary verification passed.")
 
     /**
      * A one-node workflow for a slot, kept deliberately smaller than [canaryWorkflow]: what a slot
@@ -702,7 +753,7 @@ object DemoContent {
                 description = "Main development branch.",
                 scmBranch = SCM_MAIN,
                 favourite = true,
-                promotionLevels = fullPromotions + canaryPass,
+                promotionLevels = fullPromotions + canaryPass + releasable,
                 // The dependency scan on this branch only: the maintenance branch has none, and a branch
                 // which never scanned exposes nothing, so the project is resolved as a whole (#1982)
                 validationStamps = fullValidationStamps + dependencyScan,
@@ -826,9 +877,12 @@ object DemoContent {
                         release = "1.4.6",
                         description = "Owner export as CSV, canary rollout.",
                         // Hours rather than `DaysAgo(0)`: the head of the demo's busiest branch
-                        // carries four promotions, and an offset is the only way to be sure they
+                        // carries several promotions, and an offset is the only way to be sure they
                         // fit behind the reset whatever zone it runs in
                         creation = HoursAgo(5),
+                        // GOLD after CANARY, so promoted once the canary verification CANARY starts has
+                        // finished and granted RELEASABLE: the head of main is granted every level of
+                        // its branch, which is what the highest promotions widget shows (#2006)
                         promotionLevels = listOf(BRONZE, SILVER, CANARY, GOLD),
                         validations = listOf(
                             ValidationSpec(BUILD, PASSED),
@@ -850,7 +904,7 @@ object DemoContent {
                 description = "Maintenance of the previous minor version.",
                 scmBranch = SCM_MAINTENANCE,
                 favourite = true,
-                promotionLevels = fullPromotions + canaryFail,
+                promotionLevels = fullPromotions + canaryFail + releasable,
                 validationStamps = fullValidationStamps,
                 builds = listOf(
                     BuildSpec(
@@ -2525,12 +2579,13 @@ object DemoContent {
         DeploymentSpec(PRODUCTION, BuildRef(SERVICE, MAIN, "104")),
         DeploymentSpec(STAGING, BuildRef(SERVICE, MAINTENANCE, "89")),
         DeploymentSpec(STAGING, BuildRef(SERVICE, MAIN, "107"), stopAt = DeploymentStop.RUNNING),
-        // Last, and on a slot of its own: the [CANARY_QUALIFIER] qualifier has its own history, its own
-        // graph and its own "only the last pipeline can be deployed", so nothing above is
-        // disturbed by it. 107 carries SILVER, which is all the staging canary asks for, and
-        // being DONE is what makes the slot *hold* 1.4.6 - the thing the production canary is
-        // then behind.
-        DeploymentSpec(STAGING, BuildRef(SERVICE, MAIN, "107"), qualifier = CANARY_QUALIFIER),
+        // The staging canary is NOT deployed here: the CANARY workflows deploy it, once every
+        // deployment above has run (#2114) - 89 first, whose verification then fails, and 107, whose
+        // verification passes. The [CANARY_QUALIFIER] qualifier has its own history, its own graph
+        // and its own "only the last pipeline can be deployed", so nothing above is disturbed by
+        // it, and 107 being last is what makes the slot *hold* 1.4.6 - the thing the production
+        // canary is then behind.
+        //
         // The demo's one BLOCKED candidate, and the only deployment that stops at
         // [DeploymentStop.CANDIDATE]. Without it the dataset has nothing for "What's blocking" to
         // show but green ticks - which is the one thing the deployment page exists for (#1792).
@@ -2547,11 +2602,14 @@ object DemoContent {
         //   would silently take that reading away from the matrix (#1791).
         //
         // It leaves `lastDeployedPipeline` empty, so the slot still reads "Never deployed" too.
+        //
+        // After the CANARY workflows, since its `stagingCanary` rule reads what they deployed.
         DeploymentSpec(
             PRODUCTION,
             BuildRef(SERVICE, MAIN, "104"),
             stopAt = DeploymentStop.CANDIDATE,
             qualifier = CANARY_QUALIFIER,
+            afterPromotionWorkflows = true,
         ),
     )
 

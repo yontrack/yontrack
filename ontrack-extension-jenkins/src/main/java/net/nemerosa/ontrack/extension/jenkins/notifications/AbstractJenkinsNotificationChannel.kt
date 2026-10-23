@@ -28,7 +28,7 @@ abstract class AbstractJenkinsNotificationChannel(
         if (config.config.isBlank()) {
             throw EventSubscriptionConfigException("Jenkins configuration name is required")
         } else {
-            jenkinsConfigurationService.findConfiguration(config.config)
+            findJenkinsConfiguration(config.config)
                 ?: throw EventSubscriptionConfigException("Jenkins configuration ${config.config} could not be found")
         }
         if (config.job.isBlank()) {
@@ -56,7 +56,7 @@ abstract class AbstractJenkinsNotificationChannel(
         outputProgressCallback: (current: JenkinsNotificationChannelOutput) -> JenkinsNotificationChannelOutput
     ): NotificationResult<JenkinsNotificationChannelOutput> {
         // Gets the Jenkins configuration
-        val jenkinsConfig = jenkinsConfigurationService.findConfiguration(config.config)
+        val jenkinsConfig = findJenkinsConfiguration(config.config)
             ?: return NotificationResult.invalidConfiguration("Jenkins configuration cannot be found: ${config.config}")
         // Gets the Jenkins client
         val jenkinsClient = createJenkinsClient(jenkinsConfig)
@@ -114,6 +114,12 @@ abstract class AbstractJenkinsNotificationChannel(
             NotificationResult.ok(output = output)
         }
     }
+
+    /**
+     * The Jenkins configuration a channel configuration names, `null` when there is none.
+     */
+    protected open fun findJenkinsConfiguration(name: String): JenkinsConfiguration? =
+        jenkinsConfigurationService.findConfiguration(name)
 
     protected abstract fun createJenkinsClient(config: JenkinsConfiguration): JenkinsClient
 

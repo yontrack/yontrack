@@ -1,5 +1,9 @@
 package net.nemerosa.ontrack.demo.seed
 
+import net.nemerosa.ontrack.json.getRequiredTextField
+import net.nemerosa.ontrack.json.getTextField
+import net.nemerosa.ontrack.yaml.Yaml
+import tools.jackson.databind.JsonNode
 import java.time.LocalDateTime
 
 /**
@@ -255,9 +259,94 @@ data class AutoPromotionSpec(
 /**
  * A workflow run on every promotion run created on the promotion level it is attached to.
  *
+ * A build is promoted to such a level once every deployment of the dataset has run, oldest build
+ * first, and the seed waits for the workflow to finish before it goes on: its nodes may deploy and
+ * promote, and a reset racing them would not be reproducible. The promotions of the build after that
+ * level are made once the workflow has finished, and a level the workflow promotes to is granted by
+ * the workflow alone.
+ *
  * @property yaml The workflow definition, in the format `ontrack.workflows.saveYamlWorkflow` accepts.
+ * @property expected How the workflow ends on every build promoted to its level. The seed stops when
+ * it ends otherwise: a demo whose canary verification passed when it was meant to fail tells the
+ * wrong story, and so does one whose deployment failed before reaching the gate it demonstrates.
  */
-data class WorkflowSpec(val yaml: String)
+data class WorkflowSpec(
+    val yaml: String,
+    val expected: WorkflowOutcome = WorkflowOutcome.SUCCESS,
+) {
+
+    /** The nodes of the workflow, read off [yaml]. */
+    val nodes: List<WorkflowNodeSpec> by lazy {
+        Yaml().read(yaml).first().path("nodes").toList().map { node ->
+            WorkflowNodeSpec(
+                id = node.getRequiredTextField("id"),
+                executorId = node.getRequiredTextField("executorId"),
+                parents = node.path("parents").toList().map { it.getRequiredTextField("id") },
+                data = node.path("data"),
+            )
+        }
+    }
+
+    /** IDs of the node executors the workflow runs, which the instance must have enabled. */
+    val executorIds: Set<String> get() = nodes.map { it.executorId }.toSet()
+
+    /** Notification channels the `notification` nodes of the workflow send to. */
+    val notificationChannels: Set<String>
+        get() = nodes.mapNotNull { it.notificationChannel }.toSet()
+
+    /** Promotion levels the workflow promotes the build to, through `yontrack-promotion` nodes. */
+    val promotions: Set<String>
+        get() = nodes.filter { it.notificationChannel == YONTRACK_PROMOTION_CHANNEL }
+            .mapNotNull { it.data.path("channelConfig").getTextField("promotion") }
+            .toSet()
+
+    /** Environments and qualifiers of the slots the workflow deploys to. */
+    val deploymentSlots: Set<Pair<String, String>>
+        get() = nodes.filter { it.executorId == SLOT_PIPELINE_CREATION_EXECUTOR }
+            .map { it.data.getTextField("environment").orEmpty() to it.data.getTextField("qualifier").orEmpty() }
+            .toSet()
+
+    companion object {
+        const val NOTIFICATION_EXECUTOR = "notification"
+        const val SLOT_PIPELINE_CREATION_EXECUTOR = "slot-pipeline-creation"
+        const val YONTRACK_PROMOTION_CHANNEL = "yontrack-promotion"
+    }
+}
+
+/**
+ * A node of a [WorkflowSpec].
+ *
+ * @property parents IDs of the nodes which must have succeeded for this one to run
+ * @property data Configuration of the node, whose shape is its executor's own
+ */
+data class WorkflowNodeSpec(
+    val id: String,
+    val executorId: String,
+    val parents: List<String>,
+    val data: JsonNode,
+) {
+    /** The channel of a `notification` node, `null` for any other. */
+    val notificationChannel: String?
+        get() = data.getTextField("channel")?.takeIf {
+            executorId == WorkflowSpec.NOTIFICATION_EXECUTOR && it.isNotBlank()
+        }
+}
+
+/** How a workflow ended: all of its nodes succeeded, or one of them failed. */
+enum class WorkflowOutcome {
+    SUCCESS,
+    ERROR,
+}
+
+/**
+ * A finished run of a workflow.
+ *
+ * @property errors The nodes which failed, each as `<node>: <error>`
+ */
+data class WorkflowRun(
+    val outcome: WorkflowOutcome,
+    val errors: List<String>,
+)
 
 /**
  * @property findings Thresholds of a `security-findings` stamp, whose runs are posted as the
@@ -675,6 +764,9 @@ data class SlotWorkflowSpec(
  * @property agent The agent running the deployment, on a slot which
  * [admits agents][SlotSpec.agentsAdmitted]. A deployment an agent starts and a manual rule stops is
  * left as a candidate, waiting for a person: an agent asks, a person approves.
+ * @property afterPromotionWorkflows Whether the deployment runs after the [promotion
+ * workflows][WorkflowSpec] rather than before them, because an admission rule of its slot reads what
+ * one of them deployed. In declaration order with the others of the same kind.
  */
 data class DeploymentSpec(
     val environment: String,
@@ -685,6 +777,7 @@ data class DeploymentSpec(
     val message: String? = null,
     val overrides: List<RuleOverrideSpec> = emptyList(),
     val agent: AgentSessionSpec? = null,
+    val afterPromotionWorkflows: Boolean = false,
 )
 
 /**

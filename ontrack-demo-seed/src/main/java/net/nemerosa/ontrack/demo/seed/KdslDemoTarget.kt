@@ -1,6 +1,7 @@
 package net.nemerosa.ontrack.demo.seed
 
 import net.nemerosa.ontrack.json.asJson
+import net.nemerosa.ontrack.json.getTextField
 import net.nemerosa.ontrack.kdsl.connector.graphql.schema.type.AuditTrailStorageState
 import net.nemerosa.ontrack.kdsl.connector.support.DefaultConnector
 import net.nemerosa.ontrack.kdsl.spec.ValidationRun
@@ -56,6 +57,10 @@ import net.nemerosa.ontrack.kdsl.spec.extension.general.previousPromotionConditi
 import net.nemerosa.ontrack.kdsl.spec.extension.general.promotionDependencies
 import net.nemerosa.ontrack.kdsl.spec.extension.license.isLicensedFeatureEnabled
 import net.nemerosa.ontrack.kdsl.spec.extension.notifications.NotificationsMgt
+import net.nemerosa.ontrack.kdsl.spec.extension.notifications.notifications
+import net.nemerosa.ontrack.kdsl.spec.extension.workflows.WorkflowInstanceNodeStatus
+import net.nemerosa.ontrack.kdsl.spec.extension.workflows.WorkflowInstanceStatus
+import net.nemerosa.ontrack.kdsl.spec.extension.workflows.workflows
 import net.nemerosa.ontrack.kdsl.spec.extension.scm.MockScmRepositoryContext
 import net.nemerosa.ontrack.kdsl.spec.extension.scm.mockScmBranchProperty
 import net.nemerosa.ontrack.kdsl.spec.extension.scm.mockScmBuildCommitProperty
@@ -74,6 +79,7 @@ import java.security.MessageDigest
 import java.time.Duration
 import java.time.LocalDateTime
 import java.util.HexFormat
+import net.nemerosa.ontrack.kdsl.connector.graphql.schema.type.ProjectEntityType as GraphQLProjectEntityType
 
 /**
  * [DemoTarget] against a real Yontrack instance, through the KDSL.
@@ -84,6 +90,31 @@ import java.util.HexFormat
 class KdslDemoTarget(private val ontrack: Ontrack) : DemoTarget {
 
     override fun projects(): List<DemoProject> = ontrack.projects().map { KdslDemoProject(ontrack, it) }
+
+    /**
+     * Asks the instance for its enabled node executors and notification channels rather than saving a
+     * probe workflow: a saved workflow would outlive the reset.
+     */
+    override fun checkWorkflowsAvailable(executorIds: Set<String>, notificationChannels: Set<String>) {
+        val (executors, channels) = try {
+            ontrack.workflows.enabledNodeExecutors to ontrack.notifications.enabledChannels
+        } catch (ex: Exception) {
+            error(
+                "The dataset has workflows, and the node executors and notification channels of this " +
+                        "instance could not be read to check it runs them. Nothing was deleted." +
+                        "\n\nThe server said:\n${ex.message}"
+            )
+        }
+        val missing = (executorIds - executors).map { "the workflow node executor \"$it\"" } +
+                (notificationChannels - channels).map { "the notification channel \"$it\"" }
+        check(missing.isEmpty()) {
+            "The dataset has workflows needing ${missing.joinToString(" and ")}, which this instance " +
+                    "does not run. Check that `ontrack.config.extension.workflows.mock.enabled` " +
+                    "(\"mock\") and `ontrack.config.extension.jenkins.mock.enabled` (\"mock-jenkins\") " +
+                    "are set, and that the licence enables the environments (\"slot-pipeline-*\"). " +
+                    "Nothing was deleted."
+        }
+    }
 
     override fun unavailable(capability: DemoCapability): String? =
         when (capability) {
@@ -373,6 +404,12 @@ class KdslDemoTarget(private val ontrack: Ontrack) : DemoTarget {
         val ASSISTED_CHANGE_TIMEOUT: Duration = Duration.ofSeconds(60)
 
         /**
+         * How long a promotion workflow may take, from the promotion to its last node. The demo's
+         * runs two Jenkins jobs of a second or two each, and a deployment.
+         */
+        val WORKFLOW_TIMEOUT: Duration = Duration.ofMinutes(2)
+
+        /**
          * The release property carries the version a build shows as its display name.
          */
         const val RELEASE_PROPERTY = "net.nemerosa.ontrack.extension.general.ReleasePropertyType"
@@ -388,6 +425,12 @@ class KdslDemoTarget(private val ontrack: Ontrack) : DemoTarget {
          * build runs the workflow.
          */
         const val NEW_PROMOTION_RUN_EVENT = "new_promotion_run"
+
+        /**
+         * The notification channel a promotion level's workflow subscription sends to, and whose
+         * notification of a build carries the ID of the workflow instance it started.
+         */
+        const val WORKFLOW_CHANNEL = "workflow"
 
         /**
          * The licensed feature the native formats of the security scans - SARIF, Trivy JSON - need.
@@ -577,7 +620,7 @@ private class KdslDemoBranch(
         workflow?.let {
             NotificationsMgt(promotionLevel.connector).subscribe(
                 name = "workflow",
-                channel = "workflow",
+                channel = KdslDemoTarget.WORKFLOW_CHANNEL,
                 channelConfig = mapOf("workflow" to Yaml().read(it.yaml).first()),
                 events = listOf(KdslDemoTarget.NEW_PROMOTION_RUN_EVENT),
                 projectEntity = promotionLevel,
@@ -706,6 +749,43 @@ private class KdslDemoBuild(val build: Build, private val admin: Ontrack) : Demo
         (if (byPerson) build.asSeenBy(admin) else build).promote(promotionLevel, description, at)
     }
 
+    /**
+     * Finds the run through the notification the promotion sent to the `workflow` channel: it is the
+     * only one of the build - whose ID is new on every reset - and its output carries the ID of the
+     * workflow instance, which is then polled until it has finished.
+     */
+    override fun promoteThroughWorkflow(
+        promotionLevel: String,
+        description: String,
+        at: LocalDateTime,
+        byPerson: Boolean,
+    ): WorkflowRun {
+        promote(promotionLevel, description, at, byPerson)
+        val workflow = "The workflow of $promotionLevel on build ${build.name}"
+        val instanceId = pollUntil(KdslDemoTarget.WORKFLOW_TIMEOUT, intervalMs = 500, { "$workflow did not start" }) {
+            admin.notifications.notificationRecords(
+                channel = KdslDemoTarget.WORKFLOW_CHANNEL,
+                projectEntityType = GraphQLProjectEntityType.BUILD,
+                projectEntityId = build.id.toInt(),
+            ).firstNotNullOfOrNull { record ->
+                record.result.output?.getTextField("workflowInstanceId")?.takeIf { it.isNotBlank() }
+            }
+        }
+        val instance = pollUntil(KdslDemoTarget.WORKFLOW_TIMEOUT, intervalMs = 500, { "$workflow did not finish" }) {
+            admin.workflows.workflowInstance(instanceId)?.takeIf { it.finished }
+        }
+        return WorkflowRun(
+            outcome = if (instance.status == WorkflowInstanceStatus.SUCCESS) {
+                WorkflowOutcome.SUCCESS
+            } else {
+                WorkflowOutcome.ERROR
+            },
+            errors = instance.nodesExecutions
+                .filter { it.status == WorkflowInstanceNodeStatus.ERROR }
+                .map { "${it.id}: ${it.error}" },
+        )
+    }
+
     override fun validate(
         validationStamp: String,
         status: ValidationStatus,
@@ -724,13 +804,8 @@ private class KdslDemoBuild(val build: Build, private val admin: Ontrack) : Demo
      */
     override fun awaitAssistedChange() {
         val asAdmin = build.asSeenBy(admin)
-        val deadline = System.currentTimeMillis() + KdslDemoTarget.ASSISTED_CHANGE_TIMEOUT.toMillis()
-        while (asAdmin.assistedChange == null) {
-            check(System.currentTimeMillis() < deadline) {
-                "The assisted change of build ${build.name} was not computed within " +
-                        "${KdslDemoTarget.ASSISTED_CHANGE_TIMEOUT.seconds} seconds"
-            }
-            Thread.sleep(250)
+        pollUntil(KdslDemoTarget.ASSISTED_CHANGE_TIMEOUT, intervalMs = 250, { "The assisted change of build ${build.name} was not computed" }) {
+            asAdmin.assistedChange
         }
     }
 
@@ -942,3 +1017,16 @@ private fun Slot.asSeenBy(ontrack: Ontrack): Slot =
         description = description,
         agentsAdmitted = agentsAdmitted,
     )
+
+/**
+ * Polls [poll] every [intervalMs] until it gives a value, and fails once [timeout] has passed, with
+ * [failure] saying what did not happen.
+ */
+private fun <T : Any> pollUntil(timeout: Duration, intervalMs: Long, failure: () -> String, poll: () -> T?): T {
+    val deadline = System.currentTimeMillis() + timeout.toMillis()
+    while (true) {
+        poll()?.let { return it }
+        check(System.currentTimeMillis() < deadline) { "${failure()} within ${timeout.seconds} seconds" }
+        Thread.sleep(intervalMs)
+    }
+}

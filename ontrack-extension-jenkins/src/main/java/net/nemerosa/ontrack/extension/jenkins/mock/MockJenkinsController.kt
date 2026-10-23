@@ -1,18 +1,18 @@
 package net.nemerosa.ontrack.extension.jenkins.mock
 
-import net.nemerosa.ontrack.common.RunProfile
-import org.springframework.context.annotation.Profile
+import net.nemerosa.ontrack.extension.jenkins.JenkinsExtensionConfigProperties
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.web.bind.annotation.*
 
 @RestController
 @RequestMapping("/extension/jenkins/mock")
-@Profile(RunProfile.DEV)
+@ConditionalOnProperty(name = [JenkinsExtensionConfigProperties.MOCK_ENABLED], havingValue = "true", matchIfMissing = false)
 class MockJenkinsController(
-    private val mockJenkinsClientFactory: MockJenkinsClientFactory,
+    private val mockJenkinsClients: MockJenkinsClients,
 ) {
 
     @GetMapping("/{config}/job")
     fun getJobByPath(@PathVariable config: String, @RequestParam path: String): MockJenkinsJob? =
-        mockJenkinsClientFactory.findClient(config)?.jobs?.get(path)
+        mockJenkinsClients.findClient(config)?.jobs?.get(path)
 
 }

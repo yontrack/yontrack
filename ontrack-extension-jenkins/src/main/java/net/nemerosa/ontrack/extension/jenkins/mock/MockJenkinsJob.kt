@@ -4,14 +4,19 @@ data class MockJenkinsJob(
     val job: String,
 ) {
 
-    val builds = mutableListOf<MockJenkinsBuild>()
+    private val _builds = mutableListOf<MockJenkinsBuild>()
 
+    val builds: List<MockJenkinsBuild>
+        @Synchronized get() = _builds.toList()
+
+    /** Synchronized: two concurrent builds of the job must not get the same number. */
+    @Synchronized
     fun build(parameters: Map<String, String>): MockJenkinsBuild {
         val build = MockJenkinsBuild(
-            number = builds.size + 1,
+            number = _builds.size + 1,
             parameters = parameters,
         )
-        builds += build
+        _builds += build
         return build
     }
 }

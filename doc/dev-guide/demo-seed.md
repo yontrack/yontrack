@@ -59,14 +59,21 @@ that is not a `demo.` host or a local instance. Naming another instance is possi
 ### What the target instance must have
 
 The dataset is not self-contained: it can only reference features the target instance
-actually runs. Two of them are off by default, are on automatically in the `dev` profile —
+actually runs. Three of them are off by default, are on automatically in the `dev` profile —
 so the local dev stack needs nothing — and must be switched on explicitly anywhere else,
 which for the demo means an environment variable in its Helm values:
 
 | Feature | Property | Helm value |
 |---------|----------|------------|
-| **Simulated gate** node executor (`executorId: mock`), which the CANARY promotion workflow is built on | `ontrack.config.extension.workflows.mock.enabled` | `ONTRACK_CONFIG_EXTENSION_WORKFLOWS_MOCK_ENABLED` |
+| **Simulated gate** node executor (`executorId: mock`), which the two staging slot workflows are built on | `ontrack.config.extension.workflows.mock.enabled` | `ONTRACK_CONFIG_EXTENSION_WORKFLOWS_MOCK_ENABLED` |
+| **Mock Jenkins** notification channel (`mock-jenkins`), which the two Jenkins jobs of the CANARY promotion workflow run on | `ontrack.config.extension.jenkins.mock.enabled` | `ONTRACK_CONFIG_EXTENSION_JENKINS_MOCK_ENABLED` |
 | **Mock SCM**, which the change log on `petclinic` is read from | `ontrack.config.extension.scm.mock.enabled` | `ONTRACK_CONFIG_EXTENSION_SCM_MOCK_ENABLED` |
+
+The mock Jenkins needs no Jenkins configuration: a `mock-jenkins` node naming a configuration the
+instance does not have runs on a mock Jenkins of that name (`demo-jenkins` for the demo), because
+the connection test of a real Jenkins configuration would refuse any URL the demo could give it.
+Its jobs live in the memory of each backend; only their build numbers suffer from a restart or from
+several replicas, since what a workflow makes of a run is recorded in the database.
 
 A licensed feature is needed as well, for the same reason:
 
@@ -74,7 +81,7 @@ A licensed feature is needed as well, for the same reason:
 |---------|------------------|---------------------|
 | **Native scanner formats**, which the SARIF code scan of `petclinic-billing` is posted in | `extension.findings.native-formats` | The development licence enables it when the stack has the development key; a production licence has to include it |
 | **Delivery scorecard**, which the two estates are | `extension.scorecard` | Same |
-| **Environments**, which the "Demo production" estate reads up to | `extension.environments` | Same |
+| **Environments**, which the "Demo production" estate reads up to, and which the deployment nodes of the CANARY workflow (`slot-pipeline-*`) need | `extension.environments` | Same |
 
 Unlike the two properties, a missing licence is caught before the reset: the seed reads the
 licence of the instance through `licenseInfo` and stops with "Nothing was deleted" when a
@@ -133,15 +140,15 @@ reset and the next restart — see [the change log](#the-change-log) below. With
 replicas, each one has a mock SCM of its own, and the reset fails as soon as it registers a
 commit through one replica and points a build at it through another (#2099).
 
-Without the first, the reset fails partway through, after the deletions, with
-`Workflow node executor ID "mock" not found`. Without the second it fails the same way,
-when the seed posts the demo's commits to an endpoint that is not there. The dataset
-validation cannot catch either, because it checks the dataset against Yontrack's rules, not
-against the target's configuration.
+Without the simulated gate or the mock Jenkins, the reset stops before anything is deleted: the
+seed asks the instance for its enabled workflow node executors and notification channels, and
+names what is missing, ending with "Nothing was deleted". Without the mock SCM it stops the same
+way, on a probe repository. The dataset validation cannot catch any of them, because it checks the
+dataset against Yontrack's rules, not against the target's configuration.
 
-Neither belongs on an instance tracking real deliveries: one lets a workflow report a gate
-as passed without anything having been verified, the other lets a project claim an SCM that
-answers with whatever anyone posted to it.
+None belongs on an instance tracking real deliveries: the first two let a workflow report a gate
+or a pipeline as passed without anything having been verified, the last lets a project claim an
+SCM that answers with whatever anyone posted to it.
 
 ### The changelog project
 
@@ -440,6 +447,36 @@ is destructive by design cannot be flaky.
 The cost is that the demo's slot workflows read *Not started* on the delivery map. That is a real
 state and worth showing — a gate nobody has run is the interesting case — and workflows which have
 **run** are shown on the promotion side instead, by the CANARY pair, one passing and one failing.
+
+### Promotion workflows run after the deployments, one at a time
+
+The CANARY workflow is made of real nodes (#2114): it deploys the build to the staging canary
+(`slot-pipeline-creation`, `-deploying`, `-deployed`), runs two Jenkins jobs in `SYNC` mode on the
+mock Jenkins (`smoke-tests`, and `performance-gate`, which fails on `release-1.3`), and promotes the
+build to `RELEASABLE` through `yontrack-promotion`. A promotion to a level carrying a workflow
+therefore cannot be made with the rest of its build's ladder, which is seeded with the projects,
+before any environment exists:
+
+- The seed holds it back, with every promotion of the build after it, and makes them once the
+  deployments of the dataset have run - except those flagged `afterPromotionWorkflows`, which come
+  after. The production canary's blocked candidate is one: its `stagingCanary` rule reads what the
+  staging canary holds, which only the workflows deploy.
+- One build at a time, oldest first, and **waiting** for each workflow to finish: the seed finds the
+  run through the `workflow` notification of the build - the only one, and the build's ID is new on
+  every reset - and polls its instance. A seed going on without waiting would race nodes which deploy
+  and promote. Oldest first is what leaves the staging canary holding 1.4.6 after 1.3.9.
+- The run has to end the way the dataset says (`WorkflowSpec.expected`): `SUCCESS` on `main`,
+  `ERROR` on `release-1.3`. Anything else stops the seed, because a canary which passed where it was
+  meant to fail - or a deployment refused before the gate it demonstrates - tells the wrong story.
+- `RELEASABLE` is granted by the workflow alone; the validation refuses a build declaring it.
+- The held promotions are dated on their rungs like the rest of the ladder, while what the workflow
+  does is stamped at the reset. On `107`, GOLD comes after the workflow in the trail but is dated
+  before the `RELEASABLE` it granted - kept so that the head of `main` carries every level of its
+  branch, which the highest promotions widget shows.
+
+`InMemoryDemoTarget` runs a promotion workflow node by node, as the server would, knowing the
+executors and channels the demo uses: the dataset tests read the deployments and promotions the
+workflows leave, and a node the server would not run fails there too.
 
 ### Deployments are a sequence, not a slot property
 

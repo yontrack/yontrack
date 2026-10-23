@@ -52,6 +52,16 @@ class WorkflowsMgt(connector: Connector) : Connected(connector) {
         }
     }
 
+    /**
+     * IDs of the workflow node executors the instance has enabled
+     */
+    val enabledNodeExecutors: Set<String>
+        get() = graphqlConnector.query(WorkflowNodeExecutorsQuery())
+            ?.workflowNodeExecutors
+            ?.map { it.id }
+            ?.toSet()
+            ?: emptySet()
+
     fun workflowInstancesByName(name: String): List<WorkflowInstance> {
         return graphqlConnector.query(
             WorkflowInstancesByNameQuery(name)
