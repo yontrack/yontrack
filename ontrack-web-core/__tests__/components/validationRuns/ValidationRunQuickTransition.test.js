@@ -97,6 +97,9 @@ const openPopover = async () => {
 
 const sentVariables = () => callGraphQL.mock.calls[0][0].variables
 
+const expectRunLink = (popover) =>
+    expect(within(popover).getByRole('link', {name: 'Open run'})).toHaveAttribute('href', '/validationRun/42')
+
 beforeEach(() => {
     callGraphQL.mockReset()
     callGraphQL.mockResolvedValue({changeValidationRunStatus: {errors: []}})
@@ -175,6 +178,21 @@ describe('the quick-transition popover', () => {
         withRun({status: 'FIXED'})
         const popover = await openPopover()
         expect(within(popover).getAllByRole('button').map(it => it.textContent)).toEqual(['History…'])
+    })
+
+    it('links to the page of the run', async () => {
+        expectRunLink(await openPopover())
+    })
+
+    it('links to the page of the run without the status change permission', async () => {
+        withRun({statusChange: false})
+        expectRunLink(await openPopover())
+    })
+
+    it('links to the page of the run while picking a status with a comment', async () => {
+        const popover = await openPopover()
+        fireEvent.click(within(popover).getByRole('button', {name: 'With comment…'}))
+        expectRunLink(popover)
     })
 
     it('opens the history dialog', async () => {

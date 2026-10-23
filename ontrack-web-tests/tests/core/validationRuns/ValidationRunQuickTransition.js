@@ -40,6 +40,15 @@ export class ValidationRunQuickTransition {
         await expect(this.popover).toBeHidden()
     }
 
+    openRunLink() {
+        return this.popover.getByRole('link', {name: 'Open run', exact: true})
+    }
+
+    async openRun() {
+        await this.openRunLink().click()
+        await expect(this.page).toHaveURL(new RegExp(`/validationRun/${this.run.id}$`))
+    }
+
     async history() {
         await this.historyButton().click()
         const dialog = new ValidationRunHistoryDialog(this.page, this.run)

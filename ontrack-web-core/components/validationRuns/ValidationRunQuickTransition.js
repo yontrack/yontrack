@@ -7,6 +7,8 @@ import {isAuthorized} from "@components/common/authorizations";
 import ValidationRunHistoryDialog, {
     useValidationRunHistoryDialog
 } from "@components/validationRuns/ValidationRunHistoryDialog";
+import Link from "next/link";
+import {validationRunUri} from "@components/common/Links";
 
 const FIXED = 'FIXED'
 
@@ -66,7 +68,7 @@ const CHANGE_STATUS = gql`
  * Content of the popover. Mounted only while the popover is open, so that the run is loaded
  * when it opens and the popover acts on its *current* status, whatever the host loaded earlier.
  */
-function QuickTransitionContent({run, onChanged, onHistory}) {
+function QuickTransitionContent({run, onChanged, onHistory, onNavigate}) {
 
     const {validationRunStatuses} = useRefData()
 
@@ -113,7 +115,7 @@ function QuickTransitionContent({run, onChanged, onHistory}) {
         }
     }
 
-    // 'none' when the run cannot change status from here, then only its history is offered
+    // 'none' when the run cannot change status from here, then only its history and its page are offered
     const mode = statuses.length === 0 ? 'none' : (withComment ? 'comment' : 'quick')
 
     return (
@@ -188,6 +190,19 @@ function QuickTransitionContent({run, onChanged, onHistory}) {
                 <Button size="small" type="text" onClick={onHistory}>
                     History…
                 </Button>
+                {/*
+                    A link, not a button: it navigates, and opens in a new tab like any other link.
+                    `onNavigate` and not `onClick`, so that the popover stays open when the run
+                    opens in another tab. Drawn like the small text buttons next to it: their
+                    colour and their horizontal padding.
+                */}
+                <Link
+                    href={validationRunUri(run)}
+                    onNavigate={onNavigate}
+                    style={{color: 'inherit', padding: '0 7px'}}
+                >
+                    Open run
+                </Link>
             </Space>
         </Space>
     )
@@ -195,7 +210,8 @@ function QuickTransitionContent({run, onChanged, onHistory}) {
 
 /**
  * Clicking `children` - the status of a validation run - opens a popover to move the run to one
- * of its next statuses in one click, to add a comment while doing so, or to open its history.
+ * of its next statuses in one click, to add a comment while doing so, to open its history, or to
+ * go to its page.
  *
  * @param run Validation run, only its `id` is used
  * @param label Accessible name of the trigger, for when `children` alone does not say which run it is
@@ -237,7 +253,7 @@ export default function ValidationRunQuickTransition({run, label, onChange, chil
                     <div onKeyDown={e => {
                         if (e.key === 'Escape') close()
                     }}>
-                        <QuickTransitionContent run={run} onChanged={onChanged} onHistory={onHistory}/>
+                        <QuickTransitionContent run={run} onChanged={onChanged} onHistory={onHistory} onNavigate={close}/>
                     </div>
                 }
             >

@@ -193,10 +193,11 @@ validation run opens a small popover:
 
 * one button per status the run can move to, `FIXED` first when it is one of them — one click applies it;
 * _With comment…_ to pick a status and give it a description;
-* _History…_ to display all the runs of this validation stamp for this build, and their statuses.
+* _History…_ to display all the runs of this validation stamp for this build, and their statuses;
+* _Open run_ to display the page of the validation run.
 
 The popover reads the current status of the run when it opens. Users who are not allowed to change the status of
-validation runs only see _History…_.
+validation runs only see _History…_ and _Open run_.
 
 ## Promotions
 

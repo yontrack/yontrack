@@ -68,3 +68,17 @@ test('changing a status with a comment', async ({page, ontrack}) => {
     const updated = await ontrack.getValidationRunById(run.id)
     expect(updated.lastStatus.statusID.id).toBe('EXPLAINED')
 })
+
+test('going to the page of the run from the branch builds grid', async ({page, ontrack}) => {
+    const {branch, run} = await provisionWarningRun(ontrack)
+
+    await login(page, ontrack)
+    const branchPage = new BranchPage(page, branch)
+    await branchPage.goTo()
+
+    const popover = await branchPage.validationRunQuickTransition(run)
+    await popover.openRun()
+
+    // The page of the run, with its statuses
+    await expect(page.getByText('Statuses', {exact: true})).toBeVisible()
+})
