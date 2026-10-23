@@ -19,4 +19,46 @@
 #         - "pkg:npm/some-package@1.2.3"
 #       statement: Only reachable through the dev server, which the image does not ship
 #       expired_at: 2026-12-31
-vulnerabilities: []
+vulnerabilities:
+  # Next.js 13.5 (ontrack-web-core). No 13.x fix: the fixed versions are 15.5+ and 16.x, the
+  # upgrade #1787 made on main for 6.0, out of reach of a 5.5 patch.
+  - id: GHSA-2464-fhr4-w9xw
+    purls:
+      - "pkg:npm/next@13.5.11"
+    statement: >-
+      Only reachable through the Image Optimization API (/_next/image), which next.config.js turns
+      off with images.unoptimized (#1789, kept by imageOptimization.test.js) - Next answers it with
+      a 404. The fix is in Next.js 15.5+, a major upgrade done on main for 6.0 only (#1787).
+    expired_at: 2027-01-31
+  - id: GHSA-2xp9-vwfh-vxw4
+    purls:
+      - "pkg:npm/next@13.5.11"
+    statement: >-
+      Only reachable through the Image Optimization API (/_next/image), which next.config.js turns
+      off with images.unoptimized (#1789, kept by imageOptimization.test.js) - Next answers it with
+      a 404. The fix is in Next.js 15.5+, a major upgrade done on main for 6.0 only (#1787).
+    expired_at: 2027-01-31
+  - id: CVE-2026-75604
+    purls:
+      - "pkg:npm/next@13.5.11"
+    statement: >-
+      Only exploitable on Windows-hosted servers; the UI image runs on Linux (node:24-alpine). The
+      fix is in Next.js 15.5+, a major upgrade done on main for 6.0 only (#1787).
+    expired_at: 2027-01-31
+  # Spring Framework 6.2 (backend image). The only fixed version is 7.0.9, i.e. Spring Boot 4,
+  # which release/5.5 does not move to: it stays on Boot 3.5.
+  - id: CVE-2026-47884
+    purls:
+      - "pkg:maven/org.springframework/spring-webmvc@6.2.19"
+    statement: >-
+      Only reachable through XsltView, which Yontrack does not use - no XSLT view is configured or
+      referenced anywhere. The fix is only in Spring Framework 7.0 (Spring Boot 4), not in 6.2.
+    expired_at: 2027-01-31
+  - id: CVE-2026-47890
+    purls:
+      - "pkg:maven/org.springframework/spring-webmvc@6.2.19"
+    statement: >-
+      Only affects Server-Sent Events rendered with view fragments, which Yontrack does not use - no
+      SseEmitter, FragmentsRendering or server-sent event endpoint. The fix is only in Spring
+      Framework 7.0 (Spring Boot 4), not in 6.2.
+    expired_at: 2027-01-31
