@@ -40,3 +40,8 @@ next-env.d.ts
 
 # Jest
 /reports/
+
+# Agent files Next.js writes or removes on its own (#1787); the agent guidance
+# of the repository is the root CLAUDE.md
+/AGENTS.md
+/CLAUDE.md
