@@ -282,10 +282,14 @@ class CoreConfigurationServiceIT : AbstractDSLTestSupport() {
      * read `.yontrack/ci.yaml` itself - nothing does, from a test - so it cannot catch someone
      * tidying the `^main$` block back into that file. The comment there is what has to carry that,
      * and this is what tells them the tidied version could never have worked.
+     *
+     * Since #2119 release/5.5 is deployed to v5.dev.yontrack.com and smoke-tested there, so its own
+     * `^release/5\.5$` block adds DEMO.SMOKE back the same way. Any other release branch still has
+     * no instance to be verified on, and keeps the defaults.
      */
     @Test
     @AsAdminTest
-    fun `The demo verification is added to SILVER on main and not on a release branch`() {
+    fun `The demo verification is added to SILVER on main and release 5_5 and not on another release branch`() {
         val yaml = """
             version: v1
             configuration:
@@ -311,6 +315,14 @@ class CoreConfigurationServiceIT : AbstractDSLTestSupport() {
                         SILVER:
                           validations:
                             - DEMO.SMOKE
+                  - conditions:
+                      - name: branch
+                        config: '^release/5\.5${'$'}'
+                    branch:
+                      promotions:
+                        SILVER:
+                          validations:
+                            - DEMO.SMOKE
         """.trimIndent()
 
         val main = configTestSupport.configureBranch(
@@ -320,6 +332,14 @@ class CoreConfigurationServiceIT : AbstractDSLTestSupport() {
             env = EnvFixtures.generic(configuredProjectName, scmBranch = "main"),
         )
         assertSilver(main, validations = listOf("DEMO.SMOKE"))
+
+        val release55 = configTestSupport.configureBranch(
+            yaml = yaml,
+            ci = "generic",
+            scm = "mock",
+            env = EnvFixtures.generic(configuredProjectName, scmBranch = "release/5.5"),
+        )
+        assertSilver(release55, validations = listOf("DEMO.SMOKE"))
 
         val patch = configTestSupport.configureBranch(
             yaml = yaml,

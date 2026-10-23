@@ -1,5 +1,12 @@
 # The next-major branch
 
+> **On `release/5.5` this page is a record of how 6.0 was built, not a description of this
+> branch** (#2119). `v6` became `main` at the cutover, and `main`'s copy of this page is the current
+> one. Nothing below is wired up here any more: `release/5.5`'s `.yontrack/ci.yaml` declares no
+> environments or slots at all — they are declared from `main` only, which supersedes "has to say
+> the same thing on every branch" below — and `demo-smoke.yml` has a `v5` target in place of `v6`,
+> for v5.dev.yontrack.com (see [Demo smoke test](demo-smoke.md)).
+
 The next major is developed on a long-lived branch of its own — `v6` while `main` is still
 building 5.x — and lands on `main` only at the cutover. This page says what that branch is, what
 the pipeline does differently on it, and what it costs.

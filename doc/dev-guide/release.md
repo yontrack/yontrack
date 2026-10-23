@@ -13,7 +13,7 @@ under its base version — see
 | Level     | Requires                                                     | Meaning                            |
 |-----------|--------------------------------------------------------------|------------------------------------|
 | `BRONZE`  | `BUILD`, `UI_UNIT`, `INTEGRATION`, `KDSL.ACCEPTANCE`, `PLAYWRIGHT`, `DOCS` | The build is green    |
-| `SILVER`  | `BRONZE` + `DEMO.SMOKE` on `main`; `BRONZE` alone on a release branch | Deployed to the demo and verified — or, on a release branch, green |
+| `SILVER`  | `BRONZE` + `DEMO.SMOKE` on `main` and `release/5.5`; `BRONZE` alone on another release branch | Deployed to the demo (v5 on `release/5.5`) and verified — or, on another release branch, green |
 | `GOLD`    | `SILVER`, granted **by hand**                                | A human tested the demo and approved the release |
 | `RELEASE` | `GOLD` + `DOCKER.HUB`, `GITHUB.RELEASE`, `DOCUMENTATION`, `WIKI` | Publication completed          |
 
@@ -24,7 +24,8 @@ Because `RELEASE` requires `GOLD` requires `SILVER` requires `DEMO.SMOKE`, **not
 until the demo pipeline works**. That is the intended constraint, not a side effect.
 
 `SILVER` is the one level that means something different on a release branch, where it is `BRONZE`
-alone: a patch is never deployed to the demo. See [Patch releases](patch-release.md), including why
+alone: a patch is never deployed to the demo. `release/5.5` is the exception, verified on
+v5.dev.yontrack.com (#2119). See [Patch releases](patch-release.md), including why
 `.yontrack/ci.yaml` has to declare `SILVER` weakly and add `DEMO.SMOKE` back on `main` rather than
 the other way round.
 

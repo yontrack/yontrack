@@ -13,6 +13,7 @@ import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
+import kotlin.test.fail
 
 class EnvironmentsCIConfigExtensionIT : AbstractQLKTITSupport() {
 
@@ -112,6 +113,80 @@ class EnvironmentsCIConfigExtensionIT : AbstractQLKTITSupport() {
         val workflow = workflows.first()
         assertEquals("Creation", workflow.workflow.name)
         assertEquals(SlotPipelineStatus.CANDIDATE, workflow.trigger)
+    }
+
+    /**
+     * Slots are synced forward: a slot the CI configuration does not declare is deleted. Only a
+     * configuration which mentions the extension at all goes through that sync, and that is what
+     * lets one branch alone own the slots - on Yontrack itself, `main` declares them and
+     * release/5.5 declares nothing, so a 5.5 build neither brings back stale slots nor deletes
+     * the ones main added (#2119).
+     */
+    @Test
+    @AsAdminTest
+    fun `A branch whose configuration declares no environments leaves the slots alone`() {
+        val environmentName = uid("env-")
+        val configuredProjectName = uid("cfg-")
+
+        val deployedProject = project()
+
+        configTestSupport.configureBranch(
+            yaml = """
+                version: v1
+                configuration:
+                  defaults:
+                    branch:
+                      validations:
+                        BUILD: {}
+                  custom:
+                    configs:
+                      - conditions:
+                          - name: branch
+                            config: '^main${'$'}'
+                        project:
+                          environments:
+                            environments:
+                              - name: $environmentName
+                                order: 200
+                            slots:
+                              - project: "${deployedProject.name}"
+                                environments:
+                                  - name: $environmentName
+                                    admissionRules:
+                                      - ruleId: branchPattern
+                                        ruleConfig:
+                                          includes:
+                                            - main
+            """.trimIndent(),
+            ci = "generic",
+            scm = "mock",
+            env = EnvFixtures.generic(configuredProjectName, scmBranch = "main"),
+        )
+        val slot = slotService.findSlotsByProject(deployedProject).singleOrNull()
+            ?: fail("Expected the slot declared on main")
+        val rules = slotService.getAdmissionRuleConfigs(slot)
+
+        configTestSupport.configureBranch(
+            yaml = """
+                version: v1
+                configuration:
+                  defaults:
+                    branch:
+                      validations:
+                        BUILD: {}
+            """.trimIndent(),
+            ci = "generic",
+            scm = "mock",
+            env = EnvFixtures.generic(configuredProjectName, scmBranch = "release/5.5"),
+        )
+
+        val slots = slotService.findSlotsByProject(deployedProject)
+        assertEquals(listOf(slot.id), slots.map { it.id }, "The slot declared on main is still there")
+        assertEquals(
+            rules.map { it.ruleId to it.ruleConfig },
+            slotService.getAdmissionRuleConfigs(slots.first()).map { it.ruleId to it.ruleConfig },
+            "The slot's admission rules are unchanged"
+        )
     }
 
     @Test

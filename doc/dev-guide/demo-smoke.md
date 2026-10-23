@@ -10,22 +10,23 @@ promotes the build to `SILVER` - see [`SILVER`](#silver) below.
 
 ## Two instances, one workflow
 
-The `target` input picks the instance: `demo` (the default) or `v6`, the next-major environment -
-see [the next-major branch](major-branch.md). Everything the workflow does is the same for both;
-only three things are resolved from `target`:
+The `target` input picks the instance: `demo` (the default) or `v5`, v5.dev.yontrack.com, the
+internal 5.5 maintenance environment that checks 5.5 patch candidates before `GOLD` (#2119).
+Everything the workflow does is the same for both; only four things are resolved from `target`:
 
-| | `demo` | `v6` |
+| | `demo` | `v5` |
 |---|---|---|
-| URL | `vars.DEMO_URL`, default `https://demo.dev.yontrack.com` | `vars.V6_URL`, default `https://v6.dev.yontrack.com` |
-| Credentials | `secrets.DEMO_TOKEN` / `DEMO_USERNAME` / `DEMO_PASSWORD` | `secrets.V6_TOKEN` / `V6_USERNAME` / `V6_PASSWORD` |
-| Concurrency group | `demo-instance`, shared with the passive DAST scan | `v6-instance`, this workflow alone |
+| URL | `vars.DEMO_URL`, default `https://demo.dev.yontrack.com` | `vars.V5_URL`, default `https://v5.dev.yontrack.com` |
+| Credentials | `secrets.DEMO_TOKEN` / `DEMO_USERNAME` / `DEMO_PASSWORD` | `secrets.V5_TOKEN` / `V5_USERNAME` / `V5_PASSWORD` |
+| Concurrency group | `demo-instance`, shared with the passive DAST scan | `v5-instance`, this workflow alone |
+| Seed URL pattern | the seed's default, `demo.`/localhost | exactly `v5.dev.yontrack.com` |
 
 Two instances, two databases, two Keycloak realms: nothing is shared. A missing secret is an
 empty string, so an unconfigured target would otherwise fall through to the demo's credentials
 and fail deep inside the poll; `Check the target's credentials` stops that at the door, right
 after the correlation artifact is published and before anything talks to the instance.
 
-On `v6` the seed is the point rather than the verification: the environment has no data of its
+On `v5` the seed is the point rather than the verification: the environment has no data of its
 own, and this workflow is what provisions it on every deployment.
 
 ## What it does
@@ -84,10 +85,11 @@ DAST CasC there and nothing to restore, and the step says so and passes.
 ## `SILVER`
 
 `.yontrack/ci.yaml` declares `SILVER` as `promotions: [BRONZE]` in its defaults, and adds
-`validations: [DEMO.SMOKE]` in the `^main$` and `^v6$` blocks - the branches that have an
-instance to be verified on. It needs no workflow node of its own, and nothing dispatches it:
-auto-promotion grants it as soon as both prerequisites hold, and `DEMO.SMOKE` is always the
-later of the two.
+`validations: [DEMO.SMOKE]` in the `^main$` and `^release/5\.5$` blocks - the branches that have an
+instance to be verified on, the demo and v5. A 5.5 patch therefore cannot reach `GOLD` until it has
+been deployed to v5 and smoke-tested there; any other release branch keeps the defaults. It needs no
+workflow node of its own, and nothing dispatches it: auto-promotion grants it as soon as both
+prerequisites hold, and `DEMO.SMOKE` is always the later of the two.
 
 ```
 BRONZE -> the slot admits the build -> deploy -> demo-smoke.yml -> DEMO.SMOKE -> SILVER
@@ -98,10 +100,11 @@ was verified there" - which is what someone needs before deciding on `GOLD`. A S
 on `SILVER` to `#notifications` carries the instance's URL and the version and says exactly that.
 The `BRONZE` notification stays: knowing a build is green is useful on its own.
 
-A release branch is the exception: it is never deployed, so nothing adds `DEMO.SMOKE` there and
-`SILVER` keeps the defaults' weaker meaning, "the build is green" (#1702). The merge is additive
-only, which is why the defaults carry the weakest form and each branch kind adds what it can
-satisfy.
+`release/5.5` has an environment of its own, v5.dev.yontrack.com, so its `SILVER` means the same
+(#2119). Any other release branch is the exception: it is never deployed, so nothing adds
+`DEMO.SMOKE` there and `SILVER` keeps the defaults' weaker meaning, "the build is green" (#1702).
+The merge is additive only, which is why the defaults carry the weakest form and each branch kind
+adds what it can satisfy.
 
 Two things this does *not* do:
 
@@ -148,10 +151,12 @@ Dispatched by a slot's `RUNNING` workflow through the `github-workflow` notifica
 The demo slot passes only the version: `project` and `branch` come from the workflow's own
 defaults, `yontrack` and `main`, which is what that slot is scoped to anyway.
 
-The v6 slot passes `version`, `target: v6` and `branch: v6` - the branch has to be spelled out
-because the default is `main`, and a v6 version would not resolve there. It also dispatches with
-`reference: v6` rather than `main`, so the seed program and the Playwright spec that run are the
-ones belonging to the code under test; the workflow file itself is the same on both branches.
+The v5 slot, declared on `main` like every slot, passes `version` (the build's `rc-version`
+meta-info item), `target: v5` and `branch: release-5.5` - the branch has to be spelled out
+because the default is `main`, and a 5.5 version would not resolve there. It also dispatches with
+`reference: release/5.5` rather than `main`, so the workflow, the seed program and the Playwright
+spec that run are the ones belonging to the code under test. The `v5` target therefore only
+exists on `release/5.5`.
 
 It can also be dispatched by hand from the Actions tab with a version and a target.
 
@@ -180,9 +185,9 @@ See [the channel's documentation](../../ontrack-docs/docs/content/integrations/n
 | `vars.DEMO_URL` | The demo, defaulting to `https://demo.dev.yontrack.com` |
 | `secrets.DEMO_TOKEN` | API token on the demo - admin-level, since the seed deletes every project |
 | `secrets.DEMO_USERNAME`, `secrets.DEMO_PASSWORD` | Keycloak credentials the browser signs in with |
-| `vars.V6_URL` | The v6 instance, defaulting to `https://v6.dev.yontrack.com` |
-| `secrets.V6_TOKEN` | API token on it - admin-level, for the same reason |
-| `secrets.V6_USERNAME`, `secrets.V6_PASSWORD` | Its Keycloak credentials |
+| `vars.V5_URL` | The v5 instance, defaulting to `https://v5.dev.yontrack.com` |
+| `secrets.V5_TOKEN` | API token on it - admin-level, for the same reason |
+| `secrets.V5_USERNAME`, `secrets.V5_PASSWORD` | Its Keycloak credentials |
 
 ## The pieces
 

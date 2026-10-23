@@ -15,7 +15,7 @@ These were settled in a design review. The rationale matters as much as the choi
 | # | Rule | Why |
 |---|------|-----|
 | 1 | **Patch the previous minor only**, until the next minor ships. One live release branch at a time. | Bounds the work: no N-branch fan-out whose `.yontrack/ci.yaml` drifts from main's. |
-| 2 | **`SILVER` means "green" on a release branch**, not "verified on the demo". | Keeps `GOLD` meaningful — a human still decides — without a manual `DEMO.SMOKE` stamp asserting something that never happened. |
+| 2 | **`SILVER` means "green" on a release branch**, not "verified on the demo" — except on `release/5.5`, which is verified on v5.dev.yontrack.com (#2119). | Keeps `GOLD` meaningful — a human still decides — without a manual `DEMO.SMOKE` stamp asserting something that never happened. |
 | 3 | **Release branches are cut lazily**, from the released tag, when a defect appears. | An always-on release branch pays a full CI run per push for a branch that may ship nothing. |
 | 4 | **Fixes land on `main` first, then are cherry-picked** to the release branch. | A fix living only on the patch branch is a regression in the next minor waiting to happen. |
 | 5 | **A patch must not contain a Flyway migration.** | If 5.3.2 adds `V82` and `main` independently adds `V82`, a user upgrading 5.3.2 → 5.4.0 hits a checksum conflict. If a fix needs a schema change, it is not a patch. |
@@ -85,6 +85,11 @@ archives the docs artefact, and grants `BRONZE`. `SILVER` then auto-promotes on 
 announces itself in `#notifications` with the release-branch message: *"… is green on `release-5.3`.
 Verify the fix, then decide on GOLD."*
 
+On `release/5.5` it does not (#2119). `BRONZE` makes the build eligible for the
+v5.dev.yontrack.com slot, someone deploys it by hand, the slot dispatches `demo-smoke.yml` with
+`target: v5`, and `SILVER` waits for that `DEMO.SMOKE`. Its message names v5 instead. A 5.5 patch
+cannot reach `GOLD` until it has been deployed to v5 and smoke-tested there.
+
 A freshly cut release branch produces a `-rc-1` build with **no fix in it** — the branch is the tag
 until the cherry-pick lands. It reaches `SILVER` and announces itself all the same. That is expected,
 not a bug: leave it, and grant `GOLD` on the build that carries the fix.
@@ -130,17 +135,25 @@ declare the weakest form, and each branch kind adds what it can actually satisfy
 
 Deploying a patch to the demo is not the alternative — it would roll the demo back off 5.4 — and
 stamping `DEMO.SMOKE` by hand would assert a verification that never happened. So `SILVER` means
-"green" on a release branch, and `GOLD` stays the human gate either way.
+"green" on a release branch, and `GOLD` stays the human gate either way. The one release branch with
+an instance of its own, `release/5.5`, adds `DEMO.SMOKE` back in a `^release/5\.5$` block, exactly
+as `^main$` does (#2119).
 
-`CoreConfigurationServiceIT.The demo verification is added to SILVER on main and not on a release
-branch` pins that behaviour of the merge engine, in the shape this config uses it. Note what it
-cannot do: no test reads `.yontrack/ci.yaml`, so nothing mechanically catches someone moving the
-`^main$` block back into the defaults. The comment in the file is what has to hold that line — and
-the IT is what shows the tidied version could never have worked.
+`CoreConfigurationServiceIT.The demo verification is added to SILVER on main and release 5_5 and not
+on another release branch` pins that behaviour of the merge engine, in the shape this config uses
+it. Note what it cannot do: it does not read `.yontrack/ci.yaml` — only `scripts/demo-smoke-test.sh`
+does, and only for the `release/5.5` wiring — so nothing mechanically catches someone moving the
+`^main$` block back into the defaults. The comment in the file is what has to
+hold that line — and the IT is what shows the tidied version could never have worked.
 
 Notifications behave differently, and that is what makes the message swap possible:
 `NotificationsCIConfigExtension` merges them **by name with override**, so a same-named `On SILVER`
-in the `^release/.*$` block *replaces* the default's rather than adding a second subscription.
+in the `^release/.*$` block *replaces* the default's rather than adding a second subscription. The
+`^release/5\.5$` block comes after it and replaces it in turn, which is why it is the last block.
+
+`release/5.5` declares no environments or slots at all: they are declared from `main` only,
+because slots are synced forward and a 5.5 build declaring any would resync them from stale data
+(#2119).
 
 ## See also
 

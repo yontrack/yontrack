@@ -79,6 +79,12 @@ STUB
 chmod +x "$STUB_ROOT/bin/curl"
 
 # The Yontrack CLI, used only to resolve the deployed version back to a build name.
+#
+# Two lookups, told apart by their flags: by the `rc-version` meta-info item, answered from
+# rc-build.json (absent by default, which is a build CI registered before that item existed),
+# and by display name, answered from build.json. `search_empty` and `search_fails` hit both;
+# `display_search_empty` only the second, which is what a GOLD build looks like: its display
+# name is no longer the rc version.
 cat > "$STUB_ROOT/bin/yontrack" <<'STUB'
 #!/usr/bin/env bash
 set -uo pipefail
@@ -93,7 +99,21 @@ if [ "${1:-}" = "build" ] && [ "${2:-}" = "search" ]; then
     if [ -f "$DSM_STUB_DIR/search_empty" ]; then
         exit 0
     fi
+    case " $* " in
+        *" --with-property "*)
+            [ -f "$DSM_STUB_DIR/rc-build.json" ] && cat "$DSM_STUB_DIR/rc-build.json"
+            exit 0
+            ;;
+    esac
+    if [ -f "$DSM_STUB_DIR/display_search_empty" ]; then
+        exit 0
+    fi
     cat "$DSM_STUB_DIR/build.json"
+    exit 0
+fi
+
+if [ "${1:-}" = "graphql" ]; then
+    echo '{"data":{"setBuildMetaInfoPropertyById":{"errors":null}}}'
     exit 0
 fi
 
@@ -347,6 +367,29 @@ out="$(dsm_resolve_build 5.3.0-rc-10 2>&1)"
 assert_contains "$(calls)" '--with-display-name ^5\.3\.0-rc-10$' \
     "dsm_resolve_build asks for an exact match on the display name"
 
+# A GOLD build: the release property, and with it the display name, became the base version
+# when release.yml published it. The rc version the slot deployed is still on the build, as its
+# `rc-version` meta-info item, which nothing renames (#1999, backported by #2119).
+setup_stub
+echo '{"Id":"562","Name":"20261005092915-562","DisplayName":"5.5.3"}' > "$DSM_STUB_DIR/rc-build.json"
+touch "$DSM_STUB_DIR/display_search_empty"
+out="$(dsm_resolve_build 5.5.3-rc-562 2>&1)"; rc=$?
+assert_eq "0" "$rc" "dsm_resolve_build finds a GOLD build by its rc version"
+assert_eq "20261005092915-562" "$out" "dsm_resolve_build returns the GOLD build's name"
+assert_contains "$(calls)" \
+    '--with-property net.nemerosa.ontrack.extension.general.MetaInfoPropertyType --with-property-value rc-version:5.5.3-rc-562' \
+    "dsm_resolve_build looks the rc version up in the build's meta-info"
+assert_not_contains "$(calls)" "--with-display-name" \
+    "dsm_resolve_build does not fall back once the meta-info has answered"
+
+# A build registered before CI recorded the meta-info item: its display name is still the rc
+# version, unless it went GOLD since.
+setup_stub
+out="$(dsm_resolve_build 5.3.0-rc-100 2>&1)"; rc=$?
+assert_eq "0" "$rc" "dsm_resolve_build falls back to the display name without the meta-info"
+assert_contains "$(calls)" '--with-display-name ^5\.3\.0-rc-100$' \
+    "dsm_resolve_build falls back to an exact display name match"
+
 setup_stub
 touch "$DSM_STUB_DIR/search_empty"
 out="$(dsm_resolve_build 5.3.0-rc-999 2>&1)"; rc=$?
@@ -362,6 +405,59 @@ setup_stub
 echo '{"unexpected":"shape"}' > "$DSM_STUB_DIR/build.json"
 out="$(dsm_resolve_build 5.3.0-rc-100 2>&1)"; rc=$?
 assert_eq "1" "$rc" "dsm_resolve_build fails rather than validating something unnamed"
+
+# --- yontrack_record_rc_version ---------------------------------------------
+
+# What ci.yml records is what the lookup above, and the v5 slot declared on main, read: the
+# same item name, appended to the build's other meta-info rather than replacing it.
+setup_stub
+out="$(yontrack_record_rc_version 562 5.5.3-rc-562 2>&1)"; rc=$?
+assert_eq "0" "$rc" "yontrack_record_rc_version passes when the mutation does"
+assert_contains "$(calls)" '"id":562' "yontrack_record_rc_version targets the build by its ID"
+assert_contains "$(calls)" '"append":true' "yontrack_record_rc_version keeps the other meta-info items"
+assert_contains "$(calls)" '{"name":"rc-version","value":"5.5.3-rc-562"}' \
+    "yontrack_record_rc_version records the item the lookup reads"
+assert_contains "$(calls)" "--fail-on-user-errors" \
+    "yontrack_record_rc_version fails when the mutation reports an error"
+
+ci_workflow="$(grep -v '^ *#' "$SCRIPT_DIR/../.github/workflows/ci.yml")"
+# shellcheck disable=SC2016  # the workflow's own shell variables, matched literally
+assert_contains "$ci_workflow" 'yontrack_record_rc_version "$BUILD_ID" "$VERSION"' \
+    "ci.yml records the rc version on every registered build"
+
+# --- the release/5.5 wiring (#2119) -----------------------------------------
+
+# Environments and slots are declared from main only. Slots are synced forward - one the building
+# branch does not declare is deleted - so a release/5.5 build declaring any would resync them
+# from stale data: bring back retired slots, widen self.dev's admission, delete the v5 slot.
+ci_config="$(grep -v '^ *#' "$SCRIPT_DIR/../.yontrack/ci.yaml")"
+assert_eq "0" "$(grep -c '^ *environments:' <<<"$ci_config")" \
+    "release/5.5 declares no environments extension"
+
+# SILVER on release/5.5 waits for the smoke test on v5, like main's waits for the demo's.
+v5_block="$(sed -n "/config: '^release\/5\\\\.5\$'/,/- conditions:/p" <<<"$ci_config")"
+assert_contains "$v5_block" "DEMO.SMOKE" "SILVER on release/5.5 requires DEMO.SMOKE"
+assert_contains "$v5_block" "https://v5.dev.yontrack.com" "On SILVER on release/5.5 names v5"
+# Both release blocks match release/5.5 and each declares an `On SILVER`; a same-named
+# subscription is replaced, so the later block's message is the one sent.
+generic_line="$(grep -n "config: '^release/\.\*\$'" <<<"$ci_config" | cut -d: -f1)"
+v5_line="$(grep -n "config: '^release/5\\\\.5\$'" <<<"$ci_config" | cut -d: -f1)"
+assert_eq "true" "$([ -n "$generic_line" ] && [ -n "$v5_line" ] && [ "$v5_line" -gt "$generic_line" ] && echo true || echo false)" \
+    "the release/5.5 block comes after the release/* one, so its On SILVER wins"
+
+# The v5 slot dispatches this branch's demo-smoke.yml with `target: v5`; the retired v6 target
+# is gone, and everything per-instance resolves to v5's own.
+smoke_workflow="$(grep -v '^ *#' "$SCRIPT_DIR/../.github/workflows/demo-smoke.yml")"
+assert_contains "$smoke_workflow" "          - v5" "demo-smoke.yml accepts target v5"
+assert_contains "$smoke_workflow" "vars.V5_URL || 'https://v5.dev.yontrack.com'" "v5: its URL"
+assert_contains "$smoke_workflow" "'v5-instance'" "v5: its own concurrency group"
+for secret in V5_TOKEN V5_USERNAME V5_PASSWORD; do
+    assert_contains "$smoke_workflow" "secrets.$secret" "v5: its $secret secret"
+done
+assert_contains "$smoke_workflow" "'^https://v5\.dev\.yontrack\.com(?=[:/]|\$)'" \
+    "v5: the seed is allowed on exactly its host"
+assert_eq "0" "$(grep -cE "V6_|v6[.-]|'v6'|- v6\$" <<<"$smoke_workflow")" \
+    "demo-smoke.yml has no v6 target left"
 
 # --- the entry points -------------------------------------------------------
 

@@ -77,7 +77,7 @@ env:
   CI: "true"
   # Pinned: an unpinned CLI lets a Yontrack release turn a green pipeline red in a repository
   # nobody touched.
-  YONTRACK_CLI_VERSION: "5.7.0"
+  YONTRACK_CLI_VERSION: "5.8.0"
   # Run info reported with every validation. The Jenkins shared library computed this silently;
   # the Go CLI is purely declarative and sends `runInfo: null` unless the flags are spelled out,
   # which is how the migration dropped it (#1655) and left a hole in
@@ -366,6 +366,19 @@ jobs:
         env:
           VERSION: ${{ needs.setup.outputs.version }}
         run: yontrack build set-property release "$VERSION"
+
+      # The same version a second time, as the `rc-version` meta-info item. The `release`
+      # property above becomes the base version when release.yml publishes the build; this item
+      # never changes, and stays the GHCR tag the build was pushed as. The v5 slot deploys it
+      # and demo-smoke.yml resolves the build by it (#1999, backported by #2119).
+      - name: Record the rc version on the build
+        env:
+          VERSION: ${{ needs.setup.outputs.version }}
+          BUILD_ID: ${{ steps.config.outputs.buildId }}
+        run: |
+          set -euo pipefail
+          source scripts/yontrack-build.sh
+          yontrack_record_rc_version "$BUILD_ID" "$VERSION"
 
   # ---------------------------------------------------------------------------------------------
   # Compile, unit tests, backend Docker image.
