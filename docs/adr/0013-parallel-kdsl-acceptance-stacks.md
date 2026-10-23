@@ -115,7 +115,8 @@ for the same reason.
 
 The resolved slot is recorded in `.yontrack-kdsl/instance.env` and reused by
 the next build, so a stack that is already up is never moved out from under
-itself. That file is also how anything outside Gradle discovers the ports,
+itself - unless another stack took its ports while it was down, see the
+2026-10-23 amendment of ADR 0012. That file is also how anything outside Gradle discovers the ports,
 including an agent that wants to open the acceptance instance in a browser.
 
 ## Amendment, 2026-09-25: Elasticsearch left the acceptance stacks (#1883)

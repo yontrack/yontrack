@@ -111,7 +111,8 @@ object KdslStack {
     /**
      * Resolves the whole instance for a checkout.
      *
-     * This *claims a slot*: unless one is already recorded it probes every
+     * This *claims a slot*: unless one is already recorded and still this checkout's - see
+     * [StackSlots.resolveSlot] - it probes every
      * port of every slot, and fails the build when none of them is free. Call
      * it from a task that is running, never from the configuration of a build
      * file -- a build that is not going to touch the acceptance stack must
@@ -126,7 +127,9 @@ object KdslStack {
             slotMax = SLOT_MAX,
             basePorts = BASE_PORTS,
             stackName = "KDSL acceptance",
+            stackUp = { StackSlots.composeProjectsUp(names(rootDir).let { listOf(it.projectName, it.ldapProjectName, it.oidcProjectName, it.haProjectName) }) },
             portFree = StackSlots::portFree,
+            log = ::println,
         )
         return KdslStackInstance(slug = StackSlots.slug(path), slot = slot)
     }

@@ -95,3 +95,20 @@ Two things above now read differently. A development stack no longer publishes 9
 stack's Elasticsearch has one less family to step around, although the probing is unchanged. The
 `SearchIndexer` half of the shared-stack argument is also gone, because search indices are rows in
 each test run's own Postgres database. The queue-name half still holds.
+
+## Amendment, 2026-10-23: a recorded slot is given up when another stack took its ports
+
+A recorded slot used to be reused without probing, on the reasoning above: the stack it names is
+very probably up, which is exactly when its ports are not free. That holds while the stack is up.
+While it is down, its ports are free for anyone to claim, and the stacks of different families
+share their base ports. So a development stack in another worktree could take the same slot, and
+the next `integrationTest` here failed in Compose with "port is already allocated". The first
+service to hit it was MinIO, on 19100.
+
+A recorded slot is now kept when its ports are free, or when they are busy because this
+checkout's own stack is up: one of its Compose projects has a running container
+(`docker ps --filter label=com.docker.compose.project=...`), or, for the development stack, its
+backend or frontend process is alive. Otherwise it is given up, with a line saying so, and a slot
+is probed as on a first run. A stack that is up is still never moved out from under itself.
+`StackSlots.resolveSlot` and `scripts/dev-stack.sh`'s `ds_resolve_slot` apply the same rule, which
+covers the KDSL acceptance stack (ADR 0013) and the development stack (ADR 0004) as well.

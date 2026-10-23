@@ -170,9 +170,43 @@ class StackSlotsTest {
     }
 
     @Test
-    fun `a recorded slot is reused without probing the ports`() {
-        val slot = resolve(mainCheckout = true, recordedSlot = 4) { error("must not probe a recorded slot") }
+    fun `a recorded slot whose ports are free is reused`() {
+        val slot = resolve(
+            mainCheckout = true,
+            recordedSlot = 4,
+            stackUp = { error("the stack is only asked about when the ports are busy") },
+        ) { true }
         assertEquals(4, slot)
+    }
+
+    @Test
+    fun `a recorded slot whose ports are held by the checkout's own stack is reused`() {
+        // The common case: the stack is already up, so its own ports read as busy
+        val busy = StackSlots.ports(ItStack.BASE_PORTS, 4).toSet()
+        assertEquals(4, resolve(mainCheckout = true, recordedSlot = 4, stackUp = { true }) { it !in busy })
+    }
+
+    @Test
+    fun `a recorded slot whose ports another stack took meanwhile is given up for a free one`() {
+        // Recorded while it was free; since then the development stack of another
+        // checkout - which shares the base ports - claimed the same slot. Reusing
+        // it would fail in Compose with "port is already allocated".
+        val busy = StackSlots.ports(ItStack.BASE_PORTS, 1).toSet()
+        val slot = resolve(
+            path = "/home/dev/worktrees/feature-a",
+            mainCheckout = false,
+            recordedSlot = 1,
+            stackUp = { false },
+        ) { it !in busy }
+        assertTrue(slot != 1 && slot in StackSlots.SLOT_MIN..ItStack.SLOT_MAX, "got $slot")
+    }
+
+    @Test
+    fun `a single port of the recorded slot taken by another stack is enough to give it up`() {
+        val slot = resolve(mainCheckout = true, recordedSlot = 4, stackUp = { false }) {
+            it != StackSlots.port(ItStack.BASE_MINIO, 4)
+        }
+        assertEquals(0, slot)
     }
 
     @Test
@@ -211,11 +245,13 @@ class StackSlotsTest {
         path: String = "/home/dev/yontrack",
         mainCheckout: Boolean,
         recordedSlot: Int? = null,
+        stackUp: () -> Boolean = { false },
         portFree: (Int) -> Boolean,
     ): Int = StackSlots.resolveSlot(
         path = path,
         mainCheckout = mainCheckout,
         recordedSlot = recordedSlot,
+        stackUp = stackUp,
         slotMax = ItStack.SLOT_MAX,
         basePorts = ItStack.BASE_PORTS,
         stackName = "integration test",

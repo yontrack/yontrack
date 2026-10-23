@@ -77,12 +77,22 @@ object StackSlots {
     fun ports(basePorts: List<Int>, slot: Int): List<Int> = basePorts.map { port(it, slot) }
 
     /**
-     * Picks the slot for a checkout: the one already recorded if there is one,
-     * otherwise 0 for the main working copy or a hash of the path for a
-     * worktree, bumped along until the ports are actually free.
+     * Picks the slot for a checkout: the one already recorded if it is still
+     * this checkout's, otherwise 0 for the main working copy or a hash of the
+     * path for a worktree, bumped along until the ports are actually free.
      *
-     * A recorded slot is taken as-is and never probed: the stack it names is
-     * very probably up, which is exactly when its ports are *not* free.
+     * A recorded slot is kept when its ports are free, or when they are busy
+     * because the stack it names is up - [stackUp] - which is exactly when its
+     * ports are *not* free: a stack is never moved out from under itself. It is
+     * given up when something else holds them. The stacks of different
+     * families share their base ports, and a slot recorded while it was free
+     * can be claimed meanwhile by another checkout's stack of another family -
+     * a development stack, typically - which Compose would then report as
+     * "port is already allocated".
+     *
+     * @param stackUp Whether the stack of this checkout is up, asked only when
+     * the recorded slot has busy ports
+     * @param log Told when a recorded slot is given up
      */
     fun resolveSlot(
         path: String,
@@ -91,9 +101,17 @@ object StackSlots {
         slotMax: Int,
         basePorts: List<Int>,
         stackName: String,
+        stackUp: () -> Boolean,
         portFree: (Int) -> Boolean,
+        log: (String) -> Unit = {},
     ): Int {
-        if (recordedSlot != null) return recordedSlot
+        if (recordedSlot != null) {
+            if (ports(basePorts, recordedSlot).all(portFree) || stackUp()) return recordedSlot
+            log(
+                "The $stackName stack's recorded slot $recordedSlot has ports held by another stack: " +
+                        "looking for a free one."
+            )
+        }
         var slot = if (mainCheckout) 0 else slotFromPath(path, slotMax)
         var attempts = 0
         while (!ports(basePorts, slot).all(portFree)) {
@@ -108,6 +126,25 @@ object StackSlots {
         }
         return slot
     }
+
+    /**
+     * True when any of the Compose [projects] has a running container - the
+     * stack of this checkout being up, as far as [resolveSlot] is concerned.
+     * Docker not answering reads as not up: nothing of the stack can be
+     * running then.
+     */
+    fun composeProjectsUp(projects: List<String>): Boolean =
+        projects.any { project ->
+            try {
+                val process = ProcessBuilder(
+                    "docker", "ps", "--quiet", "--filter", "label=com.docker.compose.project=$project",
+                ).redirectErrorStream(true).start()
+                val output = process.inputStream.bufferedReader().readText()
+                process.waitFor() == 0 && output.isNotBlank()
+            } catch (ignored: Exception) {
+                false
+            }
+        }
 
     /**
      * Reads back the slot recorded by a previous run, or `null` when there is

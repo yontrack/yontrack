@@ -120,22 +120,8 @@ ds_next_slot() {
     printf '%s' "$next"
 }
 
-# Sourced by the test suite, which wants the functions and nothing else.
-if [ -n "${DEV_STACK_LIB_ONLY:-}" ]; then
-    return 0
-fi
-
-# ===========================================================================
-# Instance resolution
-# ===========================================================================
-
-set -e
-
-DS_TOPLEVEL="$(git rev-parse --show-toplevel)"
-DS_COMPOSE_FILE="$DS_TOPLEVEL/compose/docker-compose-dev.yml"
-DS_STATE_DIR="$DS_TOPLEVEL/.yontrack-dev"
-DS_INSTANCE_ENV="$DS_STATE_DIR/instance.env"
-DS_READY_TIMEOUT="${YONTRACK_DEV_TIMEOUT:-300}"
+# Slot resolution: functions only, which the test suite exercises with the
+# probes stubbed.
 
 ds_log()  { printf '  %s\n' "$*"; }
 ds_step() { printf '\n==> %s\n' "$*"; }
@@ -180,17 +166,35 @@ ds_slot_is_free() {
     return 0
 }
 
-# Picks the slot for this checkout: the one already recorded if there is one,
-# otherwise 0 for the main copy or a hash of the path for a worktree, bumped
-# along until the ports are actually free.
+# Whether this checkout's stack is up: its Compose project has a running
+# container, or its backend or frontend process is alive. Docker not answering
+# reads as no container running.
+ds_own_stack_up() {
+    [ -n "$(docker ps --quiet --filter "label=com.docker.compose.project=$DS_PROJECT" 2>/dev/null)" ] ||
+        ds_pid_alive "$DS_STATE_DIR/backend.pid" ||
+        ds_pid_alive "$DS_STATE_DIR/frontend.pid"
+}
+
+# Picks the slot for this checkout: the one already recorded if it is still
+# this checkout's, otherwise 0 for the main copy or a hash of the path for a
+# worktree, bumped along until the ports are actually free.
+#
+# A recorded slot is kept when its ports are free, or busy because this stack
+# is up -- it is never moved out from under itself -- and given up when
+# something else holds them: the stacks of the integration and acceptance
+# tests share the base ports, and can claim a recorded slot while this stack
+# is down.
 ds_resolve_slot() {
     if [ -f "$DS_INSTANCE_ENV" ]; then
         # shellcheck disable=SC1090
         local recorded
         recorded="$(grep '^DS_SLOT=' "$DS_INSTANCE_ENV" | cut -d= -f2)"
         if [ -n "$recorded" ]; then
-            printf '%s' "$recorded"
-            return 0
+            if ds_slot_is_free "$recorded" || ds_own_stack_up; then
+                printf '%s' "$recorded"
+                return 0
+            fi
+            ds_warn "the recorded slot $recorded has ports held by another stack: looking for a free one."
         fi
     fi
 
@@ -212,6 +216,24 @@ ds_resolve_slot() {
     done
     printf '%s' "$slot"
 }
+
+# Sourced by the test suite, which wants the functions and nothing else.
+if [ -n "${DEV_STACK_LIB_ONLY:-}" ]; then
+    return 0
+fi
+
+# ===========================================================================
+# Instance resolution
+# ===========================================================================
+
+set -e
+
+DS_TOPLEVEL="$(git rev-parse --show-toplevel)"
+DS_COMPOSE_FILE="$DS_TOPLEVEL/compose/docker-compose-dev.yml"
+DS_STATE_DIR="$DS_TOPLEVEL/.yontrack-dev"
+DS_INSTANCE_ENV="$DS_STATE_DIR/instance.env"
+DS_READY_TIMEOUT="${YONTRACK_DEV_TIMEOUT:-300}"
+
 
 # Fills in every DS_* variable the rest of the script reads.
 ds_resolve_instance() {

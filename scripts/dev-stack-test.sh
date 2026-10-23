@@ -177,6 +177,39 @@ assert_eq "from-variable" "$(HOME="$license_home" YONTRACK_DEV_LICENSE_KEY='from
 
 rm -rf "$license_home"
 
+# --- ds_resolve_slot: a recorded slot ---------------------------------------
+#
+# Stubbed in subshells: the port probe, whether this checkout's stack is up,
+# and the main-checkout test, so that no Docker, lsof or git state is read.
+
+slot_home="$(mktemp -d "${TMPDIR:-/tmp}/dev-stack-test.XXXXXX")"
+printf 'DS_SLOT=4\n' > "$slot_home/instance.env"
+slot4_ports=" $(ds_slot_ports 4)"
+
+assert_eq "4" "$(
+    DS_INSTANCE_ENV="$slot_home/instance.env"
+    ds_port_free() { return 0; }
+    ds_own_stack_up() { echo "asked" >&2; return 1; }
+    ds_resolve_slot
+)" "ds_resolve_slot keeps a recorded slot whose ports are free"
+
+assert_eq "4" "$(
+    DS_INSTANCE_ENV="$slot_home/instance.env"
+    ds_port_free() { case "$slot4_ports" in *" $1 "*) return 1 ;; *) return 0 ;; esac; }
+    ds_own_stack_up() { return 0; }
+    ds_resolve_slot
+)" "ds_resolve_slot keeps a recorded slot whose ports its own stack holds"
+
+assert_eq "0" "$(
+    DS_INSTANCE_ENV="$slot_home/instance.env"
+    ds_port_free() { case "$slot4_ports" in *" $1 "*) return 1 ;; *) return 0 ;; esac; }
+    ds_own_stack_up() { return 1; }
+    ds_is_main_checkout() { return 0; }
+    ds_resolve_slot 2>/dev/null
+)" "ds_resolve_slot gives up a recorded slot whose ports another stack took meanwhile"
+
+rm -rf "$slot_home"
+
 # --- report ----------------------------------------------------------------
 
 echo
