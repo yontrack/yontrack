@@ -36,7 +36,7 @@ inputs:
   trivy-version:
     description: Trivy version to install
     required: false
-    default: v0.74.0
+    default: v0.76.1
   upload-sarif:
     description: Whether to upload the SARIF report to GitHub code scanning
     required: false
