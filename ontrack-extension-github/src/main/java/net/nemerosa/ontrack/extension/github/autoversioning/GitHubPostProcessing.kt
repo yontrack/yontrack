@@ -150,6 +150,8 @@ class GitHubPostProcessing(
             client.waitUntilWorkflowRun(
                 repository = repository,
                 runId = runId,
+                retries = settings.retries,
+                retriesDelaySeconds = settings.retriesDelaySeconds,
             )
         } catch (any: Exception) {
             throw GitHubPostProcessingFailureException(runUrl = url, cause = any)

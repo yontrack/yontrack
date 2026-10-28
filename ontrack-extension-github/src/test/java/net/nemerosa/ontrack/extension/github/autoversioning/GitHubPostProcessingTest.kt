@@ -171,6 +171,33 @@ class GitHubPostProcessingTest {
     }
 
     @Test
+    fun `The retries of the settings apply to the wait for the completion of the workflow run`() {
+        val client = mockk<OntrackGitHubClient>(relaxed = true)
+        every { client.launchWorkflowRun(any(), any(), any(), any(), any(), any(), any()) } returns RUN_ID
+
+        runPostProcessing(client, retries = 90, retriesDelaySeconds = 20)
+
+        verify { client.waitUntilWorkflowRun("repository", RUN_ID, retries = 90, retriesDelaySeconds = 20) }
+    }
+
+    @Test
+    fun `The wait for the completion of the workflow run defaults to the default settings`() {
+        val client = mockk<OntrackGitHubClient>(relaxed = true)
+        every { client.launchWorkflowRun(any(), any(), any(), any(), any(), any(), any()) } returns RUN_ID
+
+        runPostProcessing(client)
+
+        verify {
+            client.waitUntilWorkflowRun(
+                "repository",
+                RUN_ID,
+                retries = GitHubPostProcessingSettings.DEFAULT_RETRIES,
+                retriesDelaySeconds = GitHubPostProcessingSettings.DEFAULT_RETRIES_DELAY_SECONDS,
+            )
+        }
+    }
+
+    @Test
     fun `A workflow run completing without success is a post-processing failure carrying the run link`() {
         val client = mockk<OntrackGitHubClient>()
         every { client.launchWorkflowRun(any(), any(), any(), any(), any(), any(), any()) } returns RUN_ID
@@ -287,6 +314,8 @@ class GitHubPostProcessingTest {
         ghConfigFound: Boolean = true,
         sendId: Boolean? = null,
         workflowSendId: Boolean = true,
+        retries: Int = GitHubPostProcessingSettings.DEFAULT_RETRIES,
+        retriesDelaySeconds: Int = GitHubPostProcessingSettings.DEFAULT_RETRIES_DELAY_SECONDS,
     ) {
         val ontrackGitHubClientFactory = mockk<OntrackGitHubClientFactory>()
         every { ontrackGitHubClientFactory.create(any()) } returns client
@@ -297,6 +326,8 @@ class GitHubPostProcessingTest {
             repository = "repository",
             workflow = "workflow.yml",
             branch = "main",
+            retries = retries,
+            retriesDelaySeconds = retriesDelaySeconds,
         )
 
         val gitHubConfig = mockk<GitHubEngineConfiguration>()
