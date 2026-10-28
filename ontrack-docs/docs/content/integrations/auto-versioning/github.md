@@ -16,6 +16,9 @@ attributes:
 * _Retry interval_ - The time (in seconds) between two checks for successful scheduling and completion of the
   post-processing job
 
+Once the workflow run has started, Yontrack waits at most _Retries_ x _Retry interval_ for it to complete: 5 minutes
+by default.
+
 The `postProcessingConfig` [property](auto-versioning.md#configuration) at the branch level must contain the following
 parameters:
 
