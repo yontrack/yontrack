@@ -1037,6 +1037,9 @@ For example:
   is defined.
 * `useLabel` for
   the [use label property](../generated/properties/property-net.nemerosa.ontrack.extension.general.BuildLinkDisplayPropertyType.md)
+* `notGrantedMedals` for
+  the [not-granted medals property](../generated/properties/property-net.nemerosa.ontrack.extension.general.NotGrantedMedalsPropertyType.md),
+  at project and at branch level - see [Seeing the conditions](../concepts/model/auto-promotion.md#seeing-the-conditions)
 
 For example, for a project:
 
@@ -1045,6 +1048,24 @@ project:
   properties:
     useLabel: false
 ```
+
+A level can set several properties:
+
+```yaml
+project:
+  properties:
+    useLabel: false
+    notGrantedMedals: true
+branch:
+  properties:
+    notGrantedMedals: false
+```
+
+!!! note "Removing a property from the configuration"
+
+    The CI configuration only ever sets properties. A key removed from the YAML leaves the last value in place, and
+    as long as a key is present, each CI run overwrites what was edited in the UI. To go back to inheriting, remove the
+    key and delete the property, in the UI or through the API.
 
 !!! note
 

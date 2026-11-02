@@ -34,6 +34,7 @@ const {Column} = Table;
  * @param validationStamps List of validation stamps
  * @param promotionLevels List of promotion levels of the branch, in the branch's order
  * @param loadingValidationStamps Validation stamps loading indicator
+ * @param notGrantedMedals Whether a build gets a medal for each auto-promoted level it does not have yet
  * @param onChange Callback when builds, runs, statuses, etc. need to be reloaded after a user action
  * @param selectedBuildFilter Currently selected build filter (can be undefined)
  */
@@ -46,6 +47,7 @@ export default function BranchBuilds({
                                          rangeSelection,
                                          validationStamps,
                                          promotionLevels,
+                                         notGrantedMedals,
                                          onChange,
                                          selectedBuildFilter,
                                          onSelectedBuildFilter,
@@ -289,6 +291,7 @@ export default function BranchBuilds({
                                     promotionMedals({
                                         promotionLevels,
                                         promotionRuns: build.promotionRuns,
+                                        notGrantedMedals,
                                     }).map(({key, run, promotionLevel}) => run ?
                                         <PromotionRunStep key={key} run={run}/> :
                                         <NotGrantedPromotionStep key={key} build={build} promotionLevel={promotionLevel}/>

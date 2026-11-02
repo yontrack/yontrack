@@ -103,6 +103,10 @@ data class AgentSessionSpec(
  * A project whose requirement the instance does not meet is left out of the reset, with a line in
  * the log saying why, rather than failing it: the demo is still worth having without it.
  */
+/**
+ * @property notGrantedMedals Whether the project enables the medals of the auto-promoted levels a
+ * build does not have yet. They are off by default, so that a project without it shows the default.
+ */
 data class ProjectSpec(
     val name: String,
     val description: String,
@@ -111,6 +115,7 @@ data class ProjectSpec(
     val favourite: Boolean = false,
     val labels: List<String> = emptyList(),
     val requires: List<DemoCapability> = emptyList(),
+    val notGrantedMedals: Boolean = false,
 )
 
 /**

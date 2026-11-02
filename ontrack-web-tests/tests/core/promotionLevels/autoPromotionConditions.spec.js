@@ -13,10 +13,14 @@ import path from "node:path";
  * (not required) passed, BRONZE granted - and SILVER granted by hand, unless `grantSilver` is false.
  *
  * GOLD has no auto promotion, and is never granted.
+ *
+ * The not-granted medals of the branch builds view are enabled on the branch, unless `notGrantedMedals`
+ * is false: they are off by default.
  */
-const setup = async (ontrack, {grantSilver = true} = {}) => {
+const setup = async (ontrack, {grantSilver = true, notGrantedMedals = true} = {}) => {
     const project = await ontrack.createProject()
     const branch = await project.createBranch()
+    if (notGrantedMedals) await branch.setNotGrantedMedals(true)
     const buildVs = await branch.createValidationStamp('BUILD')
     const unitTests = await branch.createValidationStamp('UNIT.TESTS')
     await branch.createValidationStamp('INTEGRATION.TESTS')
@@ -274,9 +278,26 @@ test("the medals of the branch builds view follow the branch's order", async ({p
     await expect(medals.nth(2)).toHaveClass(`promotion-run-pl-${gold.id}`)
 })
 
+test('an auto-promoted level has no not-granted medal by default, and has it once the branch property is set', async ({page, ontrack}) => {
+    const {branch, build, bronze, silver} = await setup(ontrack, {grantSilver: false, notGrantedMedals: false})
+
+    await login(page, ontrack)
+    const branchPage = new BranchPage(page, branch)
+    await branchPage.goTo()
+
+    await expect(page.locator(`.promotion-run-pl-${bronze.id}`)).toBeVisible()
+    await expect(branchPage.allNotGrantedMedals()).toHaveCount(0)
+
+    await branch.setNotGrantedMedals(true)
+    await branchPage.goTo()
+
+    await expect(branchPage.notGrantedMedal(build, silver)).toBeVisible()
+})
+
 test('a branch without auto promotion has no not-granted medal', async ({page, ontrack}) => {
     const project = await ontrack.createProject()
     const branch = await project.createBranch()
+    await branch.setNotGrantedMedals(true)
     const bronze = await branch.createPromotionLevel('BRONZE')
     await branch.createPromotionLevel('SILVER')
     const build = await branch.createBuild()

@@ -82,8 +82,26 @@ const branchInstance = (ontrack, data, project) => {
     branch.disableBranch = async () => disableBranch(branch)
     branch.favourite = async () => favouriteBranch(branch)
     branch.delete = async () => deleteBranch(branch)
+    branch.setNotGrantedMedals = async (enabled) => setNotGrantedMedals(branch, enabled)
 
     return branch
+}
+
+const setNotGrantedMedals = async (branch, enabled) => {
+    await graphQLCallMutation(
+        branch.ontrack.connection,
+        'setBranchNotGrantedMedalsPropertyById',
+        gql`
+            mutation SetBranchNotGrantedMedals($id: Int!, $enabled: Boolean!) {
+                setBranchNotGrantedMedalsPropertyById(input: {id: $id, enabled: $enabled}) {
+                    errors {
+                        message
+                    }
+                }
+            }
+        `,
+        {id: Number(branch.id), enabled}
+    )
 }
 
 const deleteBranch = async (branch) => {

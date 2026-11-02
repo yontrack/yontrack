@@ -416,6 +416,12 @@ own, and the counts every view shows stop matching the dataset.
 That is what keeps `fullPromotions` off the changelog project, whose builds stop at BRONZE
 with both stamps green and would otherwise promote themselves to SILVER on the next reset.
 
+### The not-granted medals are asked for, on one project
+
+The not-granted medals of the branch builds view are off by default, so `ProjectSpec.notGrantedMedals`
+sets their property on `petclinic` alone and the global setting stays off: its builds `103` and
+`106` do not satisfy SILVER and show its medal, while every other project shows the default.
+
 ### The build which fails is load-bearing
 
 `petclinic/maintenance` ends on a build whose `BUILD` validation FAILED and which is promoted

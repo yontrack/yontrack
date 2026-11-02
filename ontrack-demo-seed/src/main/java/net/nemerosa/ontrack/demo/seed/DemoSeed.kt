@@ -248,6 +248,7 @@ class DemoSeed(
             if (spec.labels.isNotEmpty()) {
                 project.setLabels(spec.labels.map { labels.getValue(it) })
             }
+            if (spec.notGrantedMedals) project.enableNotGrantedMedals()
             spec.branches.forEach { branchSpec ->
                 branches[spec.name to branchSpec.name] =
                     createBranch(spec, branchSpec, project, now, builds, tokens, evidence, heldLadders)

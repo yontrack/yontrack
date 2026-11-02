@@ -411,6 +411,14 @@ class InMemoryDemoTarget(
         var labels: List<String> = emptyList()
             private set
 
+        /** Whether the not-granted medals were enabled on the project. */
+        var notGrantedMedals: Boolean = false
+            private set
+
+        override fun enableNotGrantedMedals() {
+            notGrantedMedals = true
+        }
+
         override fun markAsFavourite() {
             favourite = true
         }

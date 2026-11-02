@@ -73,7 +73,17 @@ A `WARNING` run accepted by its CHML validation stamp counts as passed in the su
 
 On the build page, hovering a promotion the build does **not** have yet shows the same conditions, with their state for that build, under the promotion's name marked **Not granted** — the place to look when wondering why a build is not promoted. A promotion level without auto promotion shows its description only.
 
-The branch builds view shows them too, for the promotion levels with an auto promotion: a build gets a greyed medal in a dashed outline for each of those it does **not** have yet, in the branch's order of promotion levels. Hovering this medal, or focusing it with the keyboard, shows the same conditions with their state for that build, and the medal links to the promotion level.
+The branch builds view can show them too, for the promotion levels with an auto promotion: a build gets a greyed medal in a dashed outline for each of those it does **not** have yet, in the branch's order of promotion levels. Hovering this medal, or focusing it with the keyboard, shows the same conditions with their state for that build, and the medal links to the promotion level.
+
+These medals are **off by default**. The first of these levels carrying a value decides, whichever way it answers, so a branch can turn them on in a project which has them off, and the reverse:
+
+| Order | Level   | Set through                                                                                                                                                                                                   |
+|-------|---------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| 1     | Branch  | The [not-granted medals property](../../generated/properties/property-net.nemerosa.ontrack.extension.general.NotGrantedMedalsPropertyType.md), in the UI, the API or the [CI configuration](../../configuration/ci-config.md#properties) |
+| 2     | Project | The same property                                                                                                                                                                                             |
+| 3     | Global  | The _Not-granted medals_ settings, in the UI or as code, under `ontrack.config.settings.not-granted-medals.enabled`                                                                                           |
+
+Deleting the property returns to inheriting from the next level. The build page shows the conditions of a promotion not granted whatever this option says.
 
 These are the _current_ conditions and statuses. The auto promotion property is not versioned, so they explain why the build is — or is not — promoted today, not what triggered a promotion in the past. They are shown for manually granted promotions too.
 

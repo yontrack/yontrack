@@ -14,7 +14,7 @@ import useLastKnown from "@components/common/useLastKnown";
 // before this fetching moved here.
 const emptyPageInfo = {nextPage: {}}
 
-const noStampsNorLevels = {validationStamps: [], promotionLevels: []}
+const noStampsNorLevels = {validationStamps: [], promotionLevels: [], notGrantedMedals: false}
 
 /**
  * Legacy branch content view: the table of the builds of the branch, with their promotions and their
@@ -46,6 +46,7 @@ export default function BuildsContentView({branch}) {
         gql`
             query GetBranchStampsAndLevels($branchId: Int!) {
                 branches(id: $branchId) {
+                    notGrantedMedals
                     validationStamps {
                         id
                         name
@@ -82,7 +83,7 @@ export default function BuildsContentView({branch}) {
         }
     )
     // A refresh which fails does not take the columns nor the medals away
-    const {validationStamps, promotionLevels} = useLastKnown(loadedStampsAndLevels)
+    const {validationStamps, promotionLevels, notGrantedMedals} = useLastKnown(loadedStampsAndLevels)
 
     return (
         <BranchBuilds
@@ -94,6 +95,7 @@ export default function BuildsContentView({branch}) {
             rangeSelection={rangeSelection}
             validationStamps={validationStamps}
             promotionLevels={promotionLevels}
+            notGrantedMedals={notGrantedMedals}
             onChange={reload}
             selectedBuildFilter={selectedBuildFilter}
             onSelectedBuildFilter={onSelectedBuildFilter}

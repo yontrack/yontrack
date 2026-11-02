@@ -246,6 +246,13 @@ interface DemoProject {
     fun setLabels(labels: List<DemoLabel>)
 
     /**
+     * Shows, on the branch builds view of the branches of this project, the medals of the auto-promoted
+     * levels a build does not have yet. They are off by default, and the global setting stays so, for
+     * the demo to show both the feature and the default.
+     */
+    fun enableNotGrantedMedals()
+
+    /**
      * Recomputes the delivery scorecard of this project, in every set it is in, and waits for it.
      *
      * The readings are otherwise computed by a daily job, so a freshly seeded demo would show every

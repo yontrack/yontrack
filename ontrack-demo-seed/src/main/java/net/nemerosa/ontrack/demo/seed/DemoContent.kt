@@ -740,6 +740,9 @@ object DemoContent {
         name = SERVICE,
         description = "Sample application - the demo's main project.",
         scm = serviceScm(),
+        // On one project only, and through its property, so that the demo shows both the medals and
+        // their default: builds 103 and 106 do not satisfy SILVER, and get its medal in the builds view.
+        notGrantedMedals = true,
         // The demo's favourites, which is what the mobile UI opens on. Both branches of the
         // main project, so the home screen shows the project each branch belongs to doing
         // real work - two branches called differently under one project name.

@@ -398,6 +398,9 @@ class KdslDemoTarget(private val ontrack: Ontrack) : DemoTarget {
          */
         const val AGENTS_ADMITTED_PROPERTY = "net.nemerosa.ontrack.extension.general.AgentsAdmittedPropertyType"
 
+        /** The not-granted medals of a project: `{"enabled": true}` shows them on its branches. */
+        const val NOT_GRANTED_MEDALS_PROPERTY = "net.nemerosa.ontrack.extension.general.NotGrantedMedalsPropertyType"
+
         /**
          * How long the seed waits for the server to compute the assisted change of a build.
          */
@@ -566,6 +569,10 @@ private class KdslDemoProject(
 
     override fun setLabels(labels: List<DemoLabel>) {
         project.setLabels(labels.map { (it as KdslDemoLabel).label.id })
+    }
+
+    override fun enableNotGrantedMedals() {
+        project.setProperty(KdslDemoTarget.NOT_GRANTED_MEDALS_PROPERTY, mapOf("enabled" to true))
     }
 
     override fun recomputeScorecard() {

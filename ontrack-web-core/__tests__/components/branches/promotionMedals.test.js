@@ -16,6 +16,7 @@ describe('promotionMedals', () => {
 
     it('adds a medal for a level with an auto promotion which is not granted', () => {
         expect(drawn(promotionMedals({
+            notGrantedMedals: true,
             promotionLevels: [bronze, silver],
             promotionRuns: [runOf(10, bronze)],
         }))).toEqual([10, 'SILVER'])
@@ -23,6 +24,7 @@ describe('promotionMedals', () => {
 
     it('adds nothing for a level without auto promotion which is not granted', () => {
         expect(drawn(promotionMedals({
+            notGrantedMedals: true,
             promotionLevels: [bronze, gold],
             promotionRuns: [runOf(10, bronze)],
         }))).toEqual([10])
@@ -30,6 +32,7 @@ describe('promotionMedals', () => {
 
     it('draws a granted level by its run, with or without auto promotion', () => {
         expect(drawn(promotionMedals({
+            notGrantedMedals: true,
             promotionLevels: [silver, gold],
             promotionRuns: [runOf(20, silver), runOf(30, gold)],
         }))).toEqual([20, 30])
@@ -37,6 +40,7 @@ describe('promotionMedals', () => {
 
     it("follows the branch's order, whatever the order of the runs", () => {
         expect(drawn(promotionMedals({
+            notGrantedMedals: true,
             promotionLevels: [bronze, silver, gold, platinum],
             promotionRuns: [runOf(30, gold), runOf(10, bronze)],
         }))).toEqual([10, 'SILVER', 30, 'PLATINUM'])
@@ -44,6 +48,7 @@ describe('promotionMedals', () => {
 
     it('keeps the runs in their order while the levels are not known yet', () => {
         expect(drawn(promotionMedals({
+            notGrantedMedals: true,
             promotionLevels: [],
             promotionRuns: [runOf(30, gold), runOf(10, bronze)],
         }))).toEqual([30, 10])
@@ -51,6 +56,7 @@ describe('promotionMedals', () => {
 
     it('still draws, last, a run whose level is not in the known levels', () => {
         expect(drawn(promotionMedals({
+            notGrantedMedals: true,
             promotionLevels: [silver],
             promotionRuns: [runOf(10, bronze)],
         }))).toEqual(['SILVER', 10])
@@ -58,11 +64,28 @@ describe('promotionMedals', () => {
 
     it('gives every medal its own key', () => {
         const keys = promotionMedals({
+            notGrantedMedals: true,
             // The ID of the run is the same as the ID of the level not granted
             promotionLevels: [bronze, silver],
             promotionRuns: [runOf(2, bronze)],
         }).map(medal => medal.key)
         expect(new Set(keys).size).toBe(2)
+    })
+
+    it('adds no medal for a level not granted when the medals are off', () => {
+        expect(drawn(promotionMedals({
+            notGrantedMedals: false,
+            promotionLevels: [bronze, silver],
+            promotionRuns: [runOf(10, bronze)],
+        }))).toEqual([10])
+    })
+
+    it("keeps the granted medals in the branch's order when the medals are off", () => {
+        expect(drawn(promotionMedals({
+            notGrantedMedals: false,
+            promotionLevels: [bronze, silver, gold, platinum],
+            promotionRuns: [runOf(40, platinum), runOf(30, gold), runOf(10, bronze)],
+        }))).toEqual([10, 30, 40])
     })
 
 })

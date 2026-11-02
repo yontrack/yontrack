@@ -738,6 +738,10 @@ type Branch implements Authorizable & ProjectEntity {
   "Mock SCM used for testing only"
   mockSCMBranchProperty: Property
   name: String
+  "Whether the branch builds view shows a medal for each auto-promoted level a build does not have yet: the first of the property of the branch, the property of the project and the global settings carrying a value decides."
+  notGrantedMedals: Boolean!
+  "Whether the branch builds view shows a medal for each auto-promoted level a build does not have yet."
+  notGrantedMedalsProperty: Property
   "List of other branches in the same project"
   otherBranches: [Branch!]!
   "Makes a promotion conditional based on the fact that a previous promotion has been granted."
@@ -1599,6 +1603,22 @@ type DeleteBranchMetaInfoPropertyPayload implements Payload {
   errors: [UserError]
 }
 
+"Output type for the deleteBranchNotGrantedMedalsPropertyById mutation."
+type DeleteBranchNotGrantedMedalsPropertyByIdPayload implements Payload {
+  "Branch updated"
+  branch: Branch
+  "List of errors"
+  errors: [UserError]
+}
+
+"Output type for the deleteBranchNotGrantedMedalsProperty mutation."
+type DeleteBranchNotGrantedMedalsPropertyPayload implements Payload {
+  "Branch updated"
+  branch: Branch
+  "List of errors"
+  errors: [UserError]
+}
+
 "Output type for the deleteBranchReleaseValidationPropertyById mutation."
 type DeleteBranchReleaseValidationPropertyByIdPayload implements Payload {
   "Branch updated"
@@ -1979,6 +1999,22 @@ type DeleteProjectMetaInfoPropertyByIdPayload implements Payload {
 
 "Output type for the deleteProjectMetaInfoProperty mutation."
 type DeleteProjectMetaInfoPropertyPayload implements Payload {
+  "List of errors"
+  errors: [UserError]
+  "Project updated"
+  project: Project
+}
+
+"Output type for the deleteProjectNotGrantedMedalsPropertyById mutation."
+type DeleteProjectNotGrantedMedalsPropertyByIdPayload implements Payload {
+  "List of errors"
+  errors: [UserError]
+  "Project updated"
+  project: Project
+}
+
+"Output type for the deleteProjectNotGrantedMedalsProperty mutation."
+type DeleteProjectNotGrantedMedalsPropertyPayload implements Payload {
   "List of errors"
   errors: [UserError]
   "Project updated"
@@ -4205,6 +4241,16 @@ type Mutation {
     "Input for the mutation"
     input: DeleteBranchMetaInfoPropertyByIdInput
   ): DeleteBranchMetaInfoPropertyByIdPayload
+  "Deletes the not-granted medals property on a branch identified by name."
+  deleteBranchNotGrantedMedalsProperty(
+    "Input for the mutation"
+    input: DeleteBranchNotGrantedMedalsPropertyInput
+  ): DeleteBranchNotGrantedMedalsPropertyPayload
+  "Deletes the not-granted medals property on a branch."
+  deleteBranchNotGrantedMedalsPropertyById(
+    "Input for the mutation"
+    input: DeleteBranchNotGrantedMedalsPropertyByIdInput
+  ): DeleteBranchNotGrantedMedalsPropertyByIdPayload
   "Deletes the validation on release/label property on a branch identified by name."
   deleteBranchReleaseValidationProperty(
     "Input for the mutation"
@@ -4474,6 +4520,16 @@ type Mutation {
     "Input for the mutation"
     input: DeleteProjectMetaInfoPropertyByIdInput
   ): DeleteProjectMetaInfoPropertyByIdPayload
+  "Deletes the not-granted medals property on a project identified by name."
+  deleteProjectNotGrantedMedalsProperty(
+    "Input for the mutation"
+    input: DeleteProjectNotGrantedMedalsPropertyInput
+  ): DeleteProjectNotGrantedMedalsPropertyPayload
+  "Deletes the not-granted medals property on a project."
+  deleteProjectNotGrantedMedalsPropertyById(
+    "Input for the mutation"
+    input: DeleteProjectNotGrantedMedalsPropertyByIdInput
+  ): DeleteProjectNotGrantedMedalsPropertyByIdPayload
   "Deletes the sonarQube property on a project identified by name."
   deleteProjectSonarQubeProperty(
     "Input for the mutation"
@@ -5002,6 +5058,16 @@ type Mutation {
     "Input for the mutation"
     input: SetBranchMetaInfoPropertyByIdInput
   ): SetBranchMetaInfoPropertyByIdPayload
+  "Set the not-granted medals property on a branch identified by name."
+  setBranchNotGrantedMedalsProperty(
+    "Input for the mutation"
+    input: SetBranchNotGrantedMedalsPropertyInput
+  ): SetBranchNotGrantedMedalsPropertyPayload
+  "Set the not-granted medals property on a branch."
+  setBranchNotGrantedMedalsPropertyById(
+    "Input for the mutation"
+    input: SetBranchNotGrantedMedalsPropertyByIdInput
+  ): SetBranchNotGrantedMedalsPropertyByIdPayload
   "Sets a property on a branch identified by name"
   setBranchProperty(
     "Input for the mutation"
@@ -5217,6 +5283,16 @@ type Mutation {
     "Input for the mutation"
     input: SetProjectMetaInfoPropertyByIdInput
   ): SetProjectMetaInfoPropertyByIdPayload
+  "Set the not-granted medals property on a project identified by name."
+  setProjectNotGrantedMedalsProperty(
+    "Input for the mutation"
+    input: SetProjectNotGrantedMedalsPropertyInput
+  ): SetProjectNotGrantedMedalsPropertyPayload
+  "Set the not-granted medals property on a project."
+  setProjectNotGrantedMedalsPropertyById(
+    "Input for the mutation"
+    input: SetProjectNotGrantedMedalsPropertyByIdInput
+  ): SetProjectNotGrantedMedalsPropertyByIdPayload
   "Sets a property on a project identified by name"
   setProjectProperty(
     "Input for the mutation"
@@ -5956,6 +6032,8 @@ type Project implements Authorizable & ProjectEntity {
   "Mock SCM used for testing only"
   mockSCMProjectProperty: Property
   name: String
+  "Whether the branch builds view shows a medal for each auto-promoted level a build does not have yet."
+  notGrantedMedalsProperty: Property
   "Makes a promotion conditional based on the fact that a previous promotion has been granted."
   previousPromotionConditionProperty: Property
   "Authorisations for the project"
@@ -7708,6 +7786,22 @@ type SetBranchMetaInfoPropertyPayload implements Payload {
   errors: [UserError]
 }
 
+"Output type for the setBranchNotGrantedMedalsPropertyById mutation."
+type SetBranchNotGrantedMedalsPropertyByIdPayload implements Payload {
+  "Branch updated"
+  branch: Branch
+  "List of errors"
+  errors: [UserError]
+}
+
+"Output type for the setBranchNotGrantedMedalsProperty mutation."
+type SetBranchNotGrantedMedalsPropertyPayload implements Payload {
+  "Branch updated"
+  branch: Branch
+  "List of errors"
+  errors: [UserError]
+}
+
 "Output type for the setBranchPropertyById mutation."
 type SetBranchPropertyByIdPayload implements Payload {
   "Branch updated"
@@ -8046,6 +8140,22 @@ type SetProjectMetaInfoPropertyByIdPayload implements Payload {
 
 "Output type for the setProjectMetaInfoProperty mutation."
 type SetProjectMetaInfoPropertyPayload implements Payload {
+  "List of errors"
+  errors: [UserError]
+  "Project updated"
+  project: Project
+}
+
+"Output type for the setProjectNotGrantedMedalsPropertyById mutation."
+type SetProjectNotGrantedMedalsPropertyByIdPayload implements Payload {
+  "List of errors"
+  errors: [UserError]
+  "Project updated"
+  project: Project
+}
+
+"Output type for the setProjectNotGrantedMedalsProperty mutation."
+type SetProjectNotGrantedMedalsPropertyPayload implements Payload {
   "List of errors"
   errors: [UserError]
   "Project updated"
@@ -10896,6 +11006,20 @@ input DeleteBranchMetaInfoPropertyInput {
   project: String!
 }
 
+"Input type for the deleteBranchNotGrantedMedalsPropertyById mutation."
+input DeleteBranchNotGrantedMedalsPropertyByIdInput {
+  "ID of the branch"
+  id: Int!
+}
+
+"Input type for the deleteBranchNotGrantedMedalsProperty mutation."
+input DeleteBranchNotGrantedMedalsPropertyInput {
+  "Branch name"
+  branch: String!
+  "Project name"
+  project: String!
+}
+
 "Input type for the deleteBranchReleaseValidationPropertyById mutation."
 input DeleteBranchReleaseValidationPropertyByIdInput {
   "ID of the branch"
@@ -11257,6 +11381,18 @@ input DeleteProjectMetaInfoPropertyByIdInput {
 
 "Input type for the deleteProjectMetaInfoProperty mutation."
 input DeleteProjectMetaInfoPropertyInput {
+  "Project name"
+  project: String!
+}
+
+"Input type for the deleteProjectNotGrantedMedalsPropertyById mutation."
+input DeleteProjectNotGrantedMedalsPropertyByIdInput {
+  "ID of the project"
+  id: Int!
+}
+
+"Input type for the deleteProjectNotGrantedMedalsProperty mutation."
+input DeleteProjectNotGrantedMedalsPropertyInput {
   "Project name"
   project: String!
 }
@@ -12541,6 +12677,24 @@ input SetBranchMetaInfoPropertyInput {
   project: String!
 }
 
+"Input type for the setBranchNotGrantedMedalsPropertyById mutation."
+input SetBranchNotGrantedMedalsPropertyByIdInput {
+  "Shows, in the branch builds view, a medal for each auto-promoted level a build does not have yet."
+  enabled: Boolean!
+  "ID of the branch"
+  id: Int!
+}
+
+"Input type for the setBranchNotGrantedMedalsProperty mutation."
+input SetBranchNotGrantedMedalsPropertyInput {
+  "Branch name"
+  branch: String!
+  "Shows, in the branch builds view, a medal for each auto-promoted level a build does not have yet."
+  enabled: Boolean!
+  "Project name"
+  project: String!
+}
+
 "Input type for the setBranchPropertyById mutation."
 input SetBranchPropertyByIdInput {
   "ID of the branch"
@@ -13077,6 +13231,22 @@ input SetProjectMetaInfoPropertyInput {
   append: Boolean = false
   "List of meta info"
   items: [MetaInfoPropertyItemInput!]!
+  "Project name"
+  project: String!
+}
+
+"Input type for the setProjectNotGrantedMedalsPropertyById mutation."
+input SetProjectNotGrantedMedalsPropertyByIdInput {
+  "Shows, in the branch builds view, a medal for each auto-promoted level a build does not have yet."
+  enabled: Boolean!
+  "ID of the project"
+  id: Int!
+}
+
+"Input type for the setProjectNotGrantedMedalsProperty mutation."
+input SetProjectNotGrantedMedalsPropertyInput {
+  "Shows, in the branch builds view, a medal for each auto-promoted level a build does not have yet."
+  enabled: Boolean!
   "Project name"
   project: String!
 }

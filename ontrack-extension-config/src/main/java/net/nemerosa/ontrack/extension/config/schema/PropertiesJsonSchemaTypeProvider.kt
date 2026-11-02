@@ -39,7 +39,6 @@ class PropertiesJsonSchemaTypeProvider(
             properties = properties,
             required = emptyList(),
             additionalProperties = false,
-            maxProperties = 1, // At most one property
             oneOf = null,
         )
     }
