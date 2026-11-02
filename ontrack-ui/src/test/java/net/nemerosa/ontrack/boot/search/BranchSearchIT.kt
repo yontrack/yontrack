@@ -126,7 +126,7 @@ class BranchSearchIT : AbstractSearchTestSupport() {
             (1..3).forEach { branch("$prefix-$it") }
         }
         try {
-            searchService.reindex(BRANCH_SEARCH_RESULT_TYPE)
+            asAdmin { searchService.reindex(BRANCH_SEARCH_RESULT_TYPE) }
             assertEquals(3, asUser { search(prefix).total })
         } finally {
             asAdmin { structureService.deleteProject(project.id) }

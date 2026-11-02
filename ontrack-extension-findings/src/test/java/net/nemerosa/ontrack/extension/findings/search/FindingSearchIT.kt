@@ -335,7 +335,7 @@ class FindingSearchIT : AbstractQLKTITSupport() {
             searchDocumentService.delete(FINDING_SEARCH_RESULT_TYPE, id.toString())
             assertEquals(0, search(cve).size)
 
-            searchService.reindex(FINDING_SEARCH_RESULT_TYPE)
+            asAdmin { searchService.reindex(FINDING_SEARCH_RESULT_TYPE) }
             val result = search(cve).single()
             assertEquals(cve, result.path("title").asText())
             assertEquals(listOf("main"), result.path("data").path("branches").toList().map { it.path("name").asText() })

@@ -63,8 +63,9 @@ messages are indexed by the same scans.
 
 ### REST API
 
-Two endpoints, meant for the administrators, rebuild the documents on demand — for example to repair the documents of a type
-after importing data directly in the database:
+Two endpoints rebuild the documents on demand — for example to repair the documents of a type
+after importing data directly in the database. Like launching a job, they require the
+*application management* function, which the administrators hold:
 
 ```
 # Rebuilds the documents of one type, and waits for the end of the rebuild

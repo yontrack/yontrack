@@ -206,7 +206,7 @@ class BuildSearchIT : AbstractSearchTestSupport() {
             branch.build("$prefix-2").release(release)
         }
         try {
-            searchService.reindex(BUILD_SEARCH_RESULT_TYPE)
+            asAdmin { searchService.reindex(BUILD_SEARCH_RESULT_TYPE) }
             assertEquals(2, asUser { search(prefix).total })
             assertEquals(listOf(release), asUser { search(release).items.map { it.title } })
         } finally {

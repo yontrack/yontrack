@@ -168,7 +168,7 @@ class GitBranchSearchIndexerIT : AbstractGitTestSupport() {
             branch(token())
         }
         try {
-            searchService.reindex(GitBranchSearchIndexer.SEARCH_RESULT_TYPE)
+            asAdmin { searchService.reindex(GitBranchSearchIndexer.SEARCH_RESULT_TYPE) }
             assertEquals(
                 listOf("$prefix-1", "$prefix-2"),
                 asUser { search(prefix).items.map { it.title }.sorted() }

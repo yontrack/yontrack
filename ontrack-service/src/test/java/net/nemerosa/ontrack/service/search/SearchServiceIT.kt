@@ -773,7 +773,7 @@ class SearchServiceIT : AbstractDSLTestSupport() {
         alpha.source += alpha.document("a-$u", "A", project, identifiers = listOf(u))
         val blocker = CountDownLatch(1)
         alpha.blocker = blocker
-        val rebuild = thread { searchService.reindex(TestAlphaSearchDocumentIndexer.TYPE) }
+        val rebuild = thread { asAdmin { searchService.reindex(TestAlphaSearchDocumentIndexer.TYPE) } }
         try {
             // Waiting for the rebuild to start
             var results: SearchResults

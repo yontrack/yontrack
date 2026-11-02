@@ -4,6 +4,7 @@ import net.nemerosa.ontrack.job.JobLaunchStatus
 import net.nemerosa.ontrack.job.JobScheduler
 import net.nemerosa.ontrack.json.toObject
 import net.nemerosa.ontrack.model.Ack
+import net.nemerosa.ontrack.model.security.ApplicationManagement
 import net.nemerosa.ontrack.model.security.ProjectList
 import net.nemerosa.ontrack.model.security.SecurityService
 import net.nemerosa.ontrack.model.structure.*
@@ -186,6 +187,7 @@ class SearchServiceImpl(
 
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     override fun indexReset(reindex: Boolean, logErrors: Boolean): Ack {
+        securityService.checkGlobalFunction(ApplicationManagement::class.java)
         val ok = indexers.values.all { indexer ->
             try {
                 searchDocumentService.clear(indexer.searchResultType.id)
@@ -207,6 +209,7 @@ class SearchServiceImpl(
 
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     override fun reindex(resultType: String) {
+        securityService.checkGlobalFunction(ApplicationManagement::class.java)
         val indexer = indexers[resultType] ?: throw SearchResultTypeNotFoundException(resultType)
         rebuild(indexer)
     }

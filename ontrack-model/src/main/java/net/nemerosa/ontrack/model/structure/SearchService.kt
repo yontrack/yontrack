@@ -40,6 +40,8 @@ interface SearchService {
      * This method is mostly used for testing but could be used
      * to repair faulty search documents.
      *
+     * Requires the [application management][net.nemerosa.ontrack.model.security.ApplicationManagement].
+     *
      * @param reindex `true` to rebuild the search documents afterward
      * @param logErrors `true` to log errors only, not raise exceptions
      * @return OK if the reset was completed successfully
@@ -49,6 +51,8 @@ interface SearchService {
     /**
      * Rebuilds the search documents of a given result type, through its rebuild job, which runs on
      * any replica. Waits until the rebuild is completed.
+     *
+     * Requires the [application management][net.nemerosa.ontrack.model.security.ApplicationManagement].
      *
      * @param resultType Result type to rebuild
      * @throws SearchResultTypeNotFoundException If no indexer serves this type

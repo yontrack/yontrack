@@ -241,11 +241,11 @@ class BuildLinkSearchIT : AbstractSearchTestSupport() {
         source.linkTo(target)
         source.linkTo(target, "dev")
         try {
-            searchService.reindex(BuildLinkSearchExtension.SEARCH_RESULT_TYPE)
+            asAdmin { searchService.reindex(BuildLinkSearchExtension.SEARCH_RESULT_TYPE) }
             assertEquals(2, asUser { search("${target.project.name}:$version").total })
             // Deleting the branch of the target is repaired by the reconciliation
             asAdmin { structureService.deleteBranch(target.branch.id) }
-            searchService.reindex(BuildLinkSearchExtension.SEARCH_RESULT_TYPE)
+            asAdmin { searchService.reindex(BuildLinkSearchExtension.SEARCH_RESULT_TYPE) }
             assertEquals(0, asUser { search(target.project.name).total })
         } finally {
             asAdmin {

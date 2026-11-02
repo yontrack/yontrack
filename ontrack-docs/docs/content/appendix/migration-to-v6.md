@@ -192,8 +192,9 @@ See also its [Upgrading to 6.x](https://github.com/yontrack/yontrack-chart#upgra
 
 #### For API clients
 
-* The `POST /rest/search/index/type/{type}` and `POST /rest/search/index/reset` endpoints are
-  unchanged, and act on the Postgres search documents. An unknown type now answers with an error.
+* The `POST /rest/search/index/type/{type}` and `POST /rest/search/index/reset` endpoints act on
+  the Postgres search documents. An unknown type now answers with an error, and both now require
+  the *application management* function, which the administrators hold: anybody else gets a `403`.
 * The GraphQL `search(query, types, offset, size, perType)` query replaces the
   `search(token, type, offset, size)` form, which is deprecated: see
   [Newly deprecated](#newly-deprecated).

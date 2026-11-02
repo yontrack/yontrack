@@ -162,7 +162,7 @@ class ReleaseSearchIT : AbstractSearchTestSupport() {
             branch.build(token())
         }
         try {
-            searchService.reindex(ReleaseSearchExtension.SEARCH_RESULT_TYPE)
+            asAdmin { searchService.reindex(ReleaseSearchExtension.SEARCH_RESULT_TYPE) }
             assertEquals(
                 listOf("$prefix-1", "$prefix-2").sorted(),
                 asUser { search(prefix).items.map { it.title }.sorted() }

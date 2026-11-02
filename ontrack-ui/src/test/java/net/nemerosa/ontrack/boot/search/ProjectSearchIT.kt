@@ -125,7 +125,7 @@ class ProjectSearchIT : AbstractSearchTestSupport() {
     fun `Rebuilding the project documents`() {
         val prefix = token()
         val projects = (1..3).map { project(NameDescription.nd("$prefix-$it", "")) }
-        searchService.reindex(PROJECT_SEARCH_RESULT_TYPE)
+        asAdmin { searchService.reindex(PROJECT_SEARCH_RESULT_TYPE) }
         try {
             assertEquals(3, asUser { searchProjects(prefix).total })
         } finally {
