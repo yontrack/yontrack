@@ -4,6 +4,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import net.nemerosa.ontrack.model.exceptions.InputException;
 import net.nemerosa.ontrack.model.exceptions.NotFoundException;
 import net.nemerosa.ontrack.model.security.AgentPolicyException;
+import net.nemerosa.ontrack.model.security.ReadOnlyTokenException;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -86,6 +87,15 @@ public class UIErrorHandler {
     @ExceptionHandler(AgentPolicyException.class)
     @ResponseBody
     public ResponseEntity<UIErrorMessage> onAgentPolicyException(AgentPolicyException ex) {
+        return getMessageResponse(HttpStatus.FORBIDDEN, ex.getMessage());
+    }
+
+    /**
+     * A refusal to a read-only token says why, as a refusal by the agent policy does.
+     */
+    @ExceptionHandler(ReadOnlyTokenException.class)
+    @ResponseBody
+    public ResponseEntity<UIErrorMessage> onReadOnlyTokenException(ReadOnlyTokenException ex) {
         return getMessageResponse(HttpStatus.FORBIDDEN, ex.getMessage());
     }
 

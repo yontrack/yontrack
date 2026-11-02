@@ -7,6 +7,7 @@ import net.nemerosa.ontrack.extension.git.GitConfigProperties
 import net.nemerosa.ontrack.extension.git.model.GitPullRequest
 import net.nemerosa.ontrack.model.metrics.increment
 import net.nemerosa.ontrack.model.metrics.time
+import net.nemerosa.ontrack.model.security.SecurityService
 import net.nemerosa.ontrack.model.structure.Branch
 import net.nemerosa.ontrack.model.structure.EntityStore
 import org.springframework.stereotype.Component
@@ -16,6 +17,7 @@ import java.time.LocalDateTime
 class DefaultGitPullRequestCache(
     private val entityStore: EntityStore,
     private val gitConfigProperties: GitConfigProperties,
+    private val securityService: SecurityService,
 ) : GitPullRequestCache, MeterBinder {
 
     private lateinit var meterRegistry: MeterRegistry
@@ -53,17 +55,19 @@ class DefaultGitPullRequestCache(
                 val reloadedPr = meterRegistry.time(GitPullRequestCacheMetrics.git_pr_cache_time_scm) {
                     prProvider()
                 }
-                reloadedPr?.apply {
+                // A read-only token changes nothing, not even a cache: the next call asks the SCM again
+                if (reloadedPr != null && securityService.currentUser?.readOnlyTokenName == null) {
                     entityStore.store(
                         branch,
                         STORE,
                         EntityStore.DEFAULT_NAME,
                         StoredGitPullRequest(
-                            pr = this,
+                            pr = reloadedPr,
                             expirationTime = now + gitConfigProperties.pullRequests.cache.duration
                         )
                     )
                 }
+                reloadedPr
             }
         }
 

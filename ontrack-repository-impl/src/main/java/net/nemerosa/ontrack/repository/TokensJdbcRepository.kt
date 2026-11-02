@@ -35,16 +35,18 @@ class TokensJdbcRepository(dataSource: DataSource) : AbstractJdbcRepository(data
         name: String,
         token: String,
         time: LocalDateTime,
-        until: LocalDateTime?
+        until: LocalDateTime?,
+        readOnly: Boolean,
     ) {
         invalidate(id, name)
         namedParameterJdbcTemplate!!.update(
-            "INSERT INTO TOKENS (ACCOUNT, NAME, VALUE, CREATION, VALID_UNTIL) VALUES (:id, :name, :token, :creation, :until)",
+            "INSERT INTO TOKENS (ACCOUNT, NAME, VALUE, CREATION, VALID_UNTIL, READ_ONLY) VALUES (:id, :name, :token, :creation, :until, :readOnly)",
             params("id", id)
                 .addValue("name", name)
                 .addValue("token", token)
                 .addValue("creation", dateTimeForDB(time))
                 .addValue("until", dateTimeForDB(until))
+                .addValue("readOnly", readOnly)
         )
     }
 
@@ -123,6 +125,7 @@ class TokensJdbcRepository(dataSource: DataSource) : AbstractJdbcRepository(data
             creation = rs.readLocalDateTimeNotNull("CREATION"),
             validUntil = rs.readLocalDateTime("VALID_UNTIL"),
             lastUsed = rs.readLocalDateTime("LAST_USED"),
+            readOnly = rs.getBoolean("READ_ONLY"),
         )
     }
 }

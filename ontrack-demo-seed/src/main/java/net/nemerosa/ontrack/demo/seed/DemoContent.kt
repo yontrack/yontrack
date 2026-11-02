@@ -1799,6 +1799,7 @@ object DemoContent {
             displayName = "Codex (demo)",
             tool = "Codex",
             description = "Asks for the deployments of $VETS to $STAGING.",
+            readOnlyToken = true,
         ),
     )
 

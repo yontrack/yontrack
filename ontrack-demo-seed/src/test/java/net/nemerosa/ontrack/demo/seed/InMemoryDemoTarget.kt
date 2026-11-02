@@ -155,16 +155,21 @@ class InMemoryDemoTarget(
         /** Names of the tokens of the agent which are still valid. */
         val tokens = mutableSetOf<String>()
 
+        /** Names of those which are read-only. */
+        val readOnlyTokens = mutableSetOf<String>()
+
         override fun delete() {
             agents -= this
         }
 
-        override fun generateToken(name: String): DemoAgentToken {
+        override fun generateToken(name: String, readOnly: Boolean): DemoAgentToken {
             require(name !in tokens) { "The agent $identifier already has a token $name" }
             tokens += name
+            if (readOnly) readOnlyTokens += name
             return object : DemoAgentToken {
                 override fun inSession(session: AgentSessionSpec): DemoToken {
                     require(session.agent == spec.slug) { "A session of ${session.agent} through a token of $identifier" }
+                    require(name !in readOnlyTokens) { "A session of ${session.agent} through the read-only token $name" }
                     return InMemoryAgentToken(this@InMemoryAgent, name, session)
                 }
             }
@@ -246,7 +251,7 @@ class InMemoryDemoTarget(
         }
         agents.forEach { agent ->
             add("agent ${agent.identifier} \"${agent.spec.displayName}\" ${agent.spec.tool} \"${agent.spec.description}\"")
-            agent.tokens.sorted().forEach { add("  token $it") }
+            agent.tokens.sorted().forEach { add("  token $it${if (it in agent.readOnlyTokens) " read-only" else ""}") }
         }
         projects.forEach { project ->
             add("project ${project.name} \"${project.description}\"")

@@ -497,8 +497,8 @@ private class KdslDemoAgent(
 
     override fun delete() = agent.delete()
 
-    override fun generateToken(name: String): DemoAgentToken {
-        val value = agent.generateToken(name)
+    override fun generateToken(name: String, readOnly: Boolean): DemoAgentToken {
+        val value = agent.generateToken(name, readOnly = readOnly)
         return object : DemoAgentToken {
             override fun inSession(session: AgentSessionSpec): DemoToken =
                 KdslDemoToken(

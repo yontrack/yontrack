@@ -1,5 +1,6 @@
 package net.nemerosa.ontrack.graphql.schema
 
+import graphql.Scalars.GraphQLBoolean
 import graphql.Scalars.GraphQLString
 import graphql.schema.GraphQLObjectType
 import net.nemerosa.ontrack.graphql.schema.agents.GQLTypeAgentPolicy
@@ -74,6 +75,20 @@ class GQLTypeUser(
                     .type(gqlTypeAgentPolicy.typeRef)
                     .dataFetcher { env ->
                         agentPolicyService.getAgentPolicy(env.getArgument<String>(ARG_PROJECT)!!)
+                    }
+            }
+            // Read-only token
+            .field {
+                it.name("tokenReadOnly")
+                    .description(
+                        "Is the token of the current call read-only? Read it before acting rather than discovering " +
+                                "the limit by being refused. Null when the call did not use a token."
+                    )
+                    .type(GraphQLBoolean)
+                    .dataFetcher {
+                        securityService.currentActor?.tokenName?.let {
+                            securityService.currentUser?.readOnlyTokenName != null
+                        }
                     }
             }
             // OK

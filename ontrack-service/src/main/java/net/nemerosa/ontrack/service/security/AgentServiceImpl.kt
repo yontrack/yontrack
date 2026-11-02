@@ -91,7 +91,7 @@ class AgentServiceImpl(
         return accountRepository.deleteAccount(agent.id)
     }
 
-    override fun generateAgentToken(agentId: ID, name: String): Token {
+    override fun generateAgentToken(agentId: ID, name: String, readOnly: Boolean): Token {
         val agent = getManagedAgent(agentId)
         if (name.isBlank()) {
             throw AgentInputException("The name of the token is required.")
@@ -101,7 +101,7 @@ class AgentServiceImpl(
                 throw TokenGenerationNameAlreadyExistsException(name)
             }
             // Usual validity rules of the instance
-            tokensService.generateToken(agent.id(), TokenOptions(name = name))
+            tokensService.generateToken(agent.id(), TokenOptions(name = name, readOnly = readOnly))
         }
     }
 

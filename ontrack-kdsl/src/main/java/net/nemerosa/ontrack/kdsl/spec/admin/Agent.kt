@@ -40,11 +40,12 @@ class Agent(
      * Generates a named token for this agent. Owner or administrator only.
      *
      * @param name Name of the token, unique for the agent
+     * @param readOnly Is the token read-only: it reads what the agent can read, and changes nothing
      * @return Value of the token — the only time it can be read
      */
-    fun generateToken(name: String): String =
+    fun generateToken(name: String, readOnly: Boolean = false): String =
         graphqlConnector.mutate(
-            GenerateAgentTokenMutation(id, name)
+            GenerateAgentTokenMutation(id, name, readOnly)
         ) {
             it?.generateAgentToken?.payloadUserErrors?.convert()
         }

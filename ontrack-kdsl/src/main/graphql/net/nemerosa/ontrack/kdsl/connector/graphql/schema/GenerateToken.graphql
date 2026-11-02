@@ -1,8 +1,10 @@
 mutation GenerateToken(
     $name: String!,
+    $readOnly: Boolean!,
 ) {
     generateToken(input: {
         name: $name,
+        readOnly: $readOnly,
     }) {
         ...PayloadUserErrors
         token {

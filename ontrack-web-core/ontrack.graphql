@@ -8920,6 +8920,8 @@ type Token {
   lastUsed: LocalDateTime
   "Name of the token"
   name: String
+  "A read-only token reads what its account can read, and changes nothing. Chosen when the token is generated, and never changed."
+  readOnly: Boolean
   "Validity flag, computed in regard to current time."
   valid: Boolean
   "Date until the end of validity."
@@ -9101,6 +9103,8 @@ type User {
   idpGroups: [String!]!
   "List of groups that have been mapped to the user from their IdP groups"
   mappedGroups: [AccountGroup!]!
+  "Is the token of the current call read-only? Read it before acting rather than discovering the limit by being refused. Null when the call did not use a token."
+  tokenReadOnly: Boolean
 }
 
 "Representation of an error."
@@ -11722,12 +11726,16 @@ input GenerateAgentTokenInput {
   id: Int!
   "Name of the token, unique for the agent"
   name: String!
+  "Is the token read-only: it reads what the agent can read, and changes nothing. Never changes afterwards. False when not set."
+  readOnly: Boolean
 }
 
 "Input type for the generateToken mutation."
 input GenerateTokenInput {
-  "name field"
+  "Name of the token, unique for the account"
   name: String!
+  "Is the token read-only: it reads what its account can read, and changes nothing. Never changes afterwards. False when not set."
+  readOnly: Boolean
 }
 
 input GenericBuildFilter {

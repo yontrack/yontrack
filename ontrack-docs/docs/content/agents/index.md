@@ -74,6 +74,9 @@ can generate them:
 
 * an agent has as many **named tokens** as needed — one per machine or per pipeline, say;
 * a token follows the usual validity rules of the instance;
+* a token is **full or [read-only](../security/tokens.md#read-only-tokens)**, chosen when it is
+  generated and never changed. The rights of a read-only token are those of the owner, narrowed by the
+  agent policy, and narrowed again to reading: it records no evidence;
 * the value of a token is **shown only once**, when it is generated: copy it then;
 * a token, or all the tokens of an agent, can be revoked at any time.
 
@@ -89,7 +92,7 @@ with it is authenticated as the agent:
 ```
 
 The `generateAgentToken`, `revokeAgentToken` and `revokeAllAgentTokens` mutations do the same
-through the API.
+through the API, `generateAgentToken` taking an optional `readOnly` input.
 
 ## The agent on the record
 

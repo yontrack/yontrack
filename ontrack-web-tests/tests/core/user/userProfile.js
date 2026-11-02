@@ -15,8 +15,11 @@ export class UserProfilePage {
         await expect(this.page.getByText("API tokens")).toBeVisible()
     }
 
-    async generateToken(tokenName) {
+    async generateToken(tokenName, {readOnly = false} = {}) {
         await this.page.getByPlaceholder("Token name").fill(tokenName)
+        if (readOnly) {
+            await this.page.getByTestId("token-access").getByRole("radio", {name: "Read-only"}).check()
+        }
         await this.page.getByText("Generate token", {exact: true}).click()
 
         // Reading from the clipboard is not supported in Firefox
@@ -24,6 +27,10 @@ export class UserProfilePage {
         // const text = await this.page.evaluate(() => navigator.clipboard.readText())
 
         return this.page.getByTestId("generatedToken").textContent()
+    }
+
+    async checkTokenReadOnly(tokenName) {
+        await expect(this.page.getByTestId(`token-read-only-${tokenName}`)).toBeVisible()
     }
 
     async checkGroups({assignedGroups, mappedGroups, idpGroups}) {

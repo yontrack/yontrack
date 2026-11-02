@@ -23,6 +23,11 @@ class GQLTypeToken : GQLType {
             .booleanField("valid", "Validity flag, computed in regard to current time.")
             .stringField("name", "Name of the token")
             .stringField("value", "Value of the token")
+            .booleanField(
+                "readOnly",
+                "A read-only token reads what its account can read, and changes nothing. Chosen when the token " +
+                        "is generated, and never changed."
+            )
             .build()
 
     override fun getTypeName(): String = Token::class.java.simpleName

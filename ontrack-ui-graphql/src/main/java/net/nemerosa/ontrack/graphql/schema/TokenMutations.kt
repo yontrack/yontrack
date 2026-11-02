@@ -1,5 +1,6 @@
 package net.nemerosa.ontrack.graphql.schema
 
+import net.nemerosa.ontrack.common.api.APIDescription
 import net.nemerosa.ontrack.graphql.support.TypedMutationProvider
 import net.nemerosa.ontrack.model.structure.Token
 import net.nemerosa.ontrack.model.structure.TokenOptions
@@ -22,6 +23,7 @@ class TokenMutations(
             tokensService.generateNewToken(
                 TokenOptions(
                     name = input.name,
+                    readOnly = input.readOnly ?: false,
                 )
             )
         },
@@ -47,7 +49,10 @@ class TokenMutations(
 }
 
 data class GenerateTokenInput(
+    @APIDescription("Name of the token, unique for the account")
     val name: String,
+    @APIDescription("Is the token read-only: it reads what its account can read, and changes nothing. Never changes afterwards. False when not set.")
+    val readOnly: Boolean? = null,
 )
 
 data class RevokeTokenInput(

@@ -6,6 +6,7 @@ import java.time.ZoneOffset
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -47,8 +48,20 @@ class DemoAgentsSeedTest {
         )
         assertEquals(listOf("Claude Code", "Codex"), target.agents.map { it.spec.tool })
         target.agents.forEach { agent ->
-            assertEquals(setOf(DemoSeed.AGENT_TOKEN), agent.tokens, "The token of ${agent.identifier} is kept")
+            assertTrue(DemoSeed.AGENT_TOKEN in agent.tokens, "The token of ${agent.identifier} is kept")
+            assertFalse(DemoSeed.AGENT_TOKEN in agent.readOnlyTokens, "The seed acts through a full token")
         }
+    }
+
+    @Test
+    fun `one of the two agents keeps a read-only token, for its marker`() {
+        val target = seeded()
+
+        val (withReadOnly, without) = target.agents.partition { it.readOnlyTokens.isNotEmpty() }
+        assertEquals(listOf("${DemoContent.AGENT_CODEX}[agent]"), withReadOnly.map { it.identifier })
+        assertEquals(setOf(DemoSeed.AGENT_READ_ONLY_TOKEN), withReadOnly.single().readOnlyTokens)
+        assertEquals(setOf(DemoSeed.AGENT_TOKEN, DemoSeed.AGENT_READ_ONLY_TOKEN), withReadOnly.single().tokens)
+        assertEquals(setOf(DemoSeed.AGENT_TOKEN), without.single().tokens)
     }
 
     @Test

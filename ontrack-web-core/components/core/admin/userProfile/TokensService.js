@@ -9,6 +9,7 @@ const gqlToken = gql`
         lastUsed
         validUntil
         valid
+        readOnly
     }
 `
 
@@ -39,8 +40,8 @@ export const useTokens = ({refreshState}) => {
 export const useGenerateToken = ({refresh}) => {
     const {mutate, data, loading, error} = useMutation(
         gql`
-            mutation GenerateToken($name: String!) {
-                generateToken(input: {name: $name}) {
+            mutation GenerateToken($name: String!, $readOnly: Boolean) {
+                generateToken(input: {name: $name, readOnly: $readOnly}) {
                     errors {
                         message
                     }
@@ -57,9 +58,10 @@ export const useGenerateToken = ({refresh}) => {
         }
     )
 
-    const generateToken = async ({name}) => {
+    const generateToken = async ({name, readOnly}) => {
         await mutate({
-            name
+            name,
+            readOnly,
         })
     }
 

@@ -78,6 +78,7 @@ class GQLTypeAccount(
                     .type(listType(token.typeRef))
                     .dataFetcher { env ->
                         val account: Account = env.getSource()!!
+                        checkReadOnlyTokenOnTokens(account)
                         securityService.asAdmin {
                             tokensService.getTokens(account.id()).map { t ->
                                 t.obfuscate()
@@ -89,6 +90,19 @@ class GQLTypeAccount(
             .fields(Account::class.java.graphQLFieldContributions(fieldContributors))
             // OK
             .build()
+    }
+
+    /**
+     * A read-only token holds no `AccountManagement`: it lists its own tokens and those of the agents
+     * of its account, not those of any other account.
+     */
+    private fun checkReadOnlyTokenOnTokens(account: Account) {
+        val user = securityService.currentUser ?: return
+        val tokenName = user.readOnlyTokenName ?: return
+        val current = user.account?.id
+        if (account.id != current && account.owner?.id != current) {
+            throw ReadOnlyTokenException.function(tokenName, AccountManagement::class.java)
+        }
     }
 
     private fun accountAuthorizedProjectsFetcher() = DataFetcher<Collection<ProjectRoleAssociation>> { env ->

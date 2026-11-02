@@ -536,6 +536,9 @@ fetched, and a link to a real service would lead nowhere.
 - **Their tokens are kept**, unlike the seeding account's own: an agent holds no right its owner
   does not, and fewer, and a kept token is what the agents page shows as last used. The value is
   never written anywhere, and the next reset deletes it with its agent.
+- **`codex-demo[agent]` also keeps a read-only token**, `demo-read-only` (`AgentSpec.readOnlyToken`,
+  #2129), so that the marker shows on its page. The seed acts through none of them: its value is
+  never written anywhere, and the next reset deletes it with its agent.
 - **The agent does what the agent policy lets it, a person does the rest** (`BuildSpec.agent`). The
   agent creates the build, its properties and links, records its validations and promotes it on the
   levels admitting agents (`PromotionLevelSpec.agentsAdmitted`). A person - the account the seed

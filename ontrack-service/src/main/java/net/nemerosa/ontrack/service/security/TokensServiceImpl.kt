@@ -30,6 +30,10 @@ class TokensServiceImpl(
     }
 
     override fun generateNewToken(options: TokenOptions): Token {
+        // A read-only token never gets a token of any kind: what follows runs as an administrator
+        securityService.currentUser?.readOnlyTokenName?.let {
+            throw ReadOnlyTokenException.tokenGeneration(it)
+        }
         // Gets the current account
         val account = securityService.currentUser?.account
             ?: throw TokenGenerationNoAccountException()
@@ -60,14 +64,15 @@ class TokensServiceImpl(
         } else {
             null
         }
-        val tokenObject = Token(options.name, token, creation, validUntil, lastUsed = null)
+        val tokenObject = Token(options.name, token, creation, validUntil, lastUsed = null, readOnly = options.readOnly)
         // Saves the token...
         tokensRepository.save(
             id = accountId,
             name = options.name,
             token = token,
             time = tokenObject.creation,
-            until = tokenObject.validUntil
+            until = tokenObject.validUntil,
+            readOnly = tokenObject.readOnly,
         )
         // ... and returns it
         return tokenObject
@@ -106,6 +111,9 @@ class TokensServiceImpl(
         val tokenAccount = findAccountByToken(token)
         return if (tokenAccount == null || !tokenAccount.token.valid) {
             false
+        } else if (tokenAccount.token.readOnly && via == ActorVia.WEBHOOK) {
+            // A hook exists to write, and its processing may continue as an administrator
+            false
         } else {
             // The session headers are read for an agent only
             val agent = ActorAgent.of(tokenAccount.account)
@@ -118,6 +126,7 @@ class TokensServiceImpl(
                     agent = agent,
                     agentSession = agent?.let { agentSession?.parse() },
                 ),
+                readOnlyTokenName = tokenAccount.token.name.takeIf { tokenAccount.token.readOnly },
             )
             true
         }

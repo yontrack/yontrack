@@ -174,8 +174,11 @@ interface DemoAgent {
      * the account the seed runs as: an agent holds no right its owner does not, and fewer - see the
      * agent policy - and the token is what the agents page shows as recently used. Its value is never
      * written anywhere, and the next reset deletes it with its agent.
+     *
+     * @param readOnly A read-only token, which shows its marker on the page of the agent. The seed
+     * acts through none of them.
      */
-    fun generateToken(name: String): DemoAgentToken
+    fun generateToken(name: String, readOnly: Boolean = false): DemoAgentToken
 }
 
 /**

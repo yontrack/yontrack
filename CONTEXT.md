@@ -502,6 +502,14 @@ deleting the owner bounds or deletes every agent it owns, and an administrator c
 transfer an agent to another owner.
 _Avoid_: creator, sponsor
 
+**Read-only token**:
+An API token which reads what its owner can read, and changes nothing, not even the
+owner's own data; only its own last-used date moves. It is an attribute of the token,
+chosen at creation and never changed, for a person or an agent alike: an agent's
+effective rights through one are its owner's rights, narrowed by the agent policy and
+by the read-only token policy.
+_Avoid_: scoped token. There are no scopes: a token is full or read-only.
+
 **Agent policy**:
 What an agent may do on top of its owner's rights:
 - it may read, and record evidence (builds, validation runs, links, build

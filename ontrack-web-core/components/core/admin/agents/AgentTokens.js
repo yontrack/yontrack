@@ -10,6 +10,7 @@ import {
     useRevokeAgentToken,
     useRevokeAllAgentTokens
 } from "@components/core/admin/agents/AgentsService";
+import {TokenAccessFormItem, TokenReadOnlyMarker} from "@components/core/admin/userProfile/TokenAccess";
 
 /**
  * Tokens of an agent: generation, with the value shown once, list and revocation.
@@ -19,9 +20,9 @@ export default function AgentTokens({agent, refresh}) {
     const [form] = Form.useForm()
 
     const {generateAgentToken, data, loading: generating, error} = useGenerateAgentToken({onSuccess: refresh})
-    const onGenerate = async ({name}) => {
+    const onGenerate = async ({name, readOnly}) => {
         form.resetFields()
-        await generateAgentToken(agent, name)
+        await generateAgentToken(agent, name, readOnly)
     }
 
     const {revokeAgentToken} = useRevokeAgentToken({onSuccess: refresh})
@@ -39,6 +40,7 @@ export default function AgentTokens({agent, refresh}) {
                 >
                     <Input placeholder="ci, laptop..."/>
                 </Form.Item>
+                <TokenAccessFormItem/>
                 <Form.Item>
                     <Button
                         type="primary"
@@ -104,6 +106,11 @@ export default function AgentTokens({agent, refresh}) {
                     key="name"
                     title="Name"
                     dataIndex="name"
+                />
+                <Table.Column
+                    key="readOnly"
+                    title="Access"
+                    render={(_, token) => <TokenReadOnlyMarker token={token}/>}
                 />
                 <Table.Column
                     key="creation"

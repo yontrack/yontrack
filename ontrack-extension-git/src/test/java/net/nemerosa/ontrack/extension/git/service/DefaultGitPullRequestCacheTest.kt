@@ -8,6 +8,8 @@ import io.mockk.verify
 import net.nemerosa.ontrack.common.Time
 import net.nemerosa.ontrack.extension.git.GitConfigProperties
 import net.nemerosa.ontrack.extension.git.model.GitPullRequest
+import net.nemerosa.ontrack.model.security.AuthenticatedUser
+import net.nemerosa.ontrack.model.security.SecurityService
 import net.nemerosa.ontrack.model.structure.Branch
 import net.nemerosa.ontrack.model.structure.EntityStore
 import org.junit.jupiter.api.BeforeEach
@@ -21,6 +23,7 @@ import kotlin.test.assertTrue
 class DefaultGitPullRequestCacheTest {
 
     private lateinit var entityStore: EntityStore
+    private lateinit var securityService: SecurityService
     private lateinit var gitConfigProperties: GitConfigProperties
     private lateinit var meterRegistry: SimpleMeterRegistry
     private lateinit var cache: DefaultGitPullRequestCache
@@ -41,7 +44,9 @@ class DefaultGitPullRequestCacheTest {
         entityStore = mockk(relaxed = true)
         gitConfigProperties = GitConfigProperties()
         meterRegistry = SimpleMeterRegistry()
-        cache = DefaultGitPullRequestCache(entityStore, gitConfigProperties)
+        securityService = mockk()
+        every { securityService.currentUser } returns null
+        cache = DefaultGitPullRequestCache(entityStore, gitConfigProperties, securityService)
         cache.bindTo(meterRegistry)
     }
 
@@ -62,6 +67,20 @@ class DefaultGitPullRequestCacheTest {
         verify(exactly = 0) { entityStore.store(any(), any(), any(), any()) }
         assertEquals(1.0, counter(GitPullRequestCacheMetrics.git_pr_cache_hits))
         assertEquals(0.0, counter(GitPullRequestCacheMetrics.git_pr_cache_miss))
+    }
+
+    @Test
+    fun `A read-only token gets the PR from the SCM, and stores nothing`() {
+        every { securityService.currentUser } returns mockk<AuthenticatedUser> {
+            every { readOnlyTokenName } returns "ro"
+        }
+        storedEntry(expirationTime = Time.now().minusHours(1))
+
+        val pr = cache.getBranchPullRequest(branch, provider)
+
+        assertSame(scmPr, pr)
+        assertEquals(1, providerCalls, "SCM called")
+        verify(exactly = 0) { entityStore.store(any(), any(), any(), any()) }
     }
 
     @Test

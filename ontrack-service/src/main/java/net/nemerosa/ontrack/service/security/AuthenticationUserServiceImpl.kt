@@ -13,9 +13,9 @@ class AuthenticationUserServiceImpl(
     private val accountGroupService: AccountGroupService,
 ) : AuthenticationUserService {
 
-    override fun asUser(account: Account, actor: Actor) {
+    override fun asUser(account: Account, actor: Actor, readOnlyTokenName: String?) {
         val enrichedAuth = AuthenticatedUserAuthentication(
-            authenticatedUser = createAuthenticatedUser(account),
+            authenticatedUser = createAuthenticatedUser(account, readOnlyTokenName),
             authorities = AuthorityUtils.createAuthorityList(SecurityRole.USER.name),
             actor = actor,
         )
@@ -23,7 +23,7 @@ class AuthenticationUserServiceImpl(
     }
 
 
-    override fun createAuthenticatedUser(account: Account): AccountAuthenticatedUser {
+    override fun createAuthenticatedUser(account: Account, readOnlyTokenName: String?): AccountAuthenticatedUser {
         // An agent has no rights of its own: no group, no ACL, and none of the rights granted to it
         // directly. Its grants are computed for its owner, and narrowed by the agent policy in
         // AccountAuthenticatedUser - nothing to keep in sync when the owner is demoted or deleted.
@@ -37,15 +37,16 @@ class AuthenticationUserServiceImpl(
                 assignedGroups = ownerUser?.assignedGroups ?: emptyList(),
                 mappedGroups = ownerUser?.mappedGroups ?: emptyList(),
                 idpGroups = ownerUser?.idpGroups ?: emptyList(),
+                readOnlyTokenName = readOnlyTokenName,
             )
         }
-        return createHumanAuthenticatedUser(account)
+        return createHumanAuthenticatedUser(account, readOnlyTokenName)
     }
 
     /**
      * The roles, groups, IdP groups and project ACLs of a person.
      */
-    private fun createHumanAuthenticatedUser(account: Account): AccountAuthenticatedUser {
+    private fun createHumanAuthenticatedUser(account: Account, readOnlyTokenName: String? = null): AccountAuthenticatedUser {
         val (assignedGroups, mappedGroups, idpGroups) = accountGroupService.getAccountGroups(account)
         val groups = (assignedGroups + mappedGroups).distinctBy { it.id() }
         return AccountAuthenticatedUser(
@@ -55,6 +56,7 @@ class AuthenticationUserServiceImpl(
             assignedGroups = assignedGroups,
             mappedGroups = mappedGroups,
             idpGroups = idpGroups,
+            readOnlyTokenName = readOnlyTokenName,
         )
     }
 }

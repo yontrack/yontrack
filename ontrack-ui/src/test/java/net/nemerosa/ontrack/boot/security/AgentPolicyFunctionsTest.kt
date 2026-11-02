@@ -3,6 +3,7 @@ package net.nemerosa.ontrack.boot.security
 import net.nemerosa.ontrack.model.security.AgentPolicy
 import net.nemerosa.ontrack.model.security.GlobalFunction
 import net.nemerosa.ontrack.model.security.ProjectFunction
+import net.nemerosa.ontrack.model.security.ReadOnlyTokenPolicy
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.AnnotatedBeanDefinition
 import org.springframework.context.annotation.ClassPathScanningCandidateComponentProvider
@@ -16,7 +17,8 @@ import kotlin.test.fail
  * it is either allowed or denied to agents.
  *
  * A new function fails this test until someone adds it to `AgentPolicy.allowedFunctions` or to
- * `AgentPolicy.deniedFunctions`. Until then, the policy denies it anyway.
+ * `AgentPolicy.deniedFunctions`. Until then, the policy denies it anyway. The same goes for the
+ * read-only token policy, whose lists are independent.
  */
 class AgentPolicyFunctionsTest {
 
@@ -59,6 +61,29 @@ class AgentPolicyFunctionsTest {
                 "These functions are neither allowed nor denied to agents. " +
                         "Add each of them to AgentPolicy.allowedFunctions or AgentPolicy.deniedFunctions:\n" +
                         undecided.sorted().joinToString("\n") { "* $it" }
+            )
+        }
+    }
+
+    @Test
+    fun `Every function is decided upon by the read-only token policy`() {
+        val undecided = functions - ReadOnlyTokenPolicy.allowedFunctions - ReadOnlyTokenPolicy.deniedFunctions
+        if (undecided.isNotEmpty()) {
+            fail(
+                "These functions are neither allowed nor denied to read-only tokens. " +
+                        "Add each of them to ReadOnlyTokenPolicy.allowedFunctions or ReadOnlyTokenPolicy.deniedFunctions:\n" +
+                        undecided.sorted().joinToString("\n") { "* $it" }
+            )
+        }
+    }
+
+    @Test
+    fun `Every function of the read-only token policy exists`() {
+        val unknown = (ReadOnlyTokenPolicy.allowedFunctions + ReadOnlyTokenPolicy.deniedFunctions) - functions
+        if (unknown.isNotEmpty()) {
+            fail(
+                "These functions of the read-only token policy do not exist (renamed or removed?):\n" +
+                        unknown.sorted().joinToString("\n") { "* $it" }
             )
         }
     }

@@ -12,6 +12,8 @@ import java.time.LocalDateTime
  * @param creation Creation timestamp
  * @param validUntil Indicates until when the token is valid - `null` if forever valid
  * @param lastUsed Indicates when the token was used for the last time
+ * @param readOnly A read-only token reads what its account can read, and changes nothing. Chosen at
+ * creation, and never changed.
  */
 data class Token(
     val name: String,
@@ -19,12 +21,13 @@ data class Token(
     val creation: LocalDateTime,
     val validUntil: LocalDateTime?,
     val lastUsed: LocalDateTime?,
+    val readOnly: Boolean = false,
 ) {
 
     /**
      * Returns an obfuscated version of this token.
      */
-    fun obfuscate() = Token(name, "", creation, validUntil, lastUsed)
+    fun obfuscate() = Token(name, "", creation, validUntil, lastUsed, readOnly)
 
     /**
      * Returns a new token with same [value] and [creation]
@@ -42,6 +45,7 @@ data class Token(
                 creation,
                 null,
                 lastUsed,
+                readOnly,
             )
         } else {
             Token(
@@ -50,6 +54,7 @@ data class Token(
                 creation,
                 creation + validity,
                 lastUsed,
+                readOnly,
             )
         }
 
@@ -73,5 +78,6 @@ data class Token(
         creation = creation,
         validUntil = validUntil,
         lastUsed = lastUsed,
+        readOnly = readOnly,
     )
 }

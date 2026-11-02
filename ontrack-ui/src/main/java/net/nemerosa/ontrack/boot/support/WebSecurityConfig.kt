@@ -25,6 +25,7 @@ import org.springframework.web.context.support.WebApplicationContextUtils
 class WebSecurityConfig(
     private val webSecurityFilter: WebSecurityFilter,
     private val tokenSecurityFilter: TokenSecurityFilter,
+    private val readOnlyTokenSecurityFilter: ReadOnlyTokenSecurityFilter,
     private val ontrackConfigProperties: OntrackConfigProperties,
 ) {
 
@@ -76,7 +77,8 @@ class WebSecurityConfig(
                 jwt { }
             }
             addFilterAfter<BearerTokenAuthenticationFilter>(tokenSecurityFilter)
-            addFilterAfter<TokenSecurityFilter>(webSecurityFilter)
+            addFilterAfter<TokenSecurityFilter>(readOnlyTokenSecurityFilter)
+            addFilterAfter<ReadOnlyTokenSecurityFilter>(webSecurityFilter)
         }
         return http.build()
     }

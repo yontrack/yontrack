@@ -1,5 +1,5 @@
-mutation GenerateAgentToken($id: Int!, $name: String!) {
-    generateAgentToken(input: {id: $id, name: $name}) {
+mutation GenerateAgentToken($id: Int!, $name: String!, $readOnly: Boolean!) {
+    generateAgentToken(input: {id: $id, name: $name, readOnly: $readOnly}) {
         ...PayloadUserErrors
         token {
             value

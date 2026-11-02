@@ -26,8 +26,9 @@ interface TokensRepository {
      * @param token Token to save
      * @param time Creation time
      * @param until End of the validity time
+     * @param readOnly Is the token read-only?
      */
-    fun save(id: Int, name: String, token: String, time: LocalDateTime, until: LocalDateTime?)
+    fun save(id: Int, name: String, token: String, time: LocalDateTime, until: LocalDateTime?, readOnly: Boolean)
 
     /**
      * Gets a named token for an account.

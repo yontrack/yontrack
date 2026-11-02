@@ -7,6 +7,7 @@ import FormErrors from "@components/form/FormErrors";
 import InlineConfirmCommand from "@components/common/InlineConfirmCommand";
 import {useRefresh} from "@components/common/RefreshUtils";
 import {useGenerateToken, useRevokeToken, useTokens} from "@components/core/admin/userProfile/TokensService";
+import {TokenAccessFormItem, TokenReadOnlyMarker} from "@components/core/admin/userProfile/TokenAccess";
 
 const {Column} = Table
 
@@ -19,10 +20,10 @@ export default function UserProfileTokens() {
     const [generateTokenForm] = Form.useForm()
 
     const {generateToken, data, loading: generatingToken, error} = useGenerateToken({refresh})
-    const onGenerateToken = async ({name}) => {
+    const onGenerateToken = async ({name, readOnly}) => {
         if (name) {
             generateTokenForm.resetFields()
-            await generateToken({name})
+            await generateToken({name, readOnly})
         }
     }
 
@@ -41,6 +42,7 @@ export default function UserProfileTokens() {
                     >
                         <Input placeholder="Token name"/>
                     </Form.Item>
+                    <TokenAccessFormItem/>
                     <Form.Item>
                         <Button
                             type="primary"
@@ -75,9 +77,9 @@ export default function UserProfileTokens() {
                         dataIndex="name"
                     />
                     <Column
-                        key="scope"
-                        title="Scope"
-                        dataIndex="scope"
+                        key="readOnly"
+                        title="Access"
+                        render={(_, token) => <TokenReadOnlyMarker token={token}/>}
                     />
                     <Column
                         key="creation"

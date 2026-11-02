@@ -61,6 +61,7 @@ data class AgentSpec(
     val displayName: String,
     val tool: String,
     val description: String,
+    val readOnlyToken: Boolean = false,
 ) {
     /** The identifier of the agent, which is what its signatures carry as their user. */
     val identifier: String get() = "$slug[agent]"

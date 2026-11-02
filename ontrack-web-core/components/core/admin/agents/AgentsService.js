@@ -20,6 +20,7 @@ export const gqlAgentFragment = gql`
             lastUsed
             validUntil
             valid
+            readOnly
         }
     }
 `
@@ -110,8 +111,8 @@ export const useDeleteAgent = ({onSuccess}) => {
 export const useGenerateAgentToken = ({onSuccess}) => {
     const {mutate, data, loading, error} = useMutation(
         gql`
-            mutation GenerateAgentToken($id: Int!, $name: String!) {
-                generateAgentToken(input: {id: $id, name: $name}) {
+            mutation GenerateAgentToken($id: Int!, $name: String!, $readOnly: Boolean) {
+                generateAgentToken(input: {id: $id, name: $name, readOnly: $readOnly}) {
                     errors {
                         message
                     }
@@ -127,8 +128,8 @@ export const useGenerateAgentToken = ({onSuccess}) => {
             onSuccess,
         }
     )
-    const generateAgentToken = async (agent, name) => {
-        await mutate({id: Number(agent.id), name})
+    const generateAgentToken = async (agent, name, readOnly) => {
+        await mutate({id: Number(agent.id), name, readOnly})
     }
     return {generateAgentToken, data, loading, error}
 }

@@ -48,9 +48,10 @@ interface AgentService {
      * Generates a named token for an agent, under the usual validity rules of the instance.
      * Owner or administrator only.
      *
+     * @param readOnly Is the token read-only?
      * @return The token, whose value is available only this once
      */
-    fun generateAgentToken(agentId: ID, name: String): Token
+    fun generateAgentToken(agentId: ID, name: String, readOnly: Boolean = false): Token
 
     /**
      * Revokes a named token of an agent. Owner or administrator only.

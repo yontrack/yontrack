@@ -206,7 +206,11 @@ class DemoSeed(
     private fun agentTokens(dataset: DemoDataset): Map<String, DemoToken> {
         val agentTokens = dataset.agents.associate { spec ->
             log("Registering agent ${spec.identifier}")
-            spec.slug to target.registerAgent(spec).generateToken(AGENT_TOKEN)
+            val agent = target.registerAgent(spec)
+            if (spec.readOnlyToken) {
+                agent.generateToken(AGENT_READ_ONLY_TOKEN, readOnly = true)
+            }
+            spec.slug to agent.generateToken(AGENT_TOKEN)
         }
         return dataset.agentSessions().associate { session ->
             sessionKey(session) to agentTokens.getValue(session.agent).inSession(session)
@@ -625,6 +629,12 @@ class DemoSeed(
          * Name of the token each agent of the dataset acts through - kept, see [DemoAgent.generateToken].
          */
         const val AGENT_TOKEN = "demo-seed"
+
+        /**
+         * Name of the read-only token of an agent declaring one ([AgentSpec.readOnlyToken]) - kept like
+         * the other one, and acted through by nothing: it is there for its marker on the agent's page.
+         */
+        const val AGENT_READ_ONLY_TOKEN = "demo-read-only"
 
         /**
          * How an agent session keys the tokens of the seed, beside the names of the tokens of the

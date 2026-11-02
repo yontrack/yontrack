@@ -10,11 +10,12 @@ import net.nemerosa.ontrack.kdsl.connector.graphqlConnector
  * Generates an API token for the account this client is connected as.
  *
  * @param name Name of the token, unique for the account
+ * @param readOnly Is the token read-only: it reads what the account can read, and changes nothing
  * @return Value of the token — the only time it can be read
  */
-fun Ontrack.generateToken(name: String): String =
+fun Ontrack.generateToken(name: String, readOnly: Boolean = false): String =
     graphqlConnector.mutate(
-        GenerateTokenMutation(name)
+        GenerateTokenMutation(name, readOnly)
     ) {
         it?.generateToken?.payloadUserErrors?.convert()
     }

@@ -6,4 +6,5 @@ data class TokenOptions(
     val name: String,
     val validity: Duration? = null,
     val forceUnlimited: Boolean = false,
+    val readOnly: Boolean = false,
 )

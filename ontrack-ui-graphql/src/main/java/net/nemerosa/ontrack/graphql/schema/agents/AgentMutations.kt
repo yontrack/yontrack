@@ -88,7 +88,7 @@ class AgentMutations(
             outputDescription = "Generated token, with its value",
             outputType = Token::class,
         ) { input ->
-            agentService.generateAgentToken(ID.of(input.id), input.name)
+            agentService.generateAgentToken(ID.of(input.id), input.name, input.readOnly ?: false)
         },
 
         unitMutation<RevokeAgentTokenInput>(
@@ -153,6 +153,8 @@ data class GenerateAgentTokenInput(
     val id: Int,
     @APIDescription("Name of the token, unique for the agent")
     val name: String,
+    @APIDescription("Is the token read-only: it reads what the agent can read, and changes nothing. Never changes afterwards. False when not set.")
+    val readOnly: Boolean? = null,
 )
 
 @APIDescription("Revocation of a token of an agent")
