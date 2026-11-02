@@ -14,6 +14,8 @@ import useLastKnown from "@components/common/useLastKnown";
 // before this fetching moved here.
 const emptyPageInfo = {nextPage: {}}
 
+const noStampsNorLevels = {validationStamps: [], promotionLevels: []}
+
 /**
  * Legacy branch content view: the table of the builds of the branch, with their promotions and their
  * validations.
@@ -39,10 +41,10 @@ export default function BuildsContentView({branch}) {
     // Refetched on every tick of the auto refresh too, so that a stamp created since gets its column
     const {autoRefreshCount} = useContext(AutoRefreshContext)
 
-    // Loading validation stamps
-    const {data: loadedValidationStamps} = useQuery(
+    // Loading validation stamps and promotion levels
+    const {data: loadedStampsAndLevels} = useQuery(
         gql`
-            query GetValidationStamps($branchId: Int!) {
+            query GetBranchStampsAndLevels($branchId: Int!) {
                 branches(id: $branchId) {
                     validationStamps {
                         id
@@ -58,18 +60,29 @@ export default function BuildsContentView({branch}) {
                             config
                         }
                     }
+                    promotionLevels {
+                        id
+                        name
+                        image
+                        description
+                        annotatedDescription
+                        # Only selecting something: what matters is whether it is null
+                        autoPromotionConditions {
+                            autoRevoke
+                        }
+                    }
                 }
             }
         `,
         {
             variables: {branchId: Number(branch.id)},
             deps: [branch, autoRefreshCount],
-            initialData: [],
-            dataFn: data => data.branches[0].validationStamps,
+            initialData: noStampsNorLevels,
+            dataFn: data => data.branches[0],
         }
     )
-    // A refresh which fails does not take the columns away
-    const validationStamps = useLastKnown(loadedValidationStamps)
+    // A refresh which fails does not take the columns nor the medals away
+    const {validationStamps, promotionLevels} = useLastKnown(loadedStampsAndLevels)
 
     return (
         <BranchBuilds
@@ -79,7 +92,8 @@ export default function BuildsContentView({branch}) {
             pageInfo={pageInfo ?? emptyPageInfo}
             onLoadMore={loadMore}
             rangeSelection={rangeSelection}
-            validationStamps={validationStamps ?? []}
+            validationStamps={validationStamps}
+            promotionLevels={promotionLevels}
             onChange={reload}
             selectedBuildFilter={selectedBuildFilter}
             onSelectedBuildFilter={onSelectedBuildFilter}

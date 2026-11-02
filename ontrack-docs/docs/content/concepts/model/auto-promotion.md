@@ -73,6 +73,8 @@ A `WARNING` run accepted by its CHML validation stamp counts as passed in the su
 
 On the build page, hovering a promotion the build does **not** have yet shows the same conditions, with their state for that build, under the promotion's name marked **Not granted** — the place to look when wondering why a build is not promoted. A promotion level without auto promotion shows its description only.
 
+The branch builds view shows them too, for the promotion levels with an auto promotion: a build gets a medal in a dashed outline for each of those it does **not** have yet, in the branch's order of promotion levels. Hovering this medal, or focusing it with the keyboard, shows the same conditions with their state for that build, and the medal links to the promotion level.
+
 These are the _current_ conditions and statuses. The auto promotion property is not versioned, so they explain why the build is — or is not — promoted today, not what triggered a promotion in the past. They are shown for manually granted promotions too.
 
 The GraphQL API exposes them as the `autoPromotionConditions` field of `PromotionLevel` and of `PromotionRun`, and as the `autoPromotionConditions(promotionLevelId)` field of `Build`, for any promotion level of the build's branch, granted or not.

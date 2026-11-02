@@ -175,6 +175,32 @@ class BranchPage {
         await trigger.hover()
     }
 
+    notGrantedMedal(build, promotionLevel) {
+        return this.page.getByTestId(`branch-promotion-level-trigger-${build.id}-${promotionLevel.id}`)
+    }
+
+    allNotGrantedMedals() {
+        return this.page.getByTestId(/^branch-promotion-level-trigger-/)
+    }
+
+    notGrantedPopover(build, promotionLevel) {
+        return this.page.getByTestId(`branch-promotion-level-popover-${build.id}-${promotionLevel.id}`)
+    }
+
+    /**
+     * Retrying the hover: a banner appearing just after the page is loaded moves the rows, and a medal
+     * can move away from under the mouse before its popover opens.
+     */
+    async hoverNotGrantedMedal(build, promotionLevel) {
+        const medal = this.notGrantedMedal(build, promotionLevel)
+        const popover = this.notGrantedPopover(build, promotionLevel)
+        await expect(async () => {
+            await medal.hover()
+            await expect(popover).toBeVisible({timeout: 1000})
+        }).toPass()
+        return popover
+    }
+
     async deleteBranch() {
         const button = this.page.getByRole('button', {name: 'Delete branch'})
         await expect(button).toBeVisible()

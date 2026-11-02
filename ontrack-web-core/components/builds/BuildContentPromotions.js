@@ -1,5 +1,5 @@
 import React, {useState} from "react";
-import {Popover, Space, Tag, Timeline, Typography} from "antd";
+import {Popover, Space, Timeline, Typography} from "antd";
 import dayjs from "dayjs";
 import AnnotatedDescription from "@components/common/AnnotatedDescription";
 import PromotionLevel from "@components/promotionLevels/PromotionLevel";
@@ -15,10 +15,11 @@ import {promotionLevelUri, promotionRunUri} from "@components/common/Links";
 import Link from "next/link";
 import TimestampText from "@components/common/TimestampText";
 import PromotionRunFieldValues from "@components/promotionRuns/PromotionRunFieldValues";
+import {PromotionRunAutoPromotionConditions} from "@components/promotionLevels/AutoPromotionConditions";
 import {
-    BuildAutoPromotionConditions,
-    PromotionRunAutoPromotionConditions
-} from "@components/promotionLevels/AutoPromotionConditions";
+    NotGrantedPromotionLevelContent,
+    NotGrantedPromotionLevelTitle
+} from "@components/promotionLevels/NotGrantedPromotionLevel";
 import WhatsMissing from "@components/readiness/WhatsMissing";
 import {gqlSignatureActorFields} from "@components/common/actors/actors";
 import ActorBadge from "@components/common/actors/ActorBadge";
@@ -198,26 +199,13 @@ export default function BuildContentPromotions({build}) {
                     }
                 </Space>,
                 content: <Popover
-                    title={
-                        <Space>
-                            <PromotionLevel
-                                promotionLevel={promotionLevel}
-                                displayText={true}
-                                displayTooltip={false}
-                            />
-                            <Tag>Not granted</Tag>
-                        </Space>
-                    }
+                    title={<NotGrantedPromotionLevelTitle promotionLevel={promotionLevel}/>}
                     content={
-                        <div data-testid={`build-promotion-level-popover-${promotionLevel.id}`}>
-                            <Space orientation="vertical">
-                                <AnnotatedDescription entity={promotionLevel}/>
-                                <BuildAutoPromotionConditions
-                                    buildId={build.id}
-                                    promotionLevelId={promotionLevel.id}
-                                />
-                            </Space>
-                        </div>
+                        <NotGrantedPromotionLevelContent
+                            buildId={build.id}
+                            promotionLevel={promotionLevel}
+                            testId={`build-promotion-level-popover-${promotionLevel.id}`}
+                        />
                     }
                 >
                     <Link

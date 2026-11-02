@@ -51,6 +51,7 @@
 
     /* Borders */
     --ot-border: rgb(128, 128, 128);
+    --ot-border-not-granted: rgb(128, 128, 128);
     --ot-border-subtle: lightgray;
     --ot-border-strong: black;
     --ot-border-well: darkgrey;
@@ -131,6 +132,7 @@
 
     /* Borders */
     --ot-border: #434343;
+    --ot-border-not-granted: #8c8c8c;
     --ot-border-subtle: #303030;
     --ot-border-strong: #595959;
     --ot-border-well: #424242;
@@ -484,6 +486,28 @@ button.ot-validation-stamp-filter-edition {
    the build column makes room for it in the measure row (#1932, see `BranchBuilds`). */
 .ant-table-measure-row .ot-branch-builds-toolbar {
     display: none;
+}
+
+/**
+ * Medal of a promotion not granted, in the branch builds view (#2113). Outlines rather than borders,
+ * so that a medal takes the same room whether its level is granted or not. The dashed one marks the
+ * state, at a contrast of at least 3:1 in both themes, and the solid one is the keyboard focus.
+ */
+.ot-promotion-not-granted {
+    display: inline-flex;
+    border-radius: 4px;
+}
+
+.ot-promotion-not-granted:focus-visible {
+    outline: 2px solid currentColor;
+    outline-offset: 3px;
+}
+
+.ot-promotion-not-granted-medal {
+    display: inline-flex;
+    border-radius: 4px;
+    outline: 1px dashed var(--ot-border-not-granted);
+    outline-offset: 1px;
 }
 
 /**

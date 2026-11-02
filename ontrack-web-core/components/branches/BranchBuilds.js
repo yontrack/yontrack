@@ -15,6 +15,8 @@ import {gql} from "graphql-request";
 import {buildUri, scmChangeLogUri} from "@components/common/Links";
 import EntityNotificationsBadge from "@components/extension/notifications/EntityNotificationsBadge";
 import PromotionRunStep from "@components/promotionRuns/PromotionRunStep";
+import NotGrantedPromotionStep from "@components/branches/NotGrantedPromotionStep";
+import {promotionMedals} from "@components/branches/promotionMedals";
 import {useQuery} from "@components/services/GraphQL";
 import AssistedBadge from "@components/extension/scm/assistants/AssistedBadge";
 import ActorBadge from "@components/common/actors/ActorBadge";
@@ -30,6 +32,7 @@ const {Column} = Table;
  * @param onLoadMore Callback when wanting to get more builds
  * @param rangeSelection Callback for the range selection
  * @param validationStamps List of validation stamps
+ * @param promotionLevels List of promotion levels of the branch, in the branch's order
  * @param loadingValidationStamps Validation stamps loading indicator
  * @param onChange Callback when builds, runs, statuses, etc. need to be reloaded after a user action
  * @param selectedBuildFilter Currently selected build filter (can be undefined)
@@ -42,6 +45,7 @@ export default function BranchBuilds({
                                          onLoadMore,
                                          rangeSelection,
                                          validationStamps,
+                                         promotionLevels,
                                          onChange,
                                          selectedBuildFilter,
                                          onSelectedBuildFilter,
@@ -282,11 +286,12 @@ export default function BranchBuilds({
                         render={(_, build) =>
                             <Space size={8}>
                                 {
-                                    build.promotionRuns.map(promotionRun =>
-                                        <PromotionRunStep
-                                            key={promotionRun.id}
-                                            run={promotionRun}
-                                        />
+                                    promotionMedals({
+                                        promotionLevels,
+                                        promotionRuns: build.promotionRuns,
+                                    }).map(({key, run, promotionLevel}) => run ?
+                                        <PromotionRunStep key={key} run={run}/> :
+                                        <NotGrantedPromotionStep key={key} build={build} promotionLevel={promotionLevel}/>
                                     )
                                 }
                             </Space>

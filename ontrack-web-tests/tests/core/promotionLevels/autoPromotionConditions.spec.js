@@ -33,7 +33,7 @@ const setup = async (ontrack, {grantSilver = true} = {}) => {
     await build.validate(securityScan)
     await build.promote(bronze)
     const silverRun = grantSilver ? await build.promote(silver) : null
-    return {branch, build, silver, gold, silverRun, buildRun}
+    return {branch, build, bronze, silver, gold, silverRun, buildRun}
 }
 
 const checkBuildConditions = async (popover, {buildRun}) => {
@@ -107,6 +107,119 @@ test('the popover of a promotion not granted, without auto promotion, shows its 
     await expect(popover.getByTestId(`build-auto-promotion-conditions-${gold.id}`)).toHaveCount(0)
     await expect(popover.getByText('Auto promotion conditions')).toHaveCount(0)
     await expect(popover.getByText('No auto promotion condition')).toHaveCount(0)
+})
+
+test('the not-granted medal of the branch builds view shows the conditions, which are only loaded on hover', async ({page, ontrack}) => {
+    const {branch, build, silver, buildRun} = await setup(ontrack, {grantSilver: false})
+
+    const conditionsRequests = []
+    page.on('request', request => {
+        if (request.postData()?.includes('BuildAutoPromotionConditions')) {
+            conditionsRequests.push(request)
+        }
+    })
+
+    await login(page, ontrack)
+    const branchPage = new BranchPage(page, branch)
+    await branchPage.goTo()
+
+    const medal = branchPage.notGrantedMedal(build, silver)
+    await expect(medal).toBeVisible()
+    expect(conditionsRequests).toHaveLength(0)
+
+    const popover = await branchPage.hoverNotGrantedMedal(build, silver)
+    await expect(page.getByTestId(`promotion-level-not-granted-title-${silver.id}`)).toContainText('Not granted')
+    await checkBuildConditions(popover, {buildRun})
+    expect(conditionsRequests).toHaveLength(1)
+})
+
+test('the not-granted medal of the branch builds view opens its popover on keyboard focus', async ({page, ontrack}) => {
+    const {branch, build, bronze, silver, buildRun} = await setup(ontrack, {grantSilver: false})
+
+    await login(page, ontrack)
+    const branchPage = new BranchPage(page, branch)
+    await branchPage.goTo()
+
+    const medal = branchPage.notGrantedMedal(build, silver)
+    await expect(medal).toBeVisible()
+    // Tabbing from the medal before it
+    await page.locator(`.promotion-run-pl-${bronze.id}`).focus()
+    await page.keyboard.press('Tab')
+    await expect(medal).toBeFocused()
+
+    await expect(page.getByTestId(`promotion-level-not-granted-title-${silver.id}`)).toContainText('Not granted')
+    await checkBuildConditions(branchPage.notGrantedPopover(build, silver), {buildRun})
+})
+
+test('the not-granted medal of the branch builds view links to the promotion level, and names its state', async ({page, ontrack}) => {
+    const {branch, build, silver} = await setup(ontrack, {grantSilver: false})
+
+    await login(page, ontrack)
+    const branchPage = new BranchPage(page, branch)
+    await branchPage.goTo()
+
+    const medal = branchPage.notGrantedMedal(build, silver)
+    await expect(medal).toHaveAttribute('href', `/promotionLevel/${silver.id}`)
+    await expect(medal).toHaveRole('link')
+    await expect(medal).toHaveAccessibleName('SILVER, not granted')
+})
+
+test('the branch builds view has no not-granted medal for a level without auto promotion', async ({page, ontrack}) => {
+    const {branch, build, silver, gold} = await setup(ontrack, {grantSilver: false})
+
+    await login(page, ontrack)
+    const branchPage = new BranchPage(page, branch)
+    await branchPage.goTo()
+
+    await expect(branchPage.notGrantedMedal(build, silver)).toBeVisible()
+    await expect(branchPage.notGrantedMedal(build, gold)).toHaveCount(0)
+})
+
+test('the branch builds view shows the normal medal of a granted level, with or without auto promotion', async ({page, ontrack}) => {
+    const {branch, build, silver, gold} = await setup(ontrack)
+    await build.promote(gold)
+
+    await login(page, ontrack)
+    const branchPage = new BranchPage(page, branch)
+    await branchPage.goTo()
+
+    await expect(page.locator(`.promotion-run-pl-${silver.id}`)).toBeVisible()
+    await expect(branchPage.notGrantedMedal(build, silver)).toHaveCount(0)
+    await expect(page.locator(`.promotion-run-pl-${gold.id}`)).toBeVisible()
+    await expect(branchPage.notGrantedMedal(build, gold)).toHaveCount(0)
+})
+
+test("the medals of the branch builds view follow the branch's order", async ({page, ontrack}) => {
+    const {branch, build, bronze, silver, gold} = await setup(ontrack, {grantSilver: false})
+    await build.promote(gold)
+
+    await login(page, ontrack)
+    const branchPage = new BranchPage(page, branch)
+    await branchPage.goTo()
+
+    await expect(branchPage.notGrantedMedal(build, silver)).toBeVisible()
+    const medals = page.locator(`.promotion-run-pl-${bronze.id}, .promotion-run-pl-${gold.id}`)
+        .or(branchPage.notGrantedMedal(build, silver))
+    await expect(medals).toHaveCount(3)
+    await expect(medals.nth(0)).toHaveClass(`promotion-run-pl-${bronze.id}`)
+    await expect(medals.nth(1)).toHaveAccessibleName('SILVER, not granted')
+    await expect(medals.nth(2)).toHaveClass(`promotion-run-pl-${gold.id}`)
+})
+
+test('a branch without auto promotion has no not-granted medal', async ({page, ontrack}) => {
+    const project = await ontrack.createProject()
+    const branch = await project.createBranch()
+    const bronze = await branch.createPromotionLevel('BRONZE')
+    await branch.createPromotionLevel('SILVER')
+    const build = await branch.createBuild()
+    await build.promote(bronze)
+
+    await login(page, ontrack)
+    const branchPage = new BranchPage(page, branch)
+    await branchPage.goTo()
+
+    await expect(page.locator(`.promotion-run-pl-${bronze.id}`)).toBeVisible()
+    await expect(branchPage.allNotGrantedMedals()).toHaveCount(0)
 })
 
 test('the auto promotion decoration of the branch promotion levels shows the conditions', async ({page, ontrack}) => {
