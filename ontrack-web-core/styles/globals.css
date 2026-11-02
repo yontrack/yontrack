@@ -492,6 +492,10 @@ button.ot-validation-stamp-filter-edition {
  * Medal of a promotion not granted, in the branch builds view (#2113). Outlines rather than borders,
  * so that a medal takes the same room whether its level is granted or not. The dashed one marks the
  * state, at a contrast of at least 3:1 in both themes, and the solid one is the keyboard focus.
+ *
+ * Greyed so that it can be told from a granted medal at a glance. An uploaded image is faded too, since
+ * a greyed silver medal looks like a granted one, but not a generated tile: its initials must stay
+ * readable. The outline is on the medal and not on the image, so the fading leaves it alone.
  */
 .ot-promotion-not-granted {
     display: inline-flex;
@@ -508,6 +512,11 @@ button.ot-validation-stamp-filter-edition {
     border-radius: 4px;
     outline: 1px dashed var(--ot-border-not-granted);
     outline-offset: 1px;
+    filter: grayscale(1);
+}
+
+.ot-promotion-not-granted-medal img {
+    opacity: 0.4;
 }
 
 /**

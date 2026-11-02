@@ -2,7 +2,9 @@ import {login} from "../login";
 import {test} from "../../fixtures/connection";
 import {BuildPage} from "../builds/BuildPage";
 import {BranchPage} from "../branches/branch";
+import {PromotionLevelPage} from "./PromotionLevelPage";
 import {expect} from "@playwright/test";
+import path from "node:path";
 
 /**
  * SILVER is auto promoted on BUILD, on the stamps matching `.*TESTS`, and on BRONZE.
@@ -162,6 +164,33 @@ test('the not-granted medal of the branch builds view links to the promotion lev
     await expect(medal).toHaveAttribute('href', `/promotionLevel/${silver.id}`)
     await expect(medal).toHaveRole('link')
     await expect(medal).toHaveAccessibleName('SILVER, not granted')
+})
+
+test('the not-granted medal of the branch builds view is greyed, and faded only when it is an image', async ({page, ontrack}) => {
+    const {branch, build, bronze, silver, gold} = await setup(ontrack, {grantSilver: false})
+    await gold.setAutoPromotionProperty({include: '.*TESTS'})
+
+    await login(page, ontrack)
+    const goldPage = new PromotionLevelPage(page, gold)
+    await goldPage.goTo()
+    await goldPage.changeImage(path.join(__dirname, 'gold.png'))
+
+    const branchPage = new BranchPage(page, branch)
+    await branchPage.goTo()
+
+    // Without an image: its initials have to stay readable, so greyed but not faded
+    const silverMedal = branchPage.notGrantedMedal(build, silver).locator('.ot-promotion-not-granted-medal')
+    await expect(silverMedal).toHaveCSS('filter', 'grayscale(1)')
+    await expect(silverMedal.getByTestId(`promotion-level-icon-${silver.id}`)).toHaveCSS('opacity', '1')
+
+    // With an image: a greyed image can look like a granted one, so faded too
+    const goldMedal = branchPage.notGrantedMedal(build, gold).locator('.ot-promotion-not-granted-medal')
+    await expect(goldMedal).toHaveCSS('filter', 'grayscale(1)')
+    await expect(goldMedal.getByTestId(`promotion-level-image-${gold.id}`)).toHaveCSS('opacity', '0.4')
+
+    // A granted medal keeps its colours
+    await expect(page.locator(`.promotion-run-pl-${bronze.id}`)).toBeVisible()
+    await expect(page.locator(`.promotion-run-pl-${bronze.id} [data-testid="promotion-level-icon-${bronze.id}"]`)).toHaveCSS('filter', 'none')
 })
 
 test('the branch builds view has no not-granted medal for a level without auto promotion', async ({page, ontrack}) => {

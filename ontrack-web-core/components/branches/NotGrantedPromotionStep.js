@@ -11,7 +11,7 @@ import {
  * Medal of a promotion level which a build does not have yet, in the branch builds view: the place to
  * hover, or to focus, to see what the build still needs to reach this level.
  *
- * The dashed outline is what marks the state.
+ * The dashed outline is what marks the state, and the greying is what makes it visible at a glance.
  *
  * @param build Build
  * @param promotionLevel Promotion level the build does not have
