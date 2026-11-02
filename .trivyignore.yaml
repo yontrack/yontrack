@@ -20,4 +20,9 @@
 #         - "pkg:npm/some-package@1.2.3"
 #       statement: Only reachable through the dev server, which the image does not ship
 #       expired_at: 2026-12-31
-vulnerabilities: []
+vulnerabilities:
+  - id: CVE-2026-102554
+    purls:
+      - "pkg:maven/com.google.guava/guava@32.1.2-jre"
+    statement: Guava shaded in graphql-java, no release has the fix (graphql-java#4496). Needs Java deserialization of a crafted stream, and Yontrack deserializes none from external input.
+    expired_at: 2027-02-01
