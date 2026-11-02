@@ -19,10 +19,13 @@ buildscript {
     // GHSA-7hhh-6rmp-j9qf, GHSA-p6pp-m3f8-5c89, GHSA-cxp5-3px4-pw24, GHSA-wv8q-qhhj-9h54 and
     // GHSA-q4xh-88c3-wmh7 (fixed in 3.1.7), like the application's own pin further down. Never
     // shipped, but in the dependency graph. Remove once the Spring Boot plugin brings >= 3.1.7.
+    // Guava of the plugin classpath (32.1.2-jre via Jib) pinned past CVE-2026-102554 (fixed in
+    // 33.7.2) for the same reason. Remove once the Jib plugin brings >= 33.7.2.
     dependencies {
         constraints {
             classpath("tools.jackson.core:jackson-core:3.1.7")
             classpath("tools.jackson.core:jackson-databind:3.1.7")
+            classpath("com.google.guava:guava:33.7.2-jre")
         }
     }
 }
