@@ -55,3 +55,7 @@ label (#1887).
 `KDSL.HA.png` is rendered from `KDSL.HA.svg` beside it, at 128×128
 (`rsvg-convert -w 128 -h 128 KDSL.HA.svg -o KDSL.HA.png`): a teal rounded square, with a proxy
 node fanning out to two backends (#2076).
+
+`LICENSE.DEV.png` is rendered from `LICENSE.DEV.svg` beside it, at 128×128: the `COVERAGE.*` rounded
+square and ring gauge, in pink, with a key in place of the label (#2107). The gauge is the time the
+development key still has.
