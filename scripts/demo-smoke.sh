@@ -48,6 +48,8 @@
 #                        always attempts once before testing the deadline, which is
 #                        what .github/workflows/demo-screenshots.yml relies on.
 #   DEMO_POLL_INTERVAL   seconds between two attempts (default: 15)
+#   DEMO_POLL_SAMPLES    requests of one attempt, which must all report the version
+#                        (default: 20)
 #
 # Everything goes through /graphql. The ingress only routes /graphql and /hook to the
 # backend - /rest/* lands on the Next UI and answers 404 - so the REST info endpoint is
@@ -75,6 +77,7 @@ DSM_YONTRACK_PROJECT="${DEMO_PROJECT:-yontrack}"
 DSM_YONTRACK_BRANCH="${DEMO_BRANCH:-main}"
 DSM_TIMEOUT="${DEMO_POLL_TIMEOUT:-600}"
 DSM_INTERVAL="${DEMO_POLL_INTERVAL:-15}"
+DSM_SAMPLES="${DEMO_POLL_SAMPLES:-20}"
 
 dsm_log() { echo "$*"; }
 dsm_fail() { echo "ERROR: $*" >&2; return 1; }
@@ -128,25 +131,43 @@ dsm_version() {
     echo "$body" | jq -r '.data.info.version.full // empty'
 }
 
-# Waits until the demo reports the expected version.
+# Waits until the demo reports the expected version, and nothing else.
 #
 # Every failure mode in between - ingress up but backend down, old pod still serving,
 # rollout half-done - looks like "not that version yet", so they all share one loop and
 # one deadline.
+#
+# One answer is not enough. The demo runs two backends and rolls them one at a time, so for
+# minutes the ingress answers from a pod of each version, and the version is whichever pod got
+# the request. So an attempt asks DSM_SAMPLES times in a row, and it takes all of them: no call
+# says how many backends there are, or which one answered, and the next step wipes the instance
+# and seeds it with what only the new version may know. The ingress balances per request and
+# without affinity, and these requests carry no cookie.
 dsm_wait_for_version() {
     local expected="$1"
-    local deadline attempt=0 actual last=""
+    local deadline attempt=0 actual last="" sample
     deadline=$(( $(dsm_now) + DSM_TIMEOUT ))
 
     while true; do
         attempt=$(( attempt + 1 ))
-        actual="$(dsm_version)" || actual=""
-        if [ -n "$actual" ] && [ "$actual" = "$expected" ]; then
-            dsm_log "The demo reports $actual after $attempt attempt(s)."
+        sample=0
+        while [ "$sample" -lt "$DSM_SAMPLES" ]; do
+            actual="$(dsm_version)" || actual=""
+            if [ -z "$actual" ] || [ "$actual" != "$expected" ]; then
+                break
+            fi
+            sample=$(( sample + 1 ))
+        done
+        if [ "$sample" -eq "$DSM_SAMPLES" ]; then
+            dsm_log "The demo reports $expected on $DSM_SAMPLES requests in a row, after $attempt attempt(s)."
             return 0
         fi
         last="${actual:-unreachable}"
-        dsm_log "Attempt $attempt: the demo reports $last, waiting for $expected."
+        if [ "$sample" -gt 0 ]; then
+            dsm_log "Attempt $attempt: rollout under way, $sample answer(s) of $expected, then $last."
+        else
+            dsm_log "Attempt $attempt: the demo reports $last, waiting for $expected."
+        fi
         if [ "$(dsm_now)" -ge "$deadline" ]; then
             dsm_fail "The demo still reports $last after ${DSM_TIMEOUT}s, expected $expected."
             return 1

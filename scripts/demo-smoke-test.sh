@@ -64,7 +64,19 @@ status="$(cat "$DSM_STUB_DIR/status" 2>/dev/null || echo 200)"
 case "$body" in
     *reloadCasc*) file=reload-casc.json ;;
     *accountGroups*) file=account-groups.json ;;
-    *info*) file=info.json ;;
+    *info*)
+        file=info.json
+        # What a rollout looks like from outside: the ingress answers from a different backend
+        # at each request. One version per line, one line per request, the last one staying.
+        if [ -f "$DSM_STUB_DIR/info-sequence" ]; then
+            printf '{"data":{"info":{"version":{"full":"%s"}}}}\n' \
+                "$(head -n 1 "$DSM_STUB_DIR/info-sequence")" > "$DSM_STUB_DIR/info.json"
+            if [ "$(wc -l < "$DSM_STUB_DIR/info-sequence")" -gt 1 ]; then
+                tail -n +2 "$DSM_STUB_DIR/info-sequence" > "$DSM_STUB_DIR/info-sequence.next"
+                mv "$DSM_STUB_DIR/info-sequence.next" "$DSM_STUB_DIR/info-sequence"
+            fi
+        fi
+        ;;
     *findingsSummary*) file=findings.json ;;
     *projects*) file=projects.json ;;
     *) file=unexpected.json ;;
@@ -232,6 +244,39 @@ DSM_TEST_NOW=0
 out="$(dsm_wait_for_version 5.3.0-rc.100 2>&1)"; rc=$?
 assert_eq "1" "$rc" "dsm_wait_for_version fails when the demo never answers"
 assert_contains "$out" "unreachable" "dsm_wait_for_version says the demo was unreachable"
+
+# One answer of the new version is not the rollout being over. The demo runs two backends and
+# rolls them one at a time, so for minutes the ingress answers from a pod of each version, and a
+# seed started then hits the old one with what only the new one knows (run 41454153469).
+setup_stub
+DSM_TEST_NOW=0
+# shellcheck disable=SC2034
+DSM_INTERVAL=15
+for _ in $(seq 1 200); do
+    echo 5.3.0-rc.100
+    echo 5.3.0-rc.101
+done > "$DSM_STUB_DIR/info-sequence"
+out="$(dsm_wait_for_version 5.3.0-rc.101 2>&1)"; rc=$?
+assert_eq "1" "$rc" "dsm_wait_for_version does not pass while the backends answer two versions"
+assert_contains "$out" "expected 5.3.0-rc.101" "dsm_wait_for_version times out on a rollout that never ends"
+
+# The answers of the new version do not carry over an old one: the rollout ends when the old
+# backends are gone, and only then does the poll pass.
+setup_stub
+DSM_TEST_NOW=0
+printf '%s\n' 5.3.0-rc.100 5.3.0-rc.101 5.3.0-rc.101 5.3.0-rc.100 5.3.0-rc.101 \
+    > "$DSM_STUB_DIR/info-sequence"
+out="$(dsm_wait_for_version 5.3.0-rc.101 2>&1)"; rc=$?
+assert_eq "0" "$rc" "dsm_wait_for_version passes once the old backends are gone"
+assert_contains "$out" "after 3 attempt" "dsm_wait_for_version starts over after an old answer"
+assert_contains "$out" "2 answer(s) of 5.3.0-rc.101, then 5.3.0-rc.100" \
+    "dsm_wait_for_version says the rollout is under way"
+assert_eq "$(( 4 + DSM_SAMPLES ))" "$(grep -c graphql "$DSM_STUB_DIR/calls.log")" \
+    "dsm_wait_for_version asks every sample of the attempt that passes"
+
+# A number of samples which makes missing a backend unlikely: at two backends, each sample has
+# one chance in two of hitting the old one.
+assert_eq "20" "$DSM_SAMPLES" "dsm_wait_for_version asks 20 times by default"
 
 # The deadline is a deadline: with a zero timeout the loop still tries once, then gives up.
 setup_stub

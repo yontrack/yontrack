@@ -11,8 +11,8 @@ name: Demo smoke
 # channel - see .yontrack/ci.yaml - once the slot has marked the deployment done. That moment
 # is when the gitops PR merged, which is well before ArgoCD has synced and the pods are
 # serving, so the first thing this workflow does is wait for the version it was told about to
-# be the version answering. That poll is the most valuable check here: "the version I asked
-# for is the version answering" is the whole deployment contract.
+# be the only version answering. That poll is the most valuable check here: "the version I
+# asked for is the version answering" is the whole deployment contract.
 #
 # Deliberately thin after that. The heavy suites already ran for BRONZE; re-running them here
 # would test the deployment rather than the code, and a fat smoke suite becomes the flaky
@@ -192,10 +192,10 @@ jobs:
         id: poll
         env:
           DEMO_TOKEN: ${{ env.TARGET_TOKEN }}
-          # 30 minutes. Since rc-350 (2026-09-22) a rollout takes the old pod down before the new
-          # one is ready, and the new one has needed more than 10 minutes to answer: two smokes
-          # failed on a 503 for their whole 600s and the same build then passed first time. The
-          # rest of the job takes ~7 minutes, which still fits in its 45.
+          # 30 minutes. A backend has needed more than 10 minutes to answer: two smokes failed on
+          # a 503 for their whole 600s and the same build then passed first time. And the poll
+          # lasts until the last backend has rolled, not the first. The rest of the job takes ~7
+          # minutes, which still fits in its 45.
           DEMO_POLL_TIMEOUT: '1800'
         run: scripts/demo-smoke.sh poll
 

@@ -29,7 +29,7 @@ door, right after the correlation artifact is published and before anything talk
 | # | Step | Why |
 |---|------|-----|
 | 1 | Resolve the build the version names | `yontrack validate --build` takes the build *name*, and the slot can only pass the version |
-| 2 | Poll until the instance reports that version | The whole deployment contract: the version asked for is the version answering |
+| 2 | Poll until the instance reports only that version | The whole deployment contract: the version asked for is the version answering |
 | 3 | Reset and seed | The instance's state is a function of the build - see [Demo seed and reset](demo-seed.md) |
 | 4 | Re-apply the CasC | The seed deleted the projects, and their permissions with them - see [Re-applying the CasC](#re-applying-the-casc) below |
 | 5 | Check the seeded dataset over GraphQL | The seed ran and left something behind, security findings included |
@@ -40,6 +40,12 @@ Step 2 is the valuable one. Everything that can go wrong between the merged PR a
 pod - ArgoCD not synced, image not pullable, old pod still up, new pod crash-looping - looks
 the same from outside: the demo answers with the previous version, or with nothing. One poll
 with one deadline covers them all.
+
+An attempt of that poll is 20 requests in a row (`DEMO_POLL_SAMPLES`), and all of them must report
+the version. The demo runs two backends and rolls them one at a time, so for minutes the ingress
+answers from a pod of each version, and a single answer of the new one only says that the first
+pod has rolled. The seed then ran against both: it wiped the instance, and failed on the old pod
+with a GraphQL validation error on a field of the new version.
 
 ## Re-applying the CasC
 
