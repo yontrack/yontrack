@@ -40,7 +40,7 @@ export default function ValidationsLastPromotionBuildWidgetForm({title, project,
                 <Form.Item
                     name="promotionLevel"
                     label="Promotion level"
-                    initialValue={{project, branch, promotion}}
+                    initialValue={{project, branch, promotionLevel: promotion}}
                 >
                     <SelectProjectBranchPromotionLevel/>
                 </Form.Item>
