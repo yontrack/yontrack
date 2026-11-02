@@ -1,5 +1,5 @@
 import {useRouter} from "next/router"
-import {useEffect, useState} from "react"
+import {useEffect, useRef, useState} from "react"
 import {
     defaultMatrixFilter,
     filterFromQuery,
@@ -49,6 +49,22 @@ export const useMatrixFilter = () => {
         ? filterFromQuery(router?.query, stored)
         : defaultMatrixFilter()
 
+    /*
+     * What the last change asked for, until the screen has caught up with the address.
+     *
+     * Next renders a shallow navigation inside a transition, so the address moves first and the
+     * screen follows when that render commits - seconds later on a busy page. A control used in
+     * between still holds the filter of the previous commit, and writing its change over that would
+     * silently undo the one before: All, then a search, and the scope is back on Favourites. Any move
+     * of the committed filter ends this, so a Back or a link is never overruled. An effect rather
+     * than the render body, because a render of a transition may never commit.
+     */
+    const requested = useRef(null)
+    const filterKey = JSON.stringify(filter)
+    useEffect(() => {
+        requested.current = null
+    }, [filterKey])
+
     /**
      * @param {Object} changes The filter fields to change
      * @param {boolean} replace Whether to replace the current history entry rather than add one.
@@ -57,7 +73,8 @@ export const useMatrixFilter = () => {
      *   the preference cannot be stored, one that undoes itself and traps the reader on the page.
      */
     const apply = (changes, {replace = false} = {}) => {
-        const next = {...filter, ...changes}
+        const next = {...(requested.current ?? filter), ...changes}
+        requested.current = next
         try {
             setLocalEnvironmentMatrixFilter(next)
         } catch (ignored) {

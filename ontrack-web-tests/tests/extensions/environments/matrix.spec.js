@@ -140,6 +140,30 @@ test('favourites, and the way out of an empty one', async ({page, ontrack}) => {
     await matrix.checkSlotIsVisible(stagingSlot)
 })
 
+/**
+ * Two changes in a row, the second made before the address has caught up with the first. Without a
+ * favourite on the account nothing can be seen: the screen moves the scope back to All by itself. With
+ * one, the second change used to be written over the filter as it was before the first, and All
+ * became Favourites again.
+ */
+test('choosing All and searching straight away, with a favourite on the account', async ({page, ontrack}) => {
+    const {prefix, project, stagingSlot} = await twoEnvironments(ontrack)
+    const favourite = await ontrack.createProject(`${prefix}-fav`)
+    await favourite.favourite()
+
+    await login(page, ontrack)
+    const matrix = new EnvironmentsPage(page, ontrack)
+    await matrix.goTo({query: ''})
+
+    await matrix.selectScope('All')
+    await matrix.searchProject(project.name)
+
+    await expect(page).toHaveURL(/scope=all/)
+    await expect(page.getByTestId('matrix-scope').getByRole('radio', {name: 'All'})).toBeChecked()
+    await matrix.checkProjectIsVisible(project)
+    await matrix.checkSlotIsVisible(stagingSlot)
+})
+
 test('a cell opens the drawer, at an address of its own', async ({page, ontrack}) => {
     const {prefix, project, stagingSlot} = await twoEnvironments(ontrack)
     const branch = await project.createBranch()
