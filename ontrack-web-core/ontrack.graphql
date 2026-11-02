@@ -108,7 +108,7 @@ type Account {
   owner: Account
   "Security role (admin or none)"
   role: String
-  "List of authentication tokens linked to this account."
+  "List of authentication tokens linked to this account. Readable by the account itself, by the owner of an agent, and by the holders of the account management function."
   tokens: [Token!]!
 }
 

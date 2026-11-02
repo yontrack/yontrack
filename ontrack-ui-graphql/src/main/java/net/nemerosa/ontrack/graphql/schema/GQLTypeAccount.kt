@@ -74,11 +74,11 @@ class GQLTypeAccount(
             }
             .field {
                 it.name("tokens")
-                    .description("List of authentication tokens linked to this account.")
+                    .description("List of authentication tokens linked to this account. Readable by the account itself, by the owner of an agent, and by the holders of the account management function.")
                     .type(listType(token.typeRef))
                     .dataFetcher { env ->
                         val account: Account = env.getSource()!!
-                        checkReadOnlyTokenOnTokens(account)
+                        checkTokensAccess(account)
                         securityService.asAdmin {
                             tokensService.getTokens(account.id()).map { t ->
                                 t.obfuscate()
@@ -93,15 +93,14 @@ class GQLTypeAccount(
     }
 
     /**
-     * A read-only token holds no `AccountManagement`: it lists its own tokens and those of the agents
-     * of its account, not those of any other account.
+     * An account reads its own tokens and those of its agents, and only the holder of
+     * [AccountManagement] those of any other account - which can be reached through its groups,
+     * by anybody. The fetcher runs as an administrator, so the check belongs here.
      */
-    private fun checkReadOnlyTokenOnTokens(account: Account) {
-        val user = securityService.currentUser ?: return
-        val tokenName = user.readOnlyTokenName ?: return
-        val current = user.account?.id
-        if (account.id != current && account.owner?.id != current) {
-            throw ReadOnlyTokenException.function(tokenName, AccountManagement::class.java)
+    private fun checkTokensAccess(account: Account) {
+        val current = securityService.currentUser?.account?.id
+        if (current == null || (account.id != current && account.owner?.id != current)) {
+            securityService.checkGlobalFunction(AccountManagement::class.java)
         }
     }
 
