@@ -28,8 +28,19 @@ class BuildFilterDialog {
         await expect(this.dialog.getByText(message)).toBeVisible()
     }
 
+    /**
+     * Selects a tab, and confirms that it is selected: a click can be lost. The tabs overflow the
+     * dialog, so Playwright scrolls them to reach a tab - and when the opening modal has made it
+     * retry, it centers the tab rather than just revealing it. Taking the focus on mouse down makes
+     * the tabs reset that scrolling, the tab leaves the mouse, and the mouse up lands on another
+     * tab: no click on this one. The tabs are settled by then, so the next click lands.
+     */
     async selectTab(name) {
-        await this.dialog.getByRole('tab', {name}).click()
+        const tab = this.dialog.getByRole('tab', {name})
+        await expect(async () => {
+            await tab.click()
+            await expect(tab).toHaveAttribute('aria-selected', 'true', {timeout: 1000})
+        }).toPass({timeout: 30000})
     }
 
     /**
