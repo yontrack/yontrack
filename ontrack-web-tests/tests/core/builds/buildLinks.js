@@ -36,7 +36,7 @@ export class BuildLinksPage {
     treeViewAlert() {
         return this.page
             .locator(".ant-alert")
-            .filter({hasText: "The tree view below displays only downstream dependencies"})
+            .filter({hasText: "The tree view below displays only what this build depends on"})
     }
 
     async expectTreeViewAlert({visible = true}) {

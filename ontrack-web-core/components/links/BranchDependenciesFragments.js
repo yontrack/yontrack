@@ -1,7 +1,7 @@
 import {gql} from "graphql-request";
 
-const maxDownstreamDepth = 5
-const maxUpstreamDepth = 5
+const maxDependencyDepth = 5
+const maxConsumerDepth = 5
 
 const gqlBuildInfo = gql`
     fragment BuildInfo on Build {
@@ -61,12 +61,12 @@ const gqlBranchNodeInfo = gql`
     }
 `
 
-const gqlDownstreamDependencies = (depth) => {
+const gqlDependencyLinks = (depth) => {
     if (depth <= 0) {
         return ''
     } else {
         return `
-                downstreamLinks(builds: 5) {
+                dependencyLinks(builds: 5) {
                     qualifier
                     sourceBuild {
                         ...BuildInfo
@@ -103,19 +103,19 @@ const gqlDownstreamDependencies = (depth) => {
                     }
                     branch {
                         ...BranchNodeInfo
-                        ${gqlDownstreamDependencies(depth - 1)}
+                        ${gqlDependencyLinks(depth - 1)}
                     }
                 }
             `
     }
 }
 
-const gqlUpstreamDependencies = (depth) => {
+const gqlConsumerLinks = (depth) => {
     if (depth <= 0) {
         return ''
     } else {
         return `
-                upstreamLinks(builds: 5) {
+                consumerLinks(builds: 5) {
                     qualifier
                     sourceBuild {
                         ...BuildInfo
@@ -125,19 +125,19 @@ const gqlUpstreamDependencies = (depth) => {
                     }
                     branch {
                         ...BranchNodeInfo
-                        ${gqlUpstreamDependencies(depth - 1)}
+                        ${gqlConsumerLinks(depth - 1)}
                     }
                 }
             `
     }
 }
 
-export const branchQuery = ({downstream, upstream}) => `
+export const branchQuery = ({dependencies, consumers}) => `
         query RootBranch($branchId: Int!, $loadPullRequests: Boolean! = false) {
             branch(id: $branchId) {
                 ...BranchNodeInfo
-                ${downstream ? gqlDownstreamDependencies(maxDownstreamDepth) : ''}
-                ${upstream ? gqlUpstreamDependencies(maxUpstreamDepth) : ''}
+                ${dependencies ? gqlDependencyLinks(maxDependencyDepth) : ''}
+                ${consumers ? gqlConsumerLinks(maxConsumerDepth) : ''}
             }
         }
         ${gqlBuildInfo}

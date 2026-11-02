@@ -279,7 +279,7 @@ class GQLTypeBuild(
                                 projectLabelManagementService.hasProjectLabel(it.build.project, actualLabel)
                             }
                         }
-                        structureService.getQualifiedBuildsUsedBy(
+                        structureService.getBuildDependencyLinks(
                             build = build,
                             offset = offset,
                             size = size,
@@ -315,7 +315,7 @@ class GQLTypeBuild(
                     ),
                     itemPaginatedListProvider = { environment, build, offset, size ->
                         val filter = getFilter(environment)
-                        structureService.getQualifiedBuildsUsing(
+                        structureService.getBuildConsumerLinks(
                             build,
                             offset,
                             size,

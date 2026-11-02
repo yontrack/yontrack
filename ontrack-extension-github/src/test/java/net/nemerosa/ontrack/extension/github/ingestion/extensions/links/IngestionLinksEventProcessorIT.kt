@@ -15,7 +15,7 @@ internal class IngestionLinksEventProcessorIT : AbstractDSLTestSupport() {
     fun `Adding links only`() {
         runScenario(addOnly = true) { ref, a, b, c ->
             // Gets the final links
-            val links = structureService.getQualifiedBuildsUsedBy(ref, size = Int.MAX_VALUE).pageItems
+            val links = structureService.getBuildDependencyLinks(ref, size = Int.MAX_VALUE).pageItems
             assertEquals(
                 listOf(a, b, c).map { it.id() }.toSet(),
                 links.map { it.build.id() }.toSet(),
@@ -28,7 +28,7 @@ internal class IngestionLinksEventProcessorIT : AbstractDSLTestSupport() {
     fun `Replacing links`() {
         runScenario(addOnly = false) { ref, _, b, c ->
             // Gets the final links
-            val links = structureService.getQualifiedBuildsUsedBy(ref, size = Int.MAX_VALUE).pageItems
+            val links = structureService.getBuildDependencyLinks(ref, size = Int.MAX_VALUE).pageItems
             assertEquals(
                 listOf(b, c).map { it.id() }.toSet(),
                 links.map { it.build.id() }.toSet(),

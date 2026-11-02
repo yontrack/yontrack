@@ -18,17 +18,17 @@ class BuildLinkDecorationExtension(
 
     override fun getDecorations(entity: ProjectEntity): List<Decoration<BuildLinkDecorationList>> {
         val build = entity as Build
-        val downstreamCount = structureService.getCountQualifiedBuildsUsedBy(build)
-        val upstreamCount = structureService.getCountQualifiedBuildsUsing(build)
+        val dependencyCount = structureService.getCountBuildDependencyLinks(build)
+        val consumerCount = structureService.getCountBuildConsumerLinks(build)
         // No link at all, nothing to show
-        return if (downstreamCount + upstreamCount > 0) {
+        return if (dependencyCount + consumerCount > 0) {
             listOf(
                 Decoration.of(
                     this,
                     BuildLinkDecorationList(
                         buildId = build.id(),
-                        linksCount = downstreamCount,
-                        upstreamCount = upstreamCount,
+                        dependencyCount = dependencyCount,
+                        consumerCount = consumerCount,
                         maxLinks = ontrackConfigProperties.buildLinks.decorationMaxLinks,
                     )
                 )

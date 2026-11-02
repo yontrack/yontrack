@@ -147,7 +147,7 @@ export default function BuildView({id}) {
                 icon={<FaProjectDiagram/>}
                 href={buildLinksUri(build)}
                 text="Links"
-                title="Displays downstream and upstream dependencies"
+                title="Displays what this build depends on, and what uses it"
             />,
             <BuildChangeLogCommand
                 key={`change-log-${build.id}`}

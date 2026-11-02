@@ -213,6 +213,29 @@ The visual identity drawn for a promotion level or validation stamp that has no
 entity image, derived deterministically from its name.
 _Avoid_: placeholder, default icon, fallback image
 
+**Build link**:
+The record that one build uses another one, optionally with a qualifier, across
+branches and projects. It has two sides, and each build reads it from its own.
+_Avoid_: dependency, which is one side of it
+
+**Dependency**:
+The side of a build link which is used: what a build uses. Labelled *Depends on*
+in the UI.
+_Avoid_: downstream, upstream
+
+**Consumer**:
+The side of a build link which uses the other: what uses a build. Labelled *Used
+by* in the UI.
+_Avoid_: upstream, downstream
+
+**Upstream**:
+Where changes come from, *downstream* being where they go. The words are for flow
+only: slots, promotions, auto-versioning propagation, the E2E lead time chart. A
+dependency is upstream of its consumers, but neither word ever names a side of a
+build link: they were used backwards for build links until #2131, so they read
+both ways there.
+_Avoid_: naming the side of a build link with it
+
 **Range selection**:
 Picking two builds on a branch in order to see what changed between them.
 _Avoid_: build comparison, diff selection

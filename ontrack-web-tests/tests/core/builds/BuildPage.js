@@ -41,8 +41,8 @@ export class BuildPage {
     async checkOnBuildPage() {
         await this.checkSection('promotions', "Promotions")
         await this.checkSection('validations', "Validations")
-        await this.checkSection('links-using', "Downstream links")
-        await this.checkSection('links-usedby', "Upstream links")
+        await this.checkSection('links-using', "Depends on")
+        await this.checkSection('links-usedby', "Used by")
         await this.assertName(this.build.name)
     }
 
@@ -173,16 +173,16 @@ export class BuildPage {
         await this.page.getByRole('button', {name: 'Previous build'}).click()
     }
 
-    async getDownstreamLinks() {
-        const downstreamLinks =  this.page.getByTestId('links-using')
-        await expect(downstreamLinks).toBeVisible()
-        return new BuildLinksSection(this.page, this.build, downstreamLinks)
+    async getDependencyLinks() {
+        const dependencyLinks =  this.page.getByTestId('links-using')
+        await expect(dependencyLinks).toBeVisible()
+        return new BuildLinksSection(this.page, this.build, dependencyLinks)
     }
 
-    async getUpstreamLinks() {
-        const upstreamLinks =  this.page.getByTestId('links-usedby')
-        await expect(upstreamLinks).toBeVisible()
-        return new BuildLinksSection(this.page, this.build, upstreamLinks)
+    async getConsumerLinks() {
+        const consumerLinks =  this.page.getByTestId('links-usedby')
+        await expect(consumerLinks).toBeVisible()
+        return new BuildLinksSection(this.page, this.build, consumerLinks)
     }
 
 }

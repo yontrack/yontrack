@@ -217,7 +217,7 @@ internal class GitHubIngestionBuildLinksMutationsIT : AbstractIngestionTestSuppo
                                         assertTrue(uuid.isNotBlank(), "UUID has been returned")
                                     }
                                     asAdmin {
-                                        val links = structureService.getQualifiedBuildsUsedBy(this).pageItems.associate {
+                                        val links = structureService.getBuildDependencyLinks(this).pageItems.associate {
                                             it.build.project.name to it.build.name
                                         }
                                         assertEquals(

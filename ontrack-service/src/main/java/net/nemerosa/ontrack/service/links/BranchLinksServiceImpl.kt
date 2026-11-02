@@ -58,17 +58,17 @@ class BranchLinksServiceImpl(
         }
     }
 
-    override fun getDownstreamDependencies(branch: Branch, n: Int): List<BranchLink> {
+    override fun getDependencyLinks(branch: Branch, n: Int): List<BranchLink> {
         // Gets the N first builds
         val builds = getBuilds(branch, n)
         // Grouping per project & qualifier
         val nextBuilds = mutableMapOf<Pair<ID, String>, LinkInfo>()
         // Looping over the N first builds
         builds.forEach { build ->
-            // Gets the downstream builds
-            val downstreamBuildLinks = structureService.getQualifiedBuildsUsedBy(build, size = n).pageItems
+            // Gets the builds it uses
+            val dependencyBuildLinks = structureService.getBuildDependencyLinks(build, size = n).pageItems
             // Looping over these dependencies
-            downstreamBuildLinks.forEach { buildLink ->
+            dependencyBuildLinks.forEach { buildLink ->
                 val linkInfo = LinkInfo(
                     sourceBuild = build,
                     targetBuild = buildLink.build,
@@ -82,17 +82,17 @@ class BranchLinksServiceImpl(
         }
     }
 
-    override fun getUpstreamDependencies(branch: Branch, n: Int): List<BranchLink> {
+    override fun getConsumerLinks(branch: Branch, n: Int): List<BranchLink> {
         // Gets the N first builds
         val builds = getBuilds(branch, n)
         // Grouping per project & qualifier
         val nextBuilds = mutableMapOf<Pair<ID, String>, LinkInfo>()
         // Looping over the N first builds
         builds.forEach { build ->
-            // Gets the downstream builds
-            val upstreamBuildLinks = structureService.getQualifiedBuildsUsing(build, size = n).pageItems
-            // Looping over these dependencies
-            upstreamBuildLinks.forEach { buildLink ->
+            // Gets the builds using it
+            val consumerBuildLinks = structureService.getBuildConsumerLinks(build, size = n).pageItems
+            // Looping over these consumers
+            consumerBuildLinks.forEach { buildLink ->
                 val linkInfo = LinkInfo(
                     sourceBuild = buildLink.build,
                     targetBuild = build,
@@ -147,12 +147,12 @@ class BranchLinksServiceImpl(
     private fun getEdgeBuild(build: Build, target: Branch, direction: BranchLinksDirection): Build? =
         when (direction) {
             BranchLinksDirection.USING ->
-                structureService.getQualifiedBuildsUsedBy(build, 0, 1) {
+                structureService.getBuildDependencyLinks(build, 0, 1) {
                     it.build.branch.id == target.id
                 }.pageItems.firstOrNull()?.build
 
             BranchLinksDirection.USED_BY ->
-                structureService.getQualifiedBuildsUsing(
+                structureService.getBuildConsumerLinks(
                     build = build,
                     offset = 0,
                     size = 1,

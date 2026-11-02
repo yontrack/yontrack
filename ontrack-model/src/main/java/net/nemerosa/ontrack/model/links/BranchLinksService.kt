@@ -9,25 +9,25 @@ import net.nemerosa.ontrack.model.structure.BranchLink
 interface BranchLinksService {
 
     /**
-     * Given a [branch], returns its downstream links based on the first [n] builds.
+     * Given a [branch], returns the links to its dependencies, based on the first [n] builds.
      *
      * @param branch Source branch
      * @param n Number of builds to take into account to get the branch dependencies
-     * @return Downstream dependencies (ie. the branches [branch] depends on)
+     * @return The branches [branch] depends on
      */
-    fun getDownstreamDependencies(
+    fun getDependencyLinks(
         branch: Branch,
         n: Int,
     ): List<BranchLink>
 
     /**
-     * Given a [branch], returns its upstream links based on the first [n] builds.
+     * Given a [branch], returns the links from its consumers, based on the first [n] builds.
      *
      * @param branch Source branch
-     * @param n Number of builds to take into account to get the branch upstream dependencies
-     * @return Upstream dependencies (ie. the branches [branch] is a dependency of)
+     * @param n Number of builds to take into account to get the branch consumers
+     * @return The branches [branch] is a dependency of
      */
-    fun getUpstreamDependencies(
+    fun getConsumerLinks(
         branch: Branch,
         n: Int,
     ): List<BranchLink>

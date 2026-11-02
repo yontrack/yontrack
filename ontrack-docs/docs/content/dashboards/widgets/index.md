@@ -15,7 +15,7 @@ Widgets are the building blocks of dashboards. Each widget displays a specific v
 | [Highest promotions per branch](highest-promotions-per-branch.md) | `home/HighestPromotionsPerBranch` | Latest build of each branch of a list, and the highest promotion it reached |
 | [Validations of last promoted build](validations-last-promotion-build.md) | `home/ValidationsLastPromotionBuild` | Validations of the last promoted build |
 | [Project promotion](project-promotion.md) | `home/ProjectPromotion` | Promotion status for a project with dependencies |
-| [Build dependencies tree](build-dependencies-tree.md) | `home/BuildDependenciesTree` | Downstream build dependency tree |
+| [Build dependencies tree](build-dependencies-tree.md) | `home/BuildDependenciesTree` | Build dependency tree |
 | [Promotion charts](promotion-charts.md) | `home/PromotionLeadTimeChart` · `home/PromotionFrequencyChart` · `home/PromotionStabilityChart` · `home/PromotionTTRChart` | Delivery metrics charts for promotion levels |
 | [Validation charts](validation-charts.md) | `home/ValidationMetricsChart` · `home/ValidationStabilityChart` | Metrics charts for validation stamps |
 | [End-to-end lead time](e2e-lead-time-chart.md) | `home/E2ELeadTimeChart` | Lead time across two projects |

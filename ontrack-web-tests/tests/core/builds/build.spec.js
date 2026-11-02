@@ -267,12 +267,12 @@ test('previous and next builds', async ({page, ontrack}) => {
     await buildPage2.expectNextBuild({visible: true})
 })
 
-test('filtering the downstream links', async ({page, ontrack}) => {
+test('filtering the dependency links', async ({page, ontrack}) => {
     // Source build
     const sourceProject = await ontrack.createProject()
     const sourceBranch = await sourceProject.createBranch()
     const sourceBuild = await sourceBranch.createBuild()
-    // Target builds (==> downstream)
+    // Target builds (==> dependencies)
     const targetBuilds = []
     for (const i of [1, 2, 3]) {
         const targetProject = await ontrack.createProject()
@@ -287,8 +287,8 @@ test('filtering the downstream links', async ({page, ontrack}) => {
     const buildPage = new BuildPage(page, sourceBuild)
     await buildPage.goTo()
 
-    // Getting access to the downstream links
-    const links = await buildPage.getDownstreamLinks()
+    // Getting access to the dependency links
+    const links = await buildPage.getDependencyLinks()
 
     // Checks all builds are visible
     await links.isProjectLinkVisible({project: targetBuilds[0].branch.project.name, visible: true})
@@ -308,12 +308,12 @@ test('filtering the downstream links', async ({page, ontrack}) => {
     await links.isProjectLinkVisible({project: targetBuilds[2].branch.project.name, visible: true})
 })
 
-test('filtering the upstream links', async ({page, ontrack}) => {
+test('filtering the consumer links', async ({page, ontrack}) => {
     // Target build
     const targetProject = await ontrack.createProject()
     const targetBranch = await targetProject.createBranch()
     const targetBuild = await targetBranch.createBuild()
-    // Source builds (==> upstream)
+    // Source builds (==> consumers)
     const sourceBuilds = []
     for (const i of [1, 2, 3]) {
         const sourceProject = await ontrack.createProject()
@@ -328,8 +328,8 @@ test('filtering the upstream links', async ({page, ontrack}) => {
     const buildPage = new BuildPage(page, targetBuild)
     await buildPage.goTo()
 
-    // Getting access to the upstream links
-    const links = await buildPage.getUpstreamLinks()
+    // Getting access to the consumer links
+    const links = await buildPage.getConsumerLinks()
 
     // Checks all builds are visible
     await links.isProjectLinkVisible({project: sourceBuilds[0].branch.project.name, visible: true})
@@ -349,12 +349,12 @@ test('filtering the upstream links', async ({page, ontrack}) => {
     await links.isProjectLinkVisible({project: sourceBuilds[2].branch.project.name, visible: true})
 })
 
-test('hovering the link decoration lists the downstream and upstream links', async ({page, ontrack}) => {
+test('hovering the link decoration lists the dependency and consumer links', async ({page, ontrack}) => {
     // The build in the middle
     const project = await ontrack.createProject()
     const branch = await project.createBranch()
     const build = await branch.createBuild()
-    // Four downstream links: one more than the cap of the test stack (3)
+    // Four dependency links: one more than the cap of the test stack (3)
     const targets = []
     for (const i of [1, 2, 3, 4]) {
         const targetProject = await ontrack.createProject()
@@ -366,7 +366,7 @@ test('hovering the link decoration lists the downstream and upstream links', asy
     // The most recent target is promoted
     const promotionLevel = await targets[3].branch.createPromotionLevel(generate("pl_"))
     const promotionRun = await targets[3].promote(promotionLevel)
-    // One upstream link
+    // One consumer link
     const sourceProject = await ontrack.createProject()
     const sourceBranch = await sourceProject.createBranch()
     const source = await sourceBranch.createBuild()
@@ -378,25 +378,25 @@ test('hovering the link decoration lists the downstream and upstream links', asy
 
     const popover = await buildPage.hoverLinkDecoration()
 
-    // Downstream: the three most recent links, then one more
-    const downstream = popover.getByTestId('build-link-decoration-downstream')
-    await expect(downstream.getByText('Downstream')).toBeVisible()
-    await expect(downstream.getByText('4', {exact: true})).toBeVisible()
+    // Depends on: the three most recent links, then one more
+    const dependencies = popover.getByTestId('build-link-decoration-dependency')
+    await expect(dependencies.getByText('Depends on')).toBeVisible()
+    await expect(dependencies.getByText('4', {exact: true})).toBeVisible()
     for (const target of targets.slice(1)) {
-        await expect(downstream.getByRole('link', {name: target.name, exact: true})).toBeVisible()
+        await expect(dependencies.getByRole('link', {name: target.name, exact: true})).toBeVisible()
     }
-    await expect(downstream.getByRole('link', {name: targets[0].name, exact: true})).toHaveCount(0)
-    await expect(downstream.getByText('extra', {exact: true})).toBeVisible()
-    await expect(downstream.getByTestId(`promotion-run-link-${promotionRun.id}`)).toBeVisible()
-    const more = downstream.getByTestId('build-link-decoration-downstream-more')
+    await expect(dependencies.getByRole('link', {name: targets[0].name, exact: true})).toHaveCount(0)
+    await expect(dependencies.getByText('extra', {exact: true})).toBeVisible()
+    await expect(dependencies.getByTestId(`promotion-run-link-${promotionRun.id}`)).toBeVisible()
+    const more = dependencies.getByTestId('build-link-decoration-dependency-more')
     await expect(more).toContainText('1 more')
     await expect(more.getByRole('link', {name: 'All links →'})).toHaveAttribute('href', `/build/${build.id}/links`)
 
-    // Upstream: the one link, and no "more" line
-    const upstream = popover.getByTestId('build-link-decoration-upstream')
-    await expect(upstream.getByText('Upstream')).toBeVisible()
-    await expect(upstream.getByText(source.branch.project.name, {exact: true})).toBeVisible()
-    await expect(upstream.getByTestId('build-link-decoration-upstream-more')).toHaveCount(0)
+    // Used by: the one link, and no "more" line
+    const consumers = popover.getByTestId('build-link-decoration-consumer')
+    await expect(consumers.getByText('Used by')).toBeVisible()
+    await expect(consumers.getByText(source.branch.project.name, {exact: true})).toBeVisible()
+    await expect(consumers.getByTestId('build-link-decoration-consumer-more')).toHaveCount(0)
 
     // Esc closes the popover
     await page.keyboard.press('Escape')
@@ -411,7 +411,7 @@ test('hovering the link decoration lists the downstream and upstream links', asy
 
     // Clicking a build opens its page
     const reopened = await buildPage.hoverLinkDecoration()
-    await reopened.getByTestId('build-link-decoration-upstream')
+    await reopened.getByTestId('build-link-decoration-consumer')
         .getByRole('link', {name: source.name, exact: true})
         .click()
     await new BuildPage(page, source).checkOnBuildPage()

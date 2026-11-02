@@ -140,7 +140,7 @@ export default function BranchView({id}) {
                     icon={<FaProjectDiagram/>}
                     href={branchLinksUri(branch)}
                     text="Links"
-                    title="Displays downstream and upstream dependencies"
+                    title="Displays what this branch depends on, and what uses it"
                 />,
                 <CloseCommand key="close" href={projectUri(branch.project)}/>,
             )

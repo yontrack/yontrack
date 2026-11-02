@@ -85,7 +85,7 @@ class AutoVersioningValidationServiceImpl(
                 && current != null
                 && (buildLinkCreation == null || buildLinkCreation)
             ) {
-                val links = structureService.getQualifiedBuildsUsedBy(build)
+                val links = structureService.getBuildDependencyLinks(build)
                 val existingLink = links.pageItems.find {
                     it.qualifier == config.qualifier && it.build.project.name == config.sourceProject
                 }
@@ -134,7 +134,7 @@ class AutoVersioningValidationServiceImpl(
         sourceProject: Project
     ): BuildVersionInfo? {
         // Using build links first
-        val link = structureService.getQualifiedBuildsUsedBy(build, 0, 1) {
+        val link = structureService.getBuildDependencyLinks(build, 0, 1) {
             it.build.project.name == config.sourceProject &&
                     (config.qualifier == null || config.qualifier == it.qualifier)
         }.pageItems.firstOrNull()?.build

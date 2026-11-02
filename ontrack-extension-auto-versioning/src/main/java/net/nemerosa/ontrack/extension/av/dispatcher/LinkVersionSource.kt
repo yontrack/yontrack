@@ -23,7 +23,7 @@ class LinkVersionSource(
     override fun getVersion(build: Build, config: String?): String {
         val (project, qualifier, subVersion) = parseConfig(config)
         // Gets the list of linked builds
-        val links = structureService.getQualifiedBuildsUsedBy(build) {
+        val links = structureService.getBuildDependencyLinks(build) {
             it.build.project.name == project && it.qualifier == qualifier
         }.pageItems
         if (links.isEmpty()) {
@@ -57,7 +57,7 @@ class LinkVersionSource(
             version = version,
         ) ?: return null
         // Gets the latest source build linked to this target build
-        return structureService.getQualifiedBuildsUsing(targetBuild) { sourceBuildLink ->
+        return structureService.getBuildConsumerLinks(targetBuild) { sourceBuildLink ->
             sourceBuildLink.build.project.name == sourceProject.name && sourceBuildLink.qualifier == qualifier
         }.pageItems.firstOrNull()?.build
     }

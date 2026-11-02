@@ -274,7 +274,7 @@ class StructureServiceImpl(
         securityService.checkProjectFunction(build.projectId(), BuildDelete::class.java)
         eventPostService.post(eventFactory.deleteBuild(build))
         beforeCascadeDeletion { listeners ->
-            val links = buildLinkRepository.getQualifiedBuildsUsing(build)
+            val links = buildLinkRepository.getBuildConsumerLinks(build)
                 .filter { it.build.id() != build.id() }
                 .map { CascadedBuildLink(build = it.build, qualifier = it.qualifier) }
                 .sortedWith(compareBy({ it.build.id() }, { it.qualifier }))
@@ -465,14 +465,14 @@ class StructureServiceImpl(
         }
     }
 
-    override fun getCountQualifiedBuildsUsedBy(build: Build): Int {
+    override fun getCountBuildDependencyLinks(build: Build): Int {
         securityService.checkProjectFunction(build, ProjectView::class.java)
-        return countVisibleLinks(buildLinkRepository.getCountQualifiedBuildsUsedBy(build))
+        return countVisibleLinks(buildLinkRepository.getCountBuildDependencyLinks(build))
     }
 
-    override fun getCountQualifiedBuildsUsing(build: Build): Int {
+    override fun getCountBuildConsumerLinks(build: Build): Int {
         securityService.checkProjectFunction(build, ProjectView::class.java)
-        return countVisibleLinks(buildLinkRepository.getCountQualifiedBuildsUsing(build))
+        return countVisibleLinks(buildLinkRepository.getCountBuildConsumerLinks(build))
     }
 
     /**
@@ -484,7 +484,7 @@ class StructureServiceImpl(
             .values
             .sum()
 
-    override fun getQualifiedBuildsUsedBy(
+    override fun getBuildDependencyLinks(
         build: Build,
         offset: Int,
         size: Int,
@@ -493,7 +493,7 @@ class StructureServiceImpl(
     ): PaginatedList<BuildLink> {
         securityService.checkProjectFunction(build, ProjectView::class.java)
         // First level dependency (depth == 0)
-        val list = internalQualifiedBuildsUsedBy(
+        val list = internalBuildDependencyLinks(
             build = build,
             depth = depth
         )
@@ -505,19 +505,19 @@ class StructureServiceImpl(
         return PaginatedList.create(list.filter(filter), offset, size)
     }
 
-    private fun internalQualifiedBuildsUsedBy(
+    private fun internalBuildDependencyLinks(
         build: Build,
         depth: Int,
     ): List<BuildLink> {
         // First level dependency (depth == 0)
-        val list = buildLinkRepository.getQualifiedBuildsUsedBy(build)
+        val list = buildLinkRepository.getBuildDependencyLinks(build)
         // Recursivity
         return if (depth > 0) {
             list.flatMap { link ->
                 // The top lebel build itself
                 listOf(link) +
                         // ... and its children (without any filter)
-                        internalQualifiedBuildsUsedBy(
+                        internalBuildDependencyLinks(
                             build = link.build,
                             depth = depth - 1, // One level less
                         )
@@ -528,7 +528,7 @@ class StructureServiceImpl(
 
     }
 
-    override fun getQualifiedBuildsUsing(
+    override fun getBuildConsumerLinks(
         build: Build,
         offset: Int,
         size: Int,
@@ -536,7 +536,7 @@ class StructureServiceImpl(
     ): PaginatedList<BuildLink> {
         securityService.checkProjectFunction(build, ProjectView::class.java)
         // Gets the complete list, filtered by ACL
-        val list = buildLinkRepository.getQualifiedBuildsUsing(build)
+        val list = buildLinkRepository.getBuildConsumerLinks(build)
             .filter { b -> securityService.isProjectFunctionGranted(b.build, ProjectView::class.java) }
         // OK
         return PaginatedList.create(list.filter { filter(it) }, offset, size)
@@ -545,7 +545,7 @@ class StructureServiceImpl(
     override fun editBuildLinks(build: Build, form: BuildLinkForm) {
         securityService.checkProjectFunction(build, BuildConfig::class.java)
         // Gets the existing links, filtered by authorisations
-        val authorisedExistingLinks = buildLinkRepository.getQualifiedBuildsUsedBy(build)
+        val authorisedExistingLinks = buildLinkRepository.getBuildDependencyLinks(build)
             .filter { securityService.isProjectFunctionGranted(it.build, ProjectView::class.java) }
         // Added links
         val addedLinks = mutableSetOf<BuildLink>()

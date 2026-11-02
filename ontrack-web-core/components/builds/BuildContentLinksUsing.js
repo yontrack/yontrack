@@ -6,7 +6,7 @@ export default function BuildContentLinksUsing({build}) {
             <BuildContentLinks
                 build={build}
                 id="links-using"
-                title="Downstream links"
+                title="Depends on"
                 fieldName="usingQualified"
             />
         </>

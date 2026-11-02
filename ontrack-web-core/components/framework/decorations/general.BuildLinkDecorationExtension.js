@@ -102,7 +102,7 @@ function BuildLinkDecorationRow({link}) {
  * Links of the build, loaded when the popover opens for the first time - never with the
  * decoration itself, which is computed for every build of a list.
  */
-function BuildLinkDecorationContent({buildId, downstreamCount, upstreamCount, maxLinks}) {
+function BuildLinkDecorationContent({buildId, dependencyCount, consumerCount, maxLinks}) {
     const {data, loading, error, finished} = useQuery(
         `
             query BuildLinkDecoration($id: Int!, $size: Int!) {
@@ -122,8 +122,8 @@ function BuildLinkDecorationContent({buildId, downstreamCount, upstreamCount, ma
         }
     )
 
-    const downstream = data?.build?.usingQualified?.pageItems ?? NO_LINKS
-    const upstream = data?.build?.usedByQualified?.pageItems ?? NO_LINKS
+    const dependencies = data?.build?.usingQualified?.pageItems ?? NO_LINKS
+    const consumers = data?.build?.usedByQualified?.pageItems ?? NO_LINKS
 
     return (
         <Spin spinning={loading || !finished} size="small">
@@ -135,25 +135,25 @@ function BuildLinkDecorationContent({buildId, downstreamCount, upstreamCount, ma
             >
                 {error && <Alert type="error" title={error}/>}
                 {
-                    downstreamCount > 0 &&
+                    dependencyCount > 0 &&
                     <BuildLinkDecorationSection
-                        id="downstream"
+                        id="dependency"
                         arrow="↓"
-                        title="Downstream"
-                        count={downstreamCount}
-                        links={downstream}
+                        title="Depends on"
+                        count={dependencyCount}
+                        links={dependencies}
                         maxLinks={maxLinks}
                         buildId={buildId}
                     />
                 }
                 {
-                    upstreamCount > 0 &&
+                    consumerCount > 0 &&
                     <BuildLinkDecorationSection
-                        id="upstream"
+                        id="consumer"
                         arrow="↑"
-                        title="Upstream"
-                        count={upstreamCount}
-                        links={upstream}
+                        title="Used by"
+                        count={consumerCount}
+                        links={consumers}
                         maxLinks={maxLinks}
                         buildId={buildId}
                     />
@@ -164,7 +164,7 @@ function BuildLinkDecorationContent({buildId, downstreamCount, upstreamCount, ma
 }
 
 export default function BuildLinkDecorationExtension({decoration}) {
-    const {buildId, linksCount: downstreamCount = 0, upstreamCount = 0, maxLinks = 10} = decoration.data
+    const {buildId, dependencyCount = 0, consumerCount = 0, maxLinks = 10} = decoration.data
     const [open, setOpen] = useState(false)
 
     // Esc closes the popover, whether it was opened by the mouse or by the keyboard
@@ -180,7 +180,7 @@ export default function BuildLinkDecorationExtension({decoration}) {
         }
     }, [open])
 
-    if (!buildId || downstreamCount + upstreamCount <= 0) {
+    if (!buildId || dependencyCount + consumerCount <= 0) {
         return null
     }
 
@@ -193,8 +193,8 @@ export default function BuildLinkDecorationExtension({decoration}) {
             content={
                 <BuildLinkDecorationContent
                     buildId={buildId}
-                    downstreamCount={downstreamCount}
-                    upstreamCount={upstreamCount}
+                    dependencyCount={dependencyCount}
+                    consumerCount={consumerCount}
                     maxLinks={maxLinks}
                 />
             }

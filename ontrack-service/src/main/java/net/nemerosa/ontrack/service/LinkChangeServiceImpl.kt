@@ -14,8 +14,8 @@ class LinkChangeServiceImpl(
     override fun linkChanges(from: Build, to: Build): List<LinkChange> {
         val (actualFrom, actualTo) = sortById(from, to)
 
-        val fromLinks = structureService.getQualifiedBuildsUsedBy(actualFrom).pageItems
-        val toLinks = structureService.getQualifiedBuildsUsedBy(actualTo).pageItems
+        val fromLinks = structureService.getBuildDependencyLinks(actualFrom).pageItems
+        val toLinks = structureService.getBuildDependencyLinks(actualTo).pageItems
 
         val changes = mutableListOf<LinkChange>()
 

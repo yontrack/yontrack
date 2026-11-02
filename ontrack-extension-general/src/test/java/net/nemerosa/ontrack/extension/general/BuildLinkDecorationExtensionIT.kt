@@ -1,8 +1,10 @@
 package net.nemerosa.ontrack.extension.general
 
+import net.nemerosa.ontrack.json.asJson
 import net.nemerosa.ontrack.model.structure.Build
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
+import tools.jackson.databind.JsonNode
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
@@ -25,7 +27,7 @@ class BuildLinkDecorationExtensionIT : AbstractGeneralExtensionTestSupport() {
     }
 
     @Test
-    fun `Downstream links only`() {
+    fun `Dependency links only`() {
         val ref1 = otherBuild()
         val ref2 = otherBuild()
         project {
@@ -34,38 +36,49 @@ class BuildLinkDecorationExtensionIT : AbstractGeneralExtensionTestSupport() {
                     linkTo(ref1)
                     linkTo(ref2)
                     val list = decorationOf(this)
-                    assertEquals(id(), list.buildId)
-                    assertEquals(2, list.linksCount)
-                    assertEquals(0, list.upstreamCount)
-                    assertEquals(10, list.maxLinks)
+                    assertEquals(id(), list.path("buildId").asInt())
+                    assertEquals(2, list.path("dependencyCount").asInt())
+                    assertEquals(0, list.path("consumerCount").asInt())
+                    assertEquals(10, list.path("maxLinks").asInt())
                 }
             }
         }
     }
 
     @Test
-    fun `Upstream links only`() {
+    fun `Consumer links only`() {
         val target = otherBuild()
         otherBuild().linkTo(target)
         otherBuild().linkTo(target)
         otherBuild().linkTo(target)
         val list = decorationOf(target)
-        assertEquals(target.id(), list.buildId)
-        assertEquals(0, list.linksCount)
-        assertEquals(3, list.upstreamCount)
-        assertEquals(10, list.maxLinks)
+        assertEquals(target.id(), list.path("buildId").asInt())
+        assertEquals(0, list.path("dependencyCount").asInt())
+        assertEquals(3, list.path("consumerCount").asInt())
+        assertEquals(10, list.path("maxLinks").asInt())
     }
 
     @Test
-    fun `Downstream and upstream links`() {
+    fun `Dependency and consumer links`() {
         val build = otherBuild()
         build.linkTo(otherBuild())
         otherBuild().linkTo(build)
         otherBuild().linkTo(build)
         val list = decorationOf(build)
-        assertEquals(1, list.linksCount)
-        assertEquals(2, list.upstreamCount)
-        assertEquals(10, list.maxLinks)
+        assertEquals(1, list.path("dependencyCount").asInt())
+        assertEquals(2, list.path("consumerCount").asInt())
+        assertEquals(10, list.path("maxLinks").asInt())
+    }
+
+    @Test
+    fun `The names shipped in 5_5_11 stay as aliases of the counts`() {
+        val build = otherBuild()
+        build.linkTo(otherBuild())
+        otherBuild().linkTo(build)
+        otherBuild().linkTo(build)
+        val list = decorationOf(build)
+        assertEquals(1, list.path("linksCount").asInt())
+        assertEquals(2, list.path("upstreamCount").asInt())
     }
 
     @Test
@@ -75,7 +88,7 @@ class BuildLinkDecorationExtensionIT : AbstractGeneralExtensionTestSupport() {
         val old = ontrackConfigProperties.buildLinks.decorationMaxLinks
         try {
             ontrackConfigProperties.buildLinks.decorationMaxLinks = 3
-            assertEquals(3, decorationOf(build).maxLinks)
+            assertEquals(3, decorationOf(build).path("maxLinks").asInt())
         } finally {
             ontrackConfigProperties.buildLinks.decorationMaxLinks = old
         }
@@ -87,10 +100,13 @@ class BuildLinkDecorationExtensionIT : AbstractGeneralExtensionTestSupport() {
         }
     }
 
-    private fun decorationOf(build: Build): BuildLinkDecorationList {
+    /**
+     * The decoration as its clients read it, as JSON.
+     */
+    private fun decorationOf(build: Build): JsonNode {
         val decorations = extension.getDecorations(build)
         assertEquals(1, decorations.size)
-        return assertNotNull(decorations.first().data)
+        return assertNotNull(decorations.first().data).asJson()
     }
 
 }

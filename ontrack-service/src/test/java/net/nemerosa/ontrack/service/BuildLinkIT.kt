@@ -32,7 +32,7 @@ class BuildLinkIT : AbstractDSLTestSupport() {
             structureService.createBuildLink(source, target, "dep1")
             structureService.createBuildLink(source, target, "dep2")
             // Gets the list of links
-            val links = structureService.getQualifiedBuildsUsedBy(source).pageItems
+            val links = structureService.getBuildDependencyLinks(source).pageItems
             assertEquals(3, links.size)
             assertEquals(
                 mapOf(
@@ -129,7 +129,7 @@ class BuildLinkIT : AbstractDSLTestSupport() {
                 // Checks all builds are still linked
                 assertEquals(
                     setOf(target1.id, target2.id, target3.id),
-                    structureService.getQualifiedBuildsUsedBy(source).pageItems.map { it.build.id }.toSet()
+                    structureService.getBuildDependencyLinks(source).pageItems.map { it.build.id }.toSet()
                 )
             }
     }
@@ -161,7 +161,7 @@ class BuildLinkIT : AbstractDSLTestSupport() {
                 // Checks all builds are still linked
                 assertEquals(
                     setOf(target1.id, target3.id),
-                    structureService.getQualifiedBuildsUsedBy(source).pageItems.map { it.build.id }.toSet()
+                    structureService.getBuildDependencyLinks(source).pageItems.map { it.build.id }.toSet()
                 )
             }
     }
@@ -191,7 +191,7 @@ class BuildLinkIT : AbstractDSLTestSupport() {
                 // Checks all builds are still linked
                 assertEquals(
                     setOf(target1.id, target2.id, target3.id),
-                    structureService.getQualifiedBuildsUsedBy(source).pageItems.map { it.build.id }.toSet()
+                    structureService.getBuildDependencyLinks(source).pageItems.map { it.build.id }.toSet()
                 )
             }
     }
@@ -225,7 +225,7 @@ class BuildLinkIT : AbstractDSLTestSupport() {
                     // Checks all builds are still linked
                     assertEquals(
                         setOf(target1.id, target2.id, target3.id),
-                        structureService.getQualifiedBuildsUsedBy(source).pageItems.map { it.build.id }.toSet()
+                        structureService.getBuildDependencyLinks(source).pageItems.map { it.build.id }.toSet()
                     )
                 }
         }
@@ -260,7 +260,7 @@ class BuildLinkIT : AbstractDSLTestSupport() {
                     // Checks all builds are still linked
                     assertEquals(
                         setOf(target2.id, target3.id),
-                        structureService.getQualifiedBuildsUsedBy(source).pageItems.map { it.build.id }.toSet()
+                        structureService.getBuildDependencyLinks(source).pageItems.map { it.build.id }.toSet()
                     )
                 }
         }
@@ -293,7 +293,7 @@ class BuildLinkIT : AbstractDSLTestSupport() {
                 // Checks all builds are still linked
                 assertEquals(
                     setOf(target1.id, target2.id, target3.id),
-                    structureService.getQualifiedBuildsUsedBy(source).pageItems.map { it.build.id }.toSet()
+                    structureService.getBuildDependencyLinks(source).pageItems.map { it.build.id }.toSet()
                 )
             }
     }
@@ -310,7 +310,7 @@ class BuildLinkIT : AbstractDSLTestSupport() {
         }
         // The build link is created
         val targets = asUser().withView(build).withView(target).call {
-            structureService.getQualifiedBuildsUsedBy(build)
+            structureService.getBuildDependencyLinks(build)
         }.pageItems.map { it.build }
         assertTrue(targets.isNotEmpty())
         assertTrue(targets.any { it.name == target.name })
@@ -358,7 +358,7 @@ class BuildLinkIT : AbstractDSLTestSupport() {
         }
         // The build link is created
         var targets = asUser().withView(build).withView(target).call {
-            structureService.getQualifiedBuildsUsedBy(build).map { it.build }
+            structureService.getBuildDependencyLinks(build).map { it.build }
         }.pageItems
         assertTrue(targets.isNotEmpty())
         assertTrue(targets.any { it.name == target.name })
@@ -368,7 +368,7 @@ class BuildLinkIT : AbstractDSLTestSupport() {
         }
         // The build link is deleted
         targets = asUser().withView(build).withView(target).call {
-            structureService.getQualifiedBuildsUsedBy(build)
+            structureService.getBuildDependencyLinks(build)
         }.pageItems.map { it.build }
         assertTrue(targets.isEmpty())
     }
@@ -387,7 +387,7 @@ class BuildLinkIT : AbstractDSLTestSupport() {
         }
         // The build link is created
         val targets = asUser().withView(build).withView(target).call {
-            structureService.getQualifiedBuildsUsedBy(build)
+            structureService.getBuildDependencyLinks(build)
         }.pageItems.map { it.build }
         assertTrue(targets.isNotEmpty())
         assertEquals(1, targets.size)
@@ -406,7 +406,7 @@ class BuildLinkIT : AbstractDSLTestSupport() {
         }
         // The build link is created
         val targets = asUser().withView(build).withView(target).call {
-            structureService.getQualifiedBuildsUsedBy(build)
+            structureService.getBuildDependencyLinks(build)
         }.pageItems.map { it.build }
         assertEquals(listOf(target.name), targets.map { it.name })
     }
@@ -437,7 +437,7 @@ class BuildLinkIT : AbstractDSLTestSupport() {
         }
         // The build link is created
         val targets = asUser().withView(build).withView(target).call {
-            structureService.getQualifiedBuildsUsedBy(build)
+            structureService.getBuildDependencyLinks(build)
         }.pageItems.map { it.build }
         assertEquals(listOf(target.name), targets.map { it.name })
     }
@@ -454,7 +454,7 @@ class BuildLinkIT : AbstractDSLTestSupport() {
         }
         // The build link is created
         val targets = asUser().withView(build).withView(target).call {
-            structureService.getQualifiedBuildsUsedBy(build)
+            structureService.getBuildDependencyLinks(build)
         }.pageItems.map { it.build }
         assertEquals(listOf(target.name), targets.map { it.name })
     }
@@ -680,7 +680,7 @@ class BuildLinkIT : AbstractDSLTestSupport() {
     }
 
     @Test
-    fun `Counting the upstream links`() {
+    fun `Counting the consumer links`() {
         val target = doCreateBuild()
         val source1 = doCreateBuild()
         val source2 = doCreateBuild()
@@ -689,17 +689,17 @@ class BuildLinkIT : AbstractDSLTestSupport() {
             structureService.createBuildLink(source1, target)
             structureService.createBuildLink(source1, target, "dep")
             structureService.createBuildLink(source2, target)
-            // Downstream of the target, not counted as upstream
+            // A dependency of the target, not counted as a consumer
             structureService.createBuildLink(target, other)
         }
         asUserWithView(target, source1, source2).call {
-            assertEquals(3, structureService.getCountQualifiedBuildsUsing(target))
-            assertEquals(0, structureService.getCountQualifiedBuildsUsing(source1))
+            assertEquals(3, structureService.getCountBuildConsumerLinks(target))
+            assertEquals(0, structureService.getCountBuildConsumerLinks(source1))
         }
     }
 
     @Test
-    fun `Counting the upstream links leaves out the builds the user cannot see`() {
+    fun `Counting the consumer links leaves out the builds the user cannot see`() {
         withNoGrantViewToAll {
             val target = doCreateBuild()
             val visible = doCreateBuild()
@@ -709,13 +709,13 @@ class BuildLinkIT : AbstractDSLTestSupport() {
                 structureService.createBuildLink(hidden, target)
             }
             asUserWithView(target, visible).call {
-                assertEquals(1, structureService.getCountQualifiedBuildsUsing(target))
+                assertEquals(1, structureService.getCountBuildConsumerLinks(target))
             }
         }
     }
 
     @Test
-    fun `Counting the downstream links leaves out the builds the user cannot see`() {
+    fun `Counting the dependency links leaves out the builds the user cannot see`() {
         withNoGrantViewToAll {
             val source = doCreateBuild()
             val visible = doCreateBuild()
@@ -725,7 +725,7 @@ class BuildLinkIT : AbstractDSLTestSupport() {
                 structureService.createBuildLink(source, hidden)
             }
             asUserWithView(source, visible).call {
-                assertEquals(1, structureService.getCountQualifiedBuildsUsedBy(source))
+                assertEquals(1, structureService.getCountBuildDependencyLinks(source))
             }
         }
     }
@@ -733,7 +733,7 @@ class BuildLinkIT : AbstractDSLTestSupport() {
     @Test
     fun `Getting first level builds by default`() {
         forRecursiveLinks { _, p, builds ->
-            val links = structureService.getQualifiedBuildsUsedBy(p)
+            val links = structureService.getBuildDependencyLinks(p)
             assertEquals(
                 listOf(
                     builds["q2"],
@@ -747,7 +747,7 @@ class BuildLinkIT : AbstractDSLTestSupport() {
     @Test
     fun `Filtering builds on project labels`() {
         forRecursiveLinks { label, p, builds ->
-            val links = structureService.getQualifiedBuildsUsedBy(
+            val links = structureService.getBuildDependencyLinks(
                 build = p
             ) { candidate ->
                 projectLabelManagementService.hasProjectLabel(candidate.build.project, label)
@@ -764,7 +764,7 @@ class BuildLinkIT : AbstractDSLTestSupport() {
     @Test
     fun `Getting recursive links with max depth`() {
         forRecursiveLinks { _, p, builds ->
-            val links = structureService.getQualifiedBuildsUsedBy(
+            val links = structureService.getBuildDependencyLinks(
                 build = p,
                 depth = 1, // We don't expect s layer
             )
@@ -786,7 +786,7 @@ class BuildLinkIT : AbstractDSLTestSupport() {
     @Test
     fun `Getting recursive links with max depth and label filtering`() {
         forRecursiveLinks { label, p, builds ->
-            val links = structureService.getQualifiedBuildsUsedBy(
+            val links = structureService.getBuildDependencyLinks(
                 build = p,
                 depth = 1, // We don't expect s layer
             ) { candidate ->
@@ -806,7 +806,7 @@ class BuildLinkIT : AbstractDSLTestSupport() {
     @Test
     fun `Getting recursive links with deep depth and label filtering`() {
         forRecursiveLinks { label, p, builds ->
-            val links = structureService.getQualifiedBuildsUsedBy(
+            val links = structureService.getBuildDependencyLinks(
                 build = p,
                 depth = 10,
             ) { candidate ->

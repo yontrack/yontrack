@@ -142,7 +142,7 @@ class OnPromotionValidationEventListener(
         val stampsPerBranch = mutableMapOf<Int, List<Pair<ValidationStamp, OnPromotionValidationConfig>>>()
         var offset = 0
         do {
-            val page = structureService.getQualifiedBuildsUsing(promoted, offset, PAGE_SIZE)
+            val page = structureService.getBuildConsumerLinks(promoted, offset, PAGE_SIZE)
             page.pageItems.forEach { link ->
                 val consumer = link.build
                 stampsPerBranch.getOrPut(consumer.branch.id()) { stampsOf(consumer) }

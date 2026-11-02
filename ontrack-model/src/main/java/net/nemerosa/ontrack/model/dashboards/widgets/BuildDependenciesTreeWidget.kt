@@ -6,7 +6,7 @@ import org.springframework.stereotype.Component
 class BuildDependenciesTreeWidget : AbstractWidget<BuildDependenciesTreeWidgetConfig>(
     key = "home/BuildDependenciesTree",
     name = "Build dependencies tree",
-    description = "Displays the downstream dependency tree for the latest build promoted to a given promotion level.",
+    description = "Displays the dependency tree for the latest build promoted to a given promotion level.",
     defaultConfig = BuildDependenciesTreeWidgetConfig(),
     preferredHeight = 30,
 )

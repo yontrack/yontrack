@@ -36,7 +36,7 @@ class IngestionLinksEventProcessor(
         }
         // Gets the existing links
         val existingLinks =
-            structureService.getQualifiedBuildsUsedBy(build, size = Int.MAX_VALUE).pageItems.toMutableList()
+            structureService.getBuildDependencyLinks(build, size = Int.MAX_VALUE).pageItems.toMutableList()
         // Added links
         val addedLinks = mutableSetOf<BuildLink>()
         // Adding all links of the input

@@ -32,7 +32,7 @@ class BuildLinkTemplatingSource(
             val mode = config.getString("mode")
                 ?.let { BuildLinkTemplatingSourceMode.valueOf(it.uppercase()) }
                 ?: BuildLinkTemplatingSourceMode.NAME
-            val linked = structureService.getQualifiedBuildsUsedBy(
+            val linked = structureService.getBuildDependencyLinks(
                 build = entity,
             ) { candidate ->
                 candidate.build.project.name == project && candidate.qualifier == qualifier

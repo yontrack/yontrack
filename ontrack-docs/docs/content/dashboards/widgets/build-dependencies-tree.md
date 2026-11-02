@@ -1,6 +1,6 @@
 # Build dependencies tree
 
-The **Build dependencies tree** widget displays the downstream dependency tree of the latest build promoted to a configured promotion level.
+The **Build dependencies tree** widget displays the dependency tree of the latest build promoted to a configured promotion level.
 
 ## Configuration
 
@@ -11,11 +11,11 @@ The **Build dependencies tree** widget displays the downstream dependency tree o
 
 ## Display
 
-Once configured, the widget fetches the latest build promoted to the selected promotion level and renders its full downstream dependency tree. Each node shows the project, branch, build name, creation date, and current promotions.
+Once configured, the widget fetches the latest build promoted to the selected promotion level and renders its full dependency tree. Each node shows the project, branch, build name, creation date, and current promotions.
 
 ![Build dependencies tree widget](build-dependencies-tree.png)
 
-The tree is expanded by default and supports up to 5 levels of downstream dependencies.
+The tree is expanded by default and supports up to 5 levels of dependencies.
 
 ## Empty state
 

@@ -7,21 +7,21 @@ import net.nemerosa.ontrack.model.structure.Project
 interface BuildLinkRepository {
 
     /**
-     * Counts the downstream links of a build.
+     * Counts the links from a build to the builds it uses.
      *
      * @return Number of links per project ID of the target builds
      */
-    fun getCountQualifiedBuildsUsedBy(build: Build): Map<Int, Int>
+    fun getCountBuildDependencyLinks(build: Build): Map<Int, Int>
 
     /**
-     * Counts the upstream links of a build.
+     * Counts the links to a build from the builds using it.
      *
      * @return Number of links per project ID of the source builds
      */
-    fun getCountQualifiedBuildsUsing(build: Build): Map<Int, Int>
+    fun getCountBuildConsumerLinks(build: Build): Map<Int, Int>
 
-    fun getQualifiedBuildsUsedBy(build: Build): List<BuildLink>
-    fun getQualifiedBuildsUsing(build: Build): List<BuildLink>
+    fun getBuildDependencyLinks(build: Build): List<BuildLink>
+    fun getBuildConsumerLinks(build: Build): List<BuildLink>
 
     /**
      * Creates a link, or keeps it if it exists already.

@@ -108,7 +108,7 @@ abstract class AbstractChangeLogTemplatingService<C>(
     private fun collectAllQualifiers(projectName: String, vararg builds: Build): List<String> {
         val qualifiers = mutableSetOf<String>()
         for (build in builds) {
-            val linkQualifiers = structureService.getQualifiedBuildsUsedBy(build, size = 100) {
+            val linkQualifiers = structureService.getBuildDependencyLinks(build, size = 100) {
                 it.build.project.name == projectName
             }.pageItems.map { it.qualifier }.filter { it.isNotBlank() }.toSet()
             qualifiers += linkQualifiers

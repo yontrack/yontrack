@@ -1,6 +1,6 @@
 import {Skeleton, Space, Tree} from "antd";
 import {useQuery} from "@components/services/GraphQL";
-import {buildDownstreamTreeData, buildQueryDownstreamOnly} from "@components/links/BuildLinksUtils";
+import {buildDependencyTreeData, buildQueryDependenciesOnly} from "@components/links/BuildLinksUtils";
 import BuildLinksTreeNode from "@components/links/BuildLinksTreeNode";
 import CloseableAlert from "@components/common/CloseableAlert";
 
@@ -9,13 +9,13 @@ const NO_TREE_DATA = []
 export default function BuildLinksTree({build, changeDependencyLinksMode}) {
 
     const {data: treeData, loading, finished} = useQuery(
-        buildQueryDownstreamOnly,
+        buildQueryDependenciesOnly,
         {
             variables: {buildId: Number(build?.id)},
             deps: [build],
             condition: !!build,
             initialData: NO_TREE_DATA,
-            dataFn: data => [buildDownstreamTreeData(data.build)],
+            dataFn: data => [buildDependencyTreeData(data.build)],
         }
     )
 
@@ -31,8 +31,8 @@ export default function BuildLinksTree({build, changeDependencyLinksMode}) {
                         id="tree-view-alert"
                         message={
                             <>
-                                The tree view below displays only downstream dependencies. To get also
-                                upstream dependencies, switch to the <a onClick={switchToGraphView}>graph</a> view.
+                                The tree view below displays only what this build depends on. To get also
+                                what uses it, switch to the <a onClick={switchToGraphView}>graph</a> view.
                             </>
                         }
                         type="info"

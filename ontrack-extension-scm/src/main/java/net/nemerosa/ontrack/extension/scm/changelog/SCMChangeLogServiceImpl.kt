@@ -19,7 +19,7 @@ class SCMChangeLogServiceImpl(
         dependencyProject: String,
         dependencyQualifier: String,
     ): Build? =
-        structureService.getQualifiedBuildsUsedBy(build, size = 1) {
+        structureService.getBuildDependencyLinks(build, size = 1) {
             it.build.branch.project.name == dependencyProject &&
                     it.qualifier == dependencyQualifier
         }.pageItems.firstOrNull()?.build

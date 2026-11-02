@@ -151,22 +151,22 @@ interface StructureService {
     fun deleteBuildLink(fromBuild: Build, toBuild: Build, qualifier: String)
 
     /**
-     * Gets the total number of downstream links, leaving out the builds the current user cannot see
+     * Gets the total number of links to the builds used by this one, leaving out the builds the current user cannot see
      *
      * @param build  Source build
-     * @return Number of downstream links
+     * @return Number of dependency links
      */
-    fun getCountQualifiedBuildsUsedBy(
+    fun getCountBuildDependencyLinks(
         build: Build,
     ): Int
 
     /**
-     * Gets the total number of upstream links, leaving out the builds the current user cannot see
+     * Gets the total number of links from the builds using this one, leaving out the builds the current user cannot see
      *
      * @param build  Target build
-     * @return Number of upstream links
+     * @return Number of consumer links
      */
-    fun getCountQualifiedBuildsUsing(
+    fun getCountBuildConsumerLinks(
         build: Build,
     ): Int
 
@@ -180,7 +180,7 @@ interface StructureService {
      * @param filter Optional filter on the build link
      * @return List of qualified build links which are used by the given one
      */
-    fun getQualifiedBuildsUsedBy(
+    fun getBuildDependencyLinks(
         build: Build,
         offset: Int = 0,
         size: Int = 10,
@@ -197,7 +197,7 @@ interface StructureService {
      * @param filter Optional filter on the build links
      * @return List of builds which use the given one
      */
-    fun getQualifiedBuildsUsing(build: Build, offset: Int = 0, size: Int = 10, filter: (BuildLink) -> Boolean = { true }): PaginatedList<BuildLink>
+    fun getBuildConsumerLinks(build: Build, offset: Int = 0, size: Int = 10, filter: (BuildLink) -> Boolean = { true }): PaginatedList<BuildLink>
 
     fun editBuildLinks(build: Build, form: BuildLinkForm)
 

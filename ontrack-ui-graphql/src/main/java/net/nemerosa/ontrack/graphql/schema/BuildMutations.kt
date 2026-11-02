@@ -174,7 +174,7 @@ class BuildMutations(
             input = DeleteBuildLinksInput::class
         ) { input ->
             val from = structureService.getBuild(ID.of(input.fromBuild))
-            val links = structureService.getQualifiedBuildsUsedBy(from, size = Int.MAX_VALUE / 2)
+            val links = structureService.getBuildDependencyLinks(from, size = Int.MAX_VALUE / 2)
             links.pageItems
                 .filter { input.project == null || it.build.project.name == input.project }
                 .filter { input.qualifier == null || it.qualifier == input.qualifier }

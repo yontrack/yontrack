@@ -137,7 +137,7 @@ class BuildController(
         @RequestParam(defaultValue = "10") size: Int
     ): ResponseEntity<List<Build>> {
         return ResponseEntity.ok(
-            structureService.getQualifiedBuildsUsedBy(
+            structureService.getBuildDependencyLinks(
                 structureService.getBuild(buildId),
                 offset,
                 size
@@ -158,7 +158,7 @@ class BuildController(
         @RequestParam(defaultValue = "10") size: Int
     ): ResponseEntity<List<Build>> {
         return ResponseEntity.ok(
-            structureService.getQualifiedBuildsUsing(
+            structureService.getBuildConsumerLinks(
                 structureService.getBuild(buildId),
                 offset,
                 size

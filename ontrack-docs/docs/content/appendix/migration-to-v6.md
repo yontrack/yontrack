@@ -658,6 +658,25 @@ Yontrack 7. Each use of one of them is counted in `ontrack_deprecated_usage_tota
 | The `Query.search(type)` argument                      | `types`, a list of types                                      |
 | The `SearchResults.pageInfo` field                     | `total`, with the `offset` and `size` arguments of `search`   |
 | The `SearchResults.pageItems` field                    | `items`                                                       |
+| The `Branch.downstreamLinks` field                     | `dependencyLinks`, which returns the same links               |
+| The `Branch.upstreamLinks` field                       | `consumerLinks`, which returns the same links                 |
+| The `Build.autoVersioning(direction)` argument         | `refRole`: `DOWN` is `CONSUMER`, `UP` is `DEPENDENCY`         |
+| The `Branch.autoVersioning(direction)` argument        | `refRole`: `DOWN` is `CONSUMER`, `UP` is `DEPENDENCY`         |
+
+### Build links
+
+Build links are now named by their two sides: a [dependency](../concepts/model/build-links.md) is what
+a build uses, and a consumer what uses it. The sections of the build page, the popover of the link
+decoration and the view tooltips now read **Depends on** and **Used by**.
+
+The data of the build link decoration gets new keys. A key inside a JSON value cannot be counted, so
+these two are the exception to the rule above: they get **no runtime warning**, neither in the metric
+nor in the logs.
+
+| Deprecated                                | Use instead       |
+|-------------------------------------------|-------------------|
+| `BuildLinkDecorationList.linksCount`      | `dependencyCount` |
+| `BuildLinkDecorationList.upstreamCount`   | `consumerCount`   |
 
 ### REST API
 

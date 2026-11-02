@@ -42,7 +42,7 @@ class BuildLinksGraphQLIT : AbstractQLKTITSupport() {
                 checkGraphQLUserErrors(data, "linkBuild") { payload ->
                     assertEquals(build1.id(), payload.path("build").path("id").asInt())
                     assertNotNull(
-                        structureService.getQualifiedBuildsUsedBy(build1).pageItems.find { it.build.id == build2.id },
+                        structureService.getBuildDependencyLinks(build1).pageItems.find { it.build.id == build2.id },
                         "Link has been created"
                     )
                 }
@@ -133,7 +133,7 @@ class BuildLinksGraphQLIT : AbstractQLKTITSupport() {
                     assertEquals(build0.id(), payload.path("build").path("id").asInt())
                     (0..2).forEach { no ->
                         assertNotNull(
-                            structureService.getQualifiedBuildsUsedBy(build0).pageItems.find { it.build.id == builds[no].id },
+                            structureService.getBuildDependencyLinks(build0).pageItems.find { it.build.id == builds[no].id },
                             "Link has been created"
                         )
                     }
@@ -168,7 +168,7 @@ class BuildLinksGraphQLIT : AbstractQLKTITSupport() {
                 checkGraphQLUserErrors(data, "linkBuildById") { payload ->
                     assertEquals(build1.id(), payload.path("build").path("id").asInt())
                     assertNotNull(
-                        structureService.getQualifiedBuildsUsedBy(build1).pageItems.find { it.build.id == build2.id },
+                        structureService.getBuildDependencyLinks(build1).pageItems.find { it.build.id == build2.id },
                         "Link has been created"
                     )
                 }

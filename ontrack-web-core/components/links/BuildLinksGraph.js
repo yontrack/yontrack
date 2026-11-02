@@ -29,9 +29,9 @@ function BuildLinksFlow({build}) {
     }
 
     /**
-     * A _box_ is the aggregation of build upstream dependencies for the same project and qualifier.
+     * A _box_ is the aggregation of the consumers of a build for the same project and qualifier.
      */
-    const collectUpstreamBoxes = (build, currentBox, boxes) => {
+    const collectConsumerBoxes = (build, currentBox, boxes) => {
         build.usedByQualified?.pageItems?.forEach(link => {
             const parent = link.build
             const parentBoxId = parent.branch.project.name
@@ -57,14 +57,14 @@ function BuildLinksFlow({build}) {
                 parentBox.children[currentBox.id] = currentBox
             }
 
-            collectUpstreamBoxes(parent, parentBox, boxes)
+            collectConsumerBoxes(parent, parentBox, boxes)
         })
     }
 
-    const collectUpstreamNodes = (rootNodeId, build, nodes, edges, nodesCache, edgesCache) => {
+    const collectConsumerNodes = (rootNodeId, build, nodes, edges, nodesCache, edgesCache) => {
 
         const boxes = {}
-        collectUpstreamBoxes(build, {
+        collectConsumerBoxes(build, {
             id: rootNodeId,
         }, boxes)
 
@@ -109,7 +109,7 @@ function BuildLinksFlow({build}) {
         }
     }
 
-    const collectDownstreamNodes = (build, nodes, edges, nodesCache, edgesCache) => {
+    const collectDependencyNodes = (build, nodes, edges, nodesCache, edgesCache) => {
         // Adds the current build as a node
         const nodeId = String(build.id)
         if (!nodesCache[nodeId]) {
@@ -121,7 +121,7 @@ function BuildLinksFlow({build}) {
         build.usingQualified?.pageItems?.forEach(link => {
             const child = link.build
             // Build the child node
-            collectDownstreamNodes(child, nodes, edges, nodesCache, edgesCache)
+            collectDependencyNodes(child, nodes, edges, nodesCache, edgesCache)
             // Adding an edge
             let edgeId = `${build.id}-${child.id}`
             const cachedEdge = edgesCache[edgeId]
@@ -182,8 +182,8 @@ function BuildLinksFlow({build}) {
             const nodesCache = {}
             const edgesCache = {}
 
-            // Building all downstream nodes recursively
-            const rootNodeId = collectDownstreamNodes(
+            // Building all dependency nodes recursively
+            const rootNodeId = collectDependencyNodes(
                 data.build,
                 nodes,
                 edges,
@@ -194,8 +194,8 @@ function BuildLinksFlow({build}) {
             // Selecting the root node
             nodesCache[rootNodeId].data.selected = true
 
-            // Building all upstream nodes recursively
-            collectUpstreamNodes(
+            // Building all consumer nodes recursively
+            collectConsumerNodes(
                 rootNodeId,
                 data.build,
                 nodes,

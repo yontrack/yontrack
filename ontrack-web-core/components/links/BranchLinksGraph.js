@@ -95,10 +95,10 @@ function BranchLinksFlow({branch, loadPullRequests, loadPullRequestsCount}) {
         }
     }
 
-    const collectDownstreamNodes = (startNode, nodes, edges, nodesCache, edgesCache) => {
+    const collectDependencyNodes = (startNode, nodes, edges, nodesCache, edgesCache) => {
         const {branch} = startNode.data
 
-        branch.downstreamLinks?.forEach(link => {
+        branch.dependencyLinks?.forEach(link => {
             const qualifier = link.qualifier
             const childBranch = link.branch
 
@@ -151,14 +151,14 @@ function BranchLinksFlow({branch, loadPullRequests, loadPullRequestsCount}) {
             }
 
             // Iteration
-            collectDownstreamNodes(childNode, nodes, edges, nodesCache, edgesCache)
+            collectDependencyNodes(childNode, nodes, edges, nodesCache, edgesCache)
         })
     }
 
-    const collectUpstreamNodes = (startNode, nodes, edges, nodesCache, edgesCache) => {
+    const collectConsumerNodes = (startNode, nodes, edges, nodesCache, edgesCache) => {
         const {branch} = startNode.data
 
-        branch.upstreamLinks?.forEach(link => {
+        branch.consumerLinks?.forEach(link => {
             const qualifier = link.qualifier
             const parentBranch = link.branch
 
@@ -211,14 +211,14 @@ function BranchLinksFlow({branch, loadPullRequests, loadPullRequestsCount}) {
             }
 
             // Iteration
-            collectUpstreamNodes(parentNode, nodes, edges, nodesCache, edgesCache)
+            collectConsumerNodes(parentNode, nodes, edges, nodesCache, edgesCache)
         })
     }
 
     const {autoRefreshCount} = useContext(AutoRefreshContext)
 
     const {data, loading, finished} = useQuery(
-        branchQuery({downstream: true, upstream: true}),
+        branchQuery({dependencies: true, consumers: true}),
         {
             variables: {
                 branchId: Number(branch?.id),
@@ -252,8 +252,8 @@ function BranchLinksFlow({branch, loadPullRequests, loadPullRequestsCount}) {
             nodes.push(rootNode)
             nodesCache[rootNode.id] = rootNode
 
-            collectDownstreamNodes(rootNode, nodes, edges, nodesCache, edgesCache)
-            collectUpstreamNodes(rootNode, nodes, edges, nodesCache, edgesCache)
+            collectDependencyNodes(rootNode, nodes, edges, nodesCache, edgesCache)
+            collectConsumerNodes(rootNode, nodes, edges, nodesCache, edgesCache)
 
             setNodes(nodes)
             setEdges(edges)

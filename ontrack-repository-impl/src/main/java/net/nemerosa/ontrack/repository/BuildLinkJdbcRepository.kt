@@ -46,7 +46,7 @@ class BuildLinkJdbcRepository(
         return !existing
     }
 
-    override fun getCountQualifiedBuildsUsedBy(build: Build): Map<Int, Int> =
+    override fun getCountBuildDependencyLinks(build: Build): Map<Int, Int> =
         countLinksPerProject(
             """
                 SELECT BR.PROJECTID, COUNT(BL.ID) AS LINKS
@@ -59,7 +59,7 @@ class BuildLinkJdbcRepository(
             build,
         )
 
-    override fun getCountQualifiedBuildsUsing(build: Build): Map<Int, Int> =
+    override fun getCountBuildConsumerLinks(build: Build): Map<Int, Int> =
         countLinksPerProject(
             """
                 SELECT BR.PROJECTID, COUNT(BL.ID) AS LINKS
@@ -80,7 +80,7 @@ class BuildLinkJdbcRepository(
         return counts
     }
 
-    override fun getQualifiedBuildsUsedBy(build: Build): List<BuildLink> {
+    override fun getBuildDependencyLinks(build: Build): List<BuildLink> {
         return namedParameterJdbcTemplate!!.query(
             """
                 SELECT B.*, BL.QUALIFIER AS QUALIFIER
@@ -98,7 +98,7 @@ class BuildLinkJdbcRepository(
         }
     }
 
-    override fun getQualifiedBuildsUsing(build: Build): List<BuildLink> {
+    override fun getBuildConsumerLinks(build: Build): List<BuildLink> {
         return namedParameterJdbcTemplate!!.query(
             """
                 SELECT F.*, BL.QUALIFIER 

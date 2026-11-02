@@ -1,7 +1,7 @@
 import {gql} from "graphql-request";
 
-const maxDownstreamDepth = 5
-const maxUpstreamDepth = 5
+const maxDependencyDepth = 5
+const maxConsumerDepth = 5
 
 const gqlBuildMinInfo = gql`
     fragment BuildMinInfo on Build {
@@ -56,7 +56,7 @@ const gqlBuildNodeInfo = gql`
     }
 `
 
-const gqlDownstreamBuildDependencies = (depth) => {
+const gqlBuildDependencyLinks = (depth) => {
     if (depth <= 0) {
         return ''
     } else {
@@ -66,7 +66,7 @@ const gqlDownstreamBuildDependencies = (depth) => {
                     qualifier
                     build {
                         ...BuildNodeInfo
-                        ${gqlDownstreamBuildDependencies(depth - 1)}
+                        ${gqlBuildDependencyLinks(depth - 1)}
                     }
                 }
               }
@@ -74,7 +74,7 @@ const gqlDownstreamBuildDependencies = (depth) => {
     }
 };
 
-const gqlUpstreamBuildDependencies = (depth) => {
+const gqlBuildConsumerLinks = (depth) => {
     if (depth <= 0) {
         return ''
     } else {
@@ -84,7 +84,7 @@ const gqlUpstreamBuildDependencies = (depth) => {
                     qualifier
                     build {
                         ...BuildNodeInfo
-                        ${gqlUpstreamBuildDependencies(depth - 1)}
+                        ${gqlBuildConsumerLinks(depth - 1)}
                     }
                 }
               }
@@ -97,32 +97,32 @@ export const buildQuery = `
         query RootBuild($buildId: Int!) {
             build(id: $buildId) {
                 ...BuildNodeInfo
-                ${gqlDownstreamBuildDependencies(maxDownstreamDepth)}
-                ${gqlUpstreamBuildDependencies(maxUpstreamDepth)}
+                ${gqlBuildDependencyLinks(maxDependencyDepth)}
+                ${gqlBuildConsumerLinks(maxConsumerDepth)}
             }
         }
         ${gqlBuildNodeInfo}
     `
 
 // noinspection GraphQLUnresolvedReference
-export const buildQueryDownstreamOnly = `
+export const buildQueryDependenciesOnly = `
         query RootBuild($buildId: Int!) {
             build(id: $buildId) {
                 ...BuildNodeInfo
-                ${gqlDownstreamBuildDependencies(maxDownstreamDepth)}
+                ${gqlBuildDependencyLinks(maxDependencyDepth)}
             }
         }
         ${gqlBuildNodeInfo}
     `
 
-export function buildDownstreamTreeData(build, qualifier, pathKey = `${build.id}`) {
+export function buildDependencyTreeData(build, qualifier, pathKey = `${build.id}`) {
     return {
         key: pathKey,
         title: build.name,
         qualifier: qualifier,
         build: build,
         children: build.usingQualified ? build.usingQualified.pageItems.map((link, index) =>
-            buildDownstreamTreeData(link.build, link.qualifier, `${pathKey}:${index}`)
+            buildDependencyTreeData(link.build, link.qualifier, `${pathKey}:${index}`)
         ) : []
     }
 }

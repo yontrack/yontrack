@@ -116,14 +116,14 @@ class BuildLinkSearchExtension(
      * All the links from a build
      */
     private fun linksFrom(build: Build): List<BuildLink> = securityService.asAdmin {
-        structureService.getQualifiedBuildsUsedBy(build, offset = 0, size = ALL).pageItems
+        structureService.getBuildDependencyLinks(build, offset = 0, size = ALL).pageItems
     }
 
     /**
      * All the links to a build
      */
     private fun linksTo(build: Build): List<BuildLink> = securityService.asAdmin {
-        structureService.getQualifiedBuildsUsing(build, offset = 0, size = ALL).pageItems
+        structureService.getBuildConsumerLinks(build, offset = 0, size = ALL).pageItems
     }
 
     private fun key(from: Build, to: Build, qualifier: String) = "${from.id}::${to.id}::$qualifier"

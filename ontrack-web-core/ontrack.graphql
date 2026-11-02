@@ -650,14 +650,16 @@ type Branch implements Authorizable & ProjectEntity {
   artifactoryPromotionSyncProperty: Property
   "Authorizations for this context"
   authorizations: [Authorization!]!
-  "Auto versioning information for this build, in regards of a parent branch"
+  "Auto versioning information for this build, in regards of a consumer branch, or of a dependency according to refRole."
   autoVersioning(
-    "ID of the parent branch. Is overridden by the buildId argument, but at least one of each is required."
+    "ID of the consumer branch, or of the dependency according to refRole. Is overridden by the buildId argument, but at least one of each is required."
     branchId: Int,
-    "ID of the parent build. Takes precedence on the branchId argument, but at least one of each is required."
+    "ID of the consumer build, or of the dependency according to refRole. Takes precedence on the branchId argument, but at least one of each is required."
     buildId: Int,
-    "Downstream or upstream dependencies (down by default)."
-    direction: AutoVersioningDirection
+    "What buildId or branchId refers to: DOWN for a consumer, UP for a dependency."
+    direction: AutoVersioningDirection @deprecated(reason : "Removed in V7. Use refRole instead. See #2130"),
+    "What buildId or branchId refers to, CONSUMER by default."
+    refRole: AutoVersioningRefRole
   ): BuildAutoVersioning
   "Auto versioning configuration"
   autoVersioningConfig: AutoVersioningConfig
@@ -687,6 +689,11 @@ type Branch implements Authorizable & ProjectEntity {
     "Size of the page"
     size: Int = 20
   ): BuildPaginated
+  "List of branches this branch is a dependency of."
+  consumerLinks(
+    "Number of builds to use to get the consumers"
+    builds: Int
+  ): [BranchLink!]!
   creation: Signature
   "List of decorations"
   decorations(
@@ -695,6 +702,11 @@ type Branch implements Authorizable & ProjectEntity {
   ): [Decoration!]!
   "What a build on this branch has to pass through on its way to an environment"
   deliveryMap: DeliveryMap!
+  "List of branches this branch depends on."
+  dependencyLinks(
+    "Number of builds to use to get the dependencies"
+    builds: Int
+  ): [BranchLink!]!
   description: String
   disabled: Boolean!
   "Display name for this branch or the branch's name if not available"
@@ -703,7 +715,7 @@ type Branch implements Authorizable & ProjectEntity {
   downstreamLinks(
     "Number of builds to use to get the dependencies"
     builds: Int
-  ): [BranchLink!]!
+  ): [BranchLink!]! @deprecated(reason : "Removed in V7. Use dependencyLinks instead. See #2130")
   "Is this branch a favourite of the current user?"
   favourite: Boolean
   "Summary of the security findings of the branch: its open findings by severity, and the number of its accepted and resolved ones. Null for a user who is not granted the view of the findings of the project."
@@ -750,9 +762,9 @@ type Branch implements Authorizable & ProjectEntity {
   scmBranchInfo: SCMBranchInfo
   "List of branches this branch is a dependency of."
   upstreamLinks(
-    "Number of builds to use to get the dependencies"
+    "Number of builds to use to get the consumers"
     builds: Int
-  ): [BranchLink!]!
+  ): [BranchLink!]! @deprecated(reason : "Removed in V7. Use consumerLinks instead. See #2130")
   "List of actions available for this entity"
   userMenuActions: [UserMenuAction!]!
   "List of issues reported into the validation run statuses"
@@ -850,14 +862,16 @@ type Build implements Authorizable & ProjectEntity {
     "ID of the promotion level, which must belong to the build's branch"
     promotionLevelId: Int!
   ): AutoPromotionBuildConditions
-  "Auto versioning information for this build, in regards of a parent branch"
+  "Auto versioning information for this build, in regards of a consumer branch, or of a dependency according to refRole."
   autoVersioning(
-    "ID of the parent branch. Is overridden by the buildId argument, but at least one of each is required."
+    "ID of the consumer branch, or of the dependency according to refRole. Is overridden by the buildId argument, but at least one of each is required."
     branchId: Int,
-    "ID of the parent build. Takes precedence on the branchId argument, but at least one of each is required."
+    "ID of the consumer build, or of the dependency according to refRole. Takes precedence on the branchId argument, but at least one of each is required."
     buildId: Int,
-    "Downstream or upstream dependencies (down by default)."
-    direction: AutoVersioningDirection
+    "What buildId or branchId refers to: DOWN for a consumer, UP for a dependency."
+    direction: AutoVersioningDirection @deprecated(reason : "Removed in V7. Use refRole instead. See #2130"),
+    "What buildId or branchId refers to, CONSUMER by default."
+    refRole: AutoVersioningRefRole
   ): BuildAutoVersioning
   "Reference to branch"
   branch: Branch
@@ -9746,7 +9760,7 @@ enum AutoVersioningAuditState {
   THROTTLED
 }
 
-"List of directions when getting auto versioning information between two builds."
+"What the reference build or branch is when getting auto versioning information between two builds: DOWN for a consumer, UP for a dependency."
 enum AutoVersioningDirection {
   DOWN
   UP
@@ -9765,6 +9779,12 @@ enum AutoVersioningNotificationScope {
 enum AutoVersioningPushMode {
   PR
   PUSH
+}
+
+"What the reference build or branch is when getting auto versioning information between two builds."
+enum AutoVersioningRefRole {
+  CONSUMER
+  DEPENDENCY
 }
 
 "Where a build stands in a slot"

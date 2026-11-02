@@ -12,7 +12,7 @@ class BranchLinksServiceIT : AbstractDSLTestSupport() {
     private lateinit var branchLinksService: BranchLinksService
 
     @Test
-    fun `Downstream dependencies with multiple source builds`() {
+    fun `Dependency links with multiple source builds`() {
         asAdmin {
             val targetBranch = project().branch()
             val targetBuild1 = targetBranch.build("1")
@@ -28,10 +28,10 @@ class BranchLinksServiceIT : AbstractDSLTestSupport() {
                     // sourceBuild2 -> targetBuild2
                     sourceBuild2.linkTo(targetBuild2)
 
-                    // Get downstream dependencies for the source branch
+                    // Get the dependency links of the source branch
                     // It should only return the link from the most recent build (sourceBuild2)
                     // to the target build it points to (targetBuild2)
-                    val links = branchLinksService.getDownstreamDependencies(this, 10)
+                    val links = branchLinksService.getDependencyLinks(this, 10)
                     assertEquals(1, links.size)
                     assertEquals(targetBranch.id, links[0].branch.id)
                     assertEquals(sourceBuild2.id, links[0].sourceBuild.id)
@@ -42,7 +42,7 @@ class BranchLinksServiceIT : AbstractDSLTestSupport() {
     }
 
     @Test
-    fun `Downstream dependencies with multiple target builds for the same source build`() {
+    fun `Dependency links with multiple target builds for the same source build`() {
         asAdmin {
             val targetBranch = project().branch()
             val targetBuild1 = targetBranch.build("1")
@@ -57,9 +57,9 @@ class BranchLinksServiceIT : AbstractDSLTestSupport() {
                     sourceBuild.linkTo(targetBuild1)
                     sourceBuild.linkTo(targetBuild2)
 
-                    // Get downstream dependencies for the source branch
+                    // Get the dependency links of the source branch
                     // It should return the link to the most recent target build
-                    val links = branchLinksService.getDownstreamDependencies(this, 10)
+                    val links = branchLinksService.getDependencyLinks(this, 10)
                     assertEquals(1, links.size)
                     assertEquals(targetBranch.id, links[0].branch.id)
                     assertEquals(sourceBuild.id, links[0].sourceBuild.id)
@@ -70,7 +70,7 @@ class BranchLinksServiceIT : AbstractDSLTestSupport() {
     }
 
     @Test
-    fun `Upstream dependencies with multiple target builds`() {
+    fun `Consumer links with multiple target builds`() {
         asAdmin {
             val sourceBranch = project().branch()
             val sourceBuild1 = sourceBranch.build("1")
@@ -86,9 +86,9 @@ class BranchLinksServiceIT : AbstractDSLTestSupport() {
                     // sourceBuild2 -> targetBuild2
                     sourceBuild2.linkTo(targetBuild2)
 
-                    // Get upstream dependencies for the target branch
-                    // In this case targetBranch USES sourceBranch, so sourceBranch is UPSTREAM of targetBranch.
-                    val links = branchLinksService.getUpstreamDependencies(this, 10)
+                    // Get the consumer links of the target branch
+                    // In this case sourceBranch uses targetBranch, so sourceBranch is a consumer of targetBranch.
+                    val links = branchLinksService.getConsumerLinks(this, 10)
                     assertEquals(1, links.size)
                     assertEquals(sourceBranch.id, links[0].branch.id)
                     assertEquals(sourceBuild2.id, links[0].sourceBuild.id)
@@ -99,7 +99,7 @@ class BranchLinksServiceIT : AbstractDSLTestSupport() {
     }
 
     @Test
-    fun `Downstream dependencies with qualifiers`() {
+    fun `Dependency links with qualifiers`() {
         asAdmin {
             val targetBranch = project().branch()
             val targetBuild1 = targetBranch.build("1")
@@ -112,7 +112,7 @@ class BranchLinksServiceIT : AbstractDSLTestSupport() {
                     sourceBuild.linkTo(targetBuild1, "qualifier-1")
                     sourceBuild.linkTo(targetBuild2, "qualifier-2")
 
-                    val links = branchLinksService.getDownstreamDependencies(this, 10)
+                    val links = branchLinksService.getDependencyLinks(this, 10)
                     assertEquals(2, links.size)
                     
                     val link1 = links.find { it.qualifier == "qualifier-1" }
@@ -143,7 +143,7 @@ class BranchLinksServiceIT : AbstractDSLTestSupport() {
                     // sourceBuild2 -> targetBuild1
                     sourceBuild2.linkTo(targetBuild1)
 
-                    val links = branchLinksService.getDownstreamDependencies(this, 10)
+                    val links = branchLinksService.getDependencyLinks(this, 10)
                     assertEquals(1, links.size)
                     
                     // It should keep the link that points to the most recent SOURCE build
@@ -170,7 +170,7 @@ class BranchLinksServiceIT : AbstractDSLTestSupport() {
                     sourceBuild1.linkTo(targetBuild)
                     sourceBuild2.linkTo(targetBuild)
 
-                    val links = branchLinksService.getDownstreamDependencies(this, 10)
+                    val links = branchLinksService.getDependencyLinks(this, 10)
                     assertEquals(1, links.size, "Only one link expected for the target branch")
                     assertEquals(targetBranch.id, links[0].branch.id)
                     assertEquals(sourceBuild2.id, links[0].sourceBuild.id, "Expected link from 1.40.8")
@@ -180,7 +180,7 @@ class BranchLinksServiceIT : AbstractDSLTestSupport() {
         }
     }
     @Test
-    fun `Multiple target builds pointing to the same source build (upstream)`() {
+    fun `Multiple target builds pointing to the same source build (consumers)`() {
         asAdmin {
             val sourceProject = project()
             val sourceBranch = sourceProject.branch("main")
@@ -195,7 +195,7 @@ class BranchLinksServiceIT : AbstractDSLTestSupport() {
                     targetBuild1.linkTo(sourceBuild)
                     targetBuild2.linkTo(sourceBuild)
 
-                    val links = branchLinksService.getUpstreamDependencies(sourceBranch, 10)
+                    val links = branchLinksService.getConsumerLinks(sourceBranch, 10)
                     assertEquals(1, links.size, "Only one link expected for the target branch")
                     assertEquals(this.id, links[0].branch.id)
                     assertEquals(targetBuild2.id, links[0].sourceBuild.id, "Expected link from 1.40.8")

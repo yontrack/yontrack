@@ -6,7 +6,7 @@ export default function BuildContentLinksUsedBy({build}) {
             <BuildContentLinks
                 build={build}
                 id="links-usedby"
-                title="Upstream links"
+                title="Used by"
                 fieldName="usedByQualified"
             />
         </>

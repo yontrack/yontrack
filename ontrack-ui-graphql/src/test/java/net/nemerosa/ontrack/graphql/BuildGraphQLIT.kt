@@ -1835,7 +1835,7 @@ class BuildGraphQLIT : AbstractQLKTITSupport() {
     }
 
     @Test
-    fun `Filtering downstream links using project name fragment`() {
+    fun `Filtering dependency links using project name fragment`() {
         val source = build()
         val prefix = uid("tgt-")
         val targets = (1..3).map { no ->
@@ -1867,7 +1867,7 @@ class BuildGraphQLIT : AbstractQLKTITSupport() {
     }
 
     @Test
-    fun `Filtering downstream links using project name fragment without a project argument`() {
+    fun `Filtering dependency links using project name fragment without a project argument`() {
         val source = build()
         val prefix = uid("tgt-")
         val targets = (1..3).map { no ->
@@ -1899,7 +1899,7 @@ class BuildGraphQLIT : AbstractQLKTITSupport() {
     }
 
     @Test
-    fun `Filtering upstream links using project name fragment`() {
+    fun `Filtering consumer links using project name fragment`() {
         val target = build()
         val prefix = uid("src-")
         val sources = (1..3).map { no ->
@@ -1936,7 +1936,7 @@ class BuildGraphQLIT : AbstractQLKTITSupport() {
     }
 
     @Test
-    fun `Filtering upstream links using project name fragment without a project argument`() {
+    fun `Filtering consumer links using project name fragment without a project argument`() {
         val target = build()
         val prefix = uid("src-")
         val sources = (1..3).map { no ->
