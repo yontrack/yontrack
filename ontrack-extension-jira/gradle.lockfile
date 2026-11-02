@@ -53,6 +53,7 @@ io.netty:netty-handler:4.2.18.Final=runtimeClasspath,testCompileClasspath,testRu
 io.netty:netty-resolver:4.2.18.Final=runtimeClasspath,testCompileClasspath,testRuntimeClasspath
 io.netty:netty-transport-native-unix-common:4.2.18.Final=runtimeClasspath,testCompileClasspath,testRuntimeClasspath
 io.netty:netty-transport:4.2.18.Final=runtimeClasspath,testCompileClasspath,testRuntimeClasspath
+io.opentelemetry:opentelemetry-bom:1.67.0=annotationProcessor,compileClasspath,runtimeClasspath,testAnnotationProcessor,testCompileClasspath,testRuntimeClasspath
 io.projectreactor:reactor-core:3.8.7=compileClasspath,runtimeClasspath,testCompileClasspath,testRuntimeClasspath
 jakarta.activation:jakarta.activation-api:2.1.4=runtimeClasspath,testCompileClasspath,testRuntimeClasspath
 jakarta.annotation:jakarta.annotation-api:3.0.0=runtimeClasspath,testCompileClasspath,testRuntimeClasspath

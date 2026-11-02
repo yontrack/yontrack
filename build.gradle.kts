@@ -339,6 +339,7 @@ configure(javaProjects) {
     val commonsBeanutilsVersion = "1.11.0"
     val tomcatVersion = "11.0.26"
     val jackson3Version = "3.1.7"
+    val openTelemetryVersion = "1.67.0"
 
     // The BOMs. The Spring Boot one is what io.spring.dependency-management imported; the other two
     // are the BOMs it imports itself, restated at the versions this build wants, in place of the
@@ -351,6 +352,10 @@ configure(javaProjects) {
         // backend image scan: CVE-2026-68497, CVE-2026-89407, CVE-2026-89425, CVE-2026-91776,
         // CVE-2026-91777 (fixed in 3.1.7). Remove once the Spring Boot BOM manages >= 3.1.7.
         "tools.jackson:jackson-bom:$jackson3Version",
+        // OpenTelemetry pinned past the Spring Boot BOM (4.1.1 manages 1.62.0, elasticsearch-java
+        // brings 1.63.0) to clear CVE-2026-118259 of the backend image scan (fixed in 1.67.0).
+        // Remove once the Spring Boot BOM manages >= 1.67.0.
+        "io.opentelemetry:opentelemetry-bom:$openTelemetryVersion",
     )
 
     // The former `dependencyManagement { dependencies { ... } }` entries, one constraint each.
