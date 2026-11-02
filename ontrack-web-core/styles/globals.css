@@ -496,9 +496,13 @@ button.ot-validation-stamp-filter-edition {
  * Greyed so that it can be told from a granted medal at a glance. An uploaded image is faded too, since
  * a greyed silver medal looks like a granted one, but not a generated tile: its initials must stay
  * readable. The outline is on the medal and not on the image, so the fading leaves it alone.
+ *
+ * Aligned on the middle: left on the baseline, a medal holding an image has no text to give it one, so
+ * it stands on the baseline at the image's bottom edge, above the descent of the line, higher than the others.
  */
 .ot-promotion-not-granted {
     display: inline-flex;
+    vertical-align: middle;
     border-radius: 4px;
 }
 

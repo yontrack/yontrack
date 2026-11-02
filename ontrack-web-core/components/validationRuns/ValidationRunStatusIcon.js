@@ -90,6 +90,9 @@ export default function ValidationRunStatusIcon({
         width: size.box,
         height: size.box,
         flex: `0 0 ${size.box}px`,
+        // On the baseline, the mark would stand on what its glyph gives it, and on its
+        // bottom edge when it has none, so the empty mark would sit higher than the others.
+        verticalAlign: 'middle',
         borderRadius: shape.radius,
         backgroundColor: isRoot ? config.fill : 'transparent',
         border: isRoot

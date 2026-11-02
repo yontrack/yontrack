@@ -193,6 +193,45 @@ test('the not-granted medal of the branch builds view is greyed, and faded only 
     await expect(page.locator(`.promotion-run-pl-${bronze.id} [data-testid="promotion-level-icon-${bronze.id}"]`)).toHaveCSS('filter', 'none')
 })
 
+test('the medals and the validations of the branch builds view are aligned, granted or not, images or not, run or not', async ({page, ontrack}) => {
+    const {branch, build, bronze, silver, gold} = await setup(ontrack, {grantSilver: false})
+    await gold.setAutoPromotionProperty({include: '.*TESTS'})
+    const iron = await branch.createPromotionLevel('IRON')
+    await build.promote(iron)
+
+    await login(page, ontrack)
+    for (const level of [iron, gold]) {
+        const levelPage = new PromotionLevelPage(page, level)
+        await levelPage.goTo()
+        await levelPage.changeImage(path.join(__dirname, 'gold.png'))
+        await levelPage.checkImage()
+    }
+
+    const branchPage = new BranchPage(page, branch)
+    await branchPage.goTo()
+
+    const medals = {
+        'granted, generated tile': page.locator(`.promotion-run-pl-${bronze.id} [data-testid="promotion-level-icon-${bronze.id}"]`),
+        'granted, image': page.locator(`.promotion-run-pl-${iron.id} [data-testid="promotion-level-image-${iron.id}"]`),
+        'not granted, generated tile': branchPage.notGrantedMedal(build, silver).getByTestId(`promotion-level-icon-${silver.id}`),
+        'not granted, image': branchPage.notGrantedMedal(build, gold).getByTestId(`promotion-level-image-${gold.id}`),
+        'validation passed': page.locator('[data-status="PASSED"]').first(),
+        'validation failed': page.locator('[data-status="FAILED"]').first(),
+        'validation not run': page.locator('[data-status="NONE"]').first(),
+    }
+    const centers = {}
+    for (const [name, medal] of Object.entries(medals)) {
+        await expect(medal).toBeVisible()
+        const {y, height} = await medal.boundingBox()
+        centers[name] = y + height / 2
+    }
+
+    const expected = centers['granted, generated tile']
+    for (const name of Object.keys(medals)) {
+        expect.soft(Math.abs(centers[name] - expected), `${name}: ${JSON.stringify(centers)}`).toBeLessThanOrEqual(1)
+    }
+})
+
 test('the branch builds view has no not-granted medal for a level without auto promotion', async ({page, ontrack}) => {
     const {branch, build, silver, gold} = await setup(ontrack, {grantSilver: false})
 
