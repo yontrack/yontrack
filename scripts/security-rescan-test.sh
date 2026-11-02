@@ -439,6 +439,7 @@ fi
 case "$*" in
     *state=open*) cat "$STUB_GH_OPEN" ;;
     *state=resolved*) cat "$STUB_GH_RESOLVED" ;;
+    *"-i /versions"*) printf 'HTTP/2.0 200 OK\r\nX-Github-Api-Version-Selected: 2022-11-28\r\n\r\n["2022-11-28"]\n' ;;
 esac
 STUB
 chmod +x "$WORK/bin/gh"
@@ -466,6 +467,14 @@ accepted=2" "$(cat "$WORK/github_output")" "secrets: writes the counts to GITHUB
 assert_contains "$out" "secrets=3" "secrets: prints the counts in the log"
 assert_not_contains "$out" "SUPERSECRETVALUE" "secrets: and prints nothing else about the alerts"
 assert_not_contains "$out" "secret_type" "secrets: nor what kind of secret it is"
+
+# The version the evidence records: the API version that answered, from the API itself (#2128).
+secrets_stubs
+assert_eq "2022-11-28" "$(PATH="$WORK/bin:$PATH" srs_api_version)" "api-version: the version GitHub selected"
+assert_contains "$(calls)" "gh api -i /versions" "api-version: asked of the API"
+assert_eq "" "$(PATH="$WORK/bin:$PATH" STUB_GH_FAIL=1 srs_api_version 2>/dev/null)" "api-version: nothing when it cannot be read"
+PATH="$WORK/bin:$PATH" STUB_GH_FAIL=1 srs_api_version > /dev/null 2>&1
+assert_eq "0" "$?" "api-version: which must not fail the step that reads the alerts"
 
 secrets_stubs
 STUB_GH_OPEN="$WORK/alerts-empty.json"

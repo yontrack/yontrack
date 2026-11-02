@@ -181,7 +181,9 @@ upgraded yet.
 - The workflow prints **counts only**. No URL, no parameter, no evidence.
 - It uploads **no artifact**. Deliberately. Do not add one.
 - The detail goes to `yontrack/security-reports` — private, one file per run, never rewritten.
-- The validation run points at the workflow run, never at the report.
+- The validation run points at the workflow run, never at the report. Its evidence pins the report
+  by path and SHA-256 without exposing it: see *Disclosure* in
+  [`security/dast/README.md`](../../security/dast/README.md), and [the stamps' evidence](ci-evidence.md).
 - Anything a scanner writes to its own stdout goes through `scripts/security-dast.sh scrub` first.
   The ZAP log carries both crawled URLs and, when it echoes the plan back, the API token.
 - The scanner roles' tokens are registered as masks, and `scrub` and `report` redact every one of

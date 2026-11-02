@@ -94,6 +94,11 @@
 #   report-path               Prints the path the report takes in yontrack/security-reports.
 #   publish REPO PATH FILE    Creates PATH in REPO with the contents of FILE. Never updates: one
 #                             file per run, never rewritten.
+#   tool-versions FILE...     Prints the scanners of normalised findings documents with the version
+#                             each reports, on one line, for the evidence of the stamp (#2128).
+#   manifest REPORT PATH OUT  Writes to OUT the evidence that pins the private report in the trail
+#                             (#2128): PATH, where it is published, and the SHA-256 of REPORT. No
+#                             count and no finding.
 #   scrub                     Copies stdin to stdout with URLs and every token redacted. Every
 #                             byte a scanner writes goes through this before it can reach a log.
 #
@@ -1889,6 +1894,28 @@ sd_publish() {
     return 0
 }
 
+# Each scanner once, sorted, those with a version first. The versions are the scanners' own, as
+# their reports give them, rather than a second copy of the pins.
+sd_tool_versions() {
+    jq -e -s -r '
+        map({scanner, version}) | unique
+        | (map(select(.version != null)) | map("\(.scanner) \(.version)"))
+          + (map(select(.version == null)) | map(.scanner))
+        | join(", ")
+    ' "$@" 2>/dev/null || { sd_fail "Could not read the versions of the scanners"; return 1; }
+}
+
+# What the signed trail holds of the private report: that it exists, where, and what it was. The
+# report itself is never attached - see security/dast/README.md.
+sd_manifest() {
+    local report="${1:-}" path="${2:-}" out="${3:-}" digest
+    [ -n "$path" ] && [ -n "$out" ] || { sd_fail "Usage: $0 manifest REPORT PATH OUT"; return 1; }
+    [ -f "$report" ] || { sd_fail "No report at $report"; return 1; }
+    digest="$(sd_sha256 "$report")" || { sd_fail "Could not hash the report"; return 1; }
+    jq -n --arg path "$path" --arg digest "$digest" '{reportPath: $path, sha256: $digest}' > "$out" \
+        || { sd_fail "Could not write the manifest"; return 1; }
+}
+
 sd_main() {
     local command="${1:-}"
     [ $# -gt 0 ] && shift
@@ -1915,9 +1942,11 @@ sd_main() {
         report) sd_report "$@" ;;
         report-path) sd_report_path ;;
         publish) sd_publish "$@" ;;
+        tool-versions) sd_tool_versions "$@" ;;
+        manifest) sd_manifest "$@" ;;
         scrub) sd_scrub ;;
         *)
-            echo "Usage: $0 query-schema|active-schema|access-control|normalize-access-control|login|whoami|render-plan|assert-authenticated|actuator|normalize-zap|assert-no-mutations|fetch|graphql-cop-preflight|render-graphql-cop-headers|assert-graphql-cop-no-mutations|normalize-graphql-cop|nuclei-preflight|nuclei-summary|normalize-nuclei|report|report-path|publish|scrub ..." >&2
+            echo "Usage: $0 query-schema|active-schema|access-control|normalize-access-control|login|whoami|render-plan|assert-authenticated|actuator|normalize-zap|assert-no-mutations|fetch|graphql-cop-preflight|render-graphql-cop-headers|assert-graphql-cop-no-mutations|normalize-graphql-cop|nuclei-preflight|nuclei-summary|normalize-nuclei|report|report-path|publish|tool-versions|manifest|scrub ..." >&2
             return 1
             ;;
     esac

@@ -48,7 +48,7 @@ env:
   # The JDK of the code measured: `main` builds on 25.
   SEARCH_PERF_JAVA: "25"
   # Pinned, like ci.yml's: an unpinned CLI lets a Yontrack release turn a green run red.
-  YONTRACK_CLI_VERSION: "5.7.0"
+  YONTRACK_CLI_VERSION: "6.1.0"
   # The Yontrack project ci.yml registers its builds in.
   YONTRACK_PROJECT: yontrack
   # Where searchPerfTest writes its report, under measured/.
@@ -149,6 +149,9 @@ jobs:
           BRANCH: ${{ steps.resolve.outputs.branch }}
           BUILD: ${{ steps.resolve.outputs.build }}
           COMMIT: ${{ steps.resolve.outputs.commit }}
+          # What the evidence names: the commit and the version measured, not this workflow's.
+          CI_EVIDENCE_COMMIT: ${{ steps.resolve.outputs.commit }}
+          SEARCH_PERF_VERSION: ${{ steps.resolve.outputs.version }}
           SEARCH_PERF_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           set -uo pipefail

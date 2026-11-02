@@ -10,7 +10,7 @@
 # reaches Yontrack only if something goes looking. Nothing pushes to a released commit, so
 # nothing re-runs its pipeline; this workflow is what re-measures it.
 #
-# Usage: scripts/security-rescan.sh targets|select|stamp-config|setup-stamp|secrets|secret-findings ...
+# Usage: scripts/security-rescan.sh targets|select|stamp-config|setup-stamp|secrets|secret-findings|api-version ...
 #
 #   targets PROJECT              Resolves the released builds to rescan and writes `count`,
 #                                `targets` (a one-line JSON array, ready for a matrix) and
@@ -29,6 +29,9 @@
 #                                `accepted=N`, also written to $GITHUB_OUTPUT.
 #   secret-findings [FILE]       The pure half of `secrets`: converts an answer of the
 #                                secret-scanning alerts API, read from FILE or stdin.
+#   api-version                  The version of the GitHub API that answers, recorded on the
+#                                evidence of SECURITY.SECRETS (#2128). Prints nothing and succeeds
+#                                when it cannot be read: scripts/ci-evidence.sh reports that gap.
 #
 # Environment:
 #   YONTRACK_URL, YONTRACK_TOKEN   the instance the builds are read from and reported to
@@ -437,6 +440,14 @@ srs_secrets() {
     srs_output accepted "$(printf '%s' "$report" | jq '[.findings[] | select(.acceptance != null)] | length')"
 }
 
+# Secret scanning has no version of its own: the API serving it is the closest thing.
+srs_api_version() {
+    gh api -i /versions 2>/dev/null \
+        | tr -d '\r' \
+        | awk 'tolower($1) == "x-github-api-version-selected:" { print $2; exit }'
+    return 0
+}
+
 srs_main() {
     local command="${1:-}"
     [ $# -gt 0 ] && shift
@@ -447,8 +458,9 @@ srs_main() {
         setup-stamp) srs_setup_stamp "$@" ;;
         secrets) srs_secrets "$@" ;;
         secret-findings) srs_secret_findings "$@" ;;
+        api-version) srs_api_version ;;
         *)
-            echo "Usage: $0 targets|select|stamp-config|setup-stamp|secrets|secret-findings ..." >&2
+            echo "Usage: $0 targets|select|stamp-config|setup-stamp|secrets|secret-findings|api-version ..." >&2
             return 1
             ;;
     esac

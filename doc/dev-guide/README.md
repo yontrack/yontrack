@@ -13,6 +13,7 @@
   * [Search performance test](search-perf-test.md) - `./gradlew searchPerfTest`: EXPLAIN assertions, p95 latencies and rebuild time on a large dataset
 * Delivery
   * [Test coverage](coverage.md) - what the COVERAGE.* figures measure, and how to get them locally
+  * [Evidence of the CI stamps](ci-evidence.md) - what each test and scan stamp attaches, the renderer, and what happens when evidence goes wrong
   * [Demo seed and reset](demo-seed.md) - resetting the demo environment through the Yontrack API
   * [Demo smoke test](demo-smoke.md) - verifying the demo deployment and reporting DEMO.SMOKE
   * [Demo screenshots](demo-screenshots.md) - capturing the release-notes images from the demo

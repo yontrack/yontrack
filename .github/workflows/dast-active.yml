@@ -68,9 +68,9 @@ permissions:
   contents: read
 
 env:
-  # See dast-passive.yml: 5.8.0 for `validate … findings`, and validate is always called with
+  # See dast-passive.yml: 6.1.0 for `validate --evidence`, and validate is always called with
   # --project/--branch/--build spelled out.
-  YONTRACK_CLI_VERSION: "5.8.0"
+  YONTRACK_CLI_VERSION: "6.1.0"
   # The same digest-pinned ZAP image the passive scan uses (2.17.0). Moved together with the passive
   # pin by Dependabot.
   ZAP_IMAGE: ghcr.io/zaproxy/zaproxy@sha256:781a2bdaea47324e7bab583e2263f21d257b0aee61ed51521a5be45f5f5081ef
@@ -504,7 +504,13 @@ jobs:
           # The findings report goes to Yontrack: what was found, never where nor how (#1875).
           DAST_FINDINGS_OUT="$WORK/out/findings.json" \
             scripts/security-dast.sh report "$WORK/out/report.md" "${documents[@]}"
-          echo "path=$(scripts/security-dast.sh report-path)" >> "$GITHUB_OUTPUT"
+          path="$(scripts/security-dast.sh report-path)"
+          echo "path=$path" >> "$GITHUB_OUTPUT"
+          # What the signed trail pins of that report (#2128). A manifest that could not be written
+          # must not lose the stamp: the step that attaches the evidence says so, in red.
+          echo "tool_version=$(scripts/security-dast.sh tool-versions "${documents[@]}" || true)" >> "$GITHUB_OUTPUT"
+          scripts/security-dast.sh manifest "$WORK/out/report.md" "$path" "$WORK/out/manifest.json" \
+            || echo "::warning title=SECURITY.DAST.ACTIVE evidence::The manifest of the report could not be written."
 
       - name: Publish the report
         env:
@@ -524,6 +530,8 @@ jobs:
       - name: Validate SECURITY.DAST.ACTIVE
         env:
           REPORT: ${{ steps.prepare.outputs.work }}/out/findings.json
+          MANIFEST: ${{ steps.prepare.outputs.work }}/out/manifest.json
+          TOOL_VERSION: ${{ steps.report.outputs.tool_version }}
           STARTED: ${{ steps.job_start.outputs.started }}
           BUILD: ${{ steps.resolve.outputs.build }}
           VERSION: ${{ steps.resolve.outputs.version }}
@@ -536,7 +544,9 @@ jobs:
           run_info="--source-type github-workflow --source-uri $DAST_RUN_URL"
           run_info="$run_info --trigger-type ${GITHUB_EVENT_NAME} --trigger-data $VERSION"
           # shellcheck disable=SC2086  # deliberate: run info is a set of flags, not one word
-          yontrack validate \
+          scripts/ci-evidence.sh dast SECURITY.DAST.ACTIVE "$REPORT" "$MANIFEST" \
+            --tool yontrack-dast --tool-version "$TOOL_VERSION" -- \
+            validate \
             --project "$YONTRACK_PROJECT" --branch "$YONTRACK_BRANCH" --build "$BUILD" \
             --validation SECURITY.DAST.ACTIVE \
             findings --format findings --kind DAST --report "$REPORT" \

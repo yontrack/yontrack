@@ -78,7 +78,7 @@ permissions:
   contents: read
 
 env:
-  YONTRACK_CLI_VERSION: '5.2.0'
+  YONTRACK_CLI_VERSION: '6.1.0'
   TARGET: ${{ inputs.target }}
   # The instance under test, not the Yontrack instance the validation is reported to. Everything
   # the smoke test asks of it goes through /graphql: the chart's ingress routes only /graphql and
@@ -340,7 +340,8 @@ jobs:
             echo "| UI signs in and renders | ${PLAYWRIGHT:-skipped} |"
           } >> "$GITHUB_STEP_SUMMARY"
           # shellcheck disable=SC2086  # deliberate: run info is a set of flags, not one word
-          yontrack validate \
+          scripts/ci-evidence.sh junit DEMO.SMOKE "ontrack-web-tests/reports/demo/junit/*.xml" --tool playwright -- \
+            validate \
             --project "$DEMO_PROJECT" --branch "$DEMO_BRANCH" --build "$BUILD" \
             --validation DEMO.SMOKE --status "$status" \
             $run_time_flag \

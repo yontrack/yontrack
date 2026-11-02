@@ -684,6 +684,8 @@ assert_eq "" "$(jq -r '[.findings[].location] | unique | .[]' "$WORK/dast-findin
 assert_not_contains "$(cat "$WORK/dast-findings.json")" "demo.example.com" "findings report: carries no URL"
 assert_not_contains "$(cat "$WORK/dast-findings.json")" "/graphql" "findings report: carries no path"
 
+cp "$WORK/dast-findings.json" "$WORK/real-dast-findings.json"
+
 rm -f "$WORK/dast-findings.json"
 counts="$(sd_report "$WORK/report.md" "$WORK/findings.json")"; rc=$?
 assert_eq "false" "$([ -f "$WORK/dast-findings.json" ] && echo true || echo false)" \
@@ -1414,6 +1416,126 @@ assert_contains "$(cat "$WORK/active-plan-rendered.yaml")" "Bearer active-tok" \
 # shellcheck disable=SC2016  # deliberate: the literal placeholder is what must be gone
 assert_not_contains "$(cat "$WORK/active-plan-rendered.yaml")" '${DAST_BEARER_TOKEN}' \
     "active plan: no placeholder is left unrendered"
+
+# ===========================================================================
+# The evidence of the stamp (#2128): what the signed trail pins, without the detail
+# ===========================================================================
+
+printf 'the private report\n' > "$WORK/evidence-report.md"
+out="$(sd_main manifest "$WORK/evidence-report.md" dast/passive/2026/2026-11-02-6.0.0-42.md "$WORK/manifest.json" 2>&1)"; rc=$?
+assert_eq "0" "$rc" "manifest: succeeds"
+assert_eq "dast/passive/2026/2026-11-02-6.0.0-42.md" "$(jq -r .reportPath "$WORK/manifest.json")" \
+    "manifest: holds the path of the private report"
+assert_eq "$(sd_sha256 "$WORK/evidence-report.md")" "$(jq -r .sha256 "$WORK/manifest.json")" \
+    "manifest: and its SHA-256, so that the trail pins it"
+assert_eq "reportPath,sha256" "$(jq -r 'keys | join(",")' "$WORK/manifest.json")" \
+    "manifest: and nothing else - no count, no finding"
+out="$(sd_main manifest "$WORK/no-such-report.md" some/path "$WORK/manifest-none.json" 2>&1)"; rc=$?
+assert_eq "1" "$rc" "manifest: no report, no manifest"
+assert_eq false "$([ -e "$WORK/manifest-none.json" ] && echo true || echo false)" "manifest: leaves nothing behind"
+
+# Everything a scanner could have put in a report, in every field of the findings file, whether the
+# findings report has that field today or not: the HTML is built from a list of fields, not around
+# one. The header's workflow run is the one URL allowed: the validation run points at it anyway.
+cat > "$WORK/hostile-findings.json" <<'JSON'
+{
+  "scanner": "yontrack-dast", "kind": "DAST",
+  "url": "https://demo.example.com/top-level",
+  "findings": [
+    {
+      "externalId": "zap:https://demo.example.com/external-id",
+      "location": "https://demo.example.com/location?param=location-param",
+      "severity": "HIGH",
+      "title": "Reflected <b>XSS at https://demo.example.com/in-title?secret=title-param and /graphql?query=path-param, or schemeless.example.org/host-path, or /actuator/env-path, or demo.internal.example, or example.com, or param=bare-param",
+      "rawSeverity": "evidence-in-raw-severity",
+      "url": "https://demo.example.com/url-field",
+      "uri": "https://demo.example.com/uri-field",
+      "param": "parameter-field",
+      "evidence": "<script>scanner-evidence</script>",
+      "attack": "attack-field",
+      "instances": [{"uri": "https://demo.example.com/instance", "evidence": "instance-evidence"}]
+    },
+    {
+      "externalId": "zap:10098", "location": "", "severity": "MEDIUM", "title": "Tolerated rule",
+      "acceptance": {"statement": "Accepted at https://demo.example.com/in-statement", "source": "https://demo.example.com/in-source"}
+    }
+  ]
+}
+JSON
+cat > "$WORK/stub-cli" <<'STUB'
+#!/usr/bin/env bash
+printf '%s\n' "$@" > "$CLI_LOG"
+STUB
+chmod +x "$WORK/stub-cli"
+dast_evidence() {
+    CI_EVIDENCE_CLI="$WORK/stub-cli" CI_EVIDENCE_DIR="$WORK/evidence" CI_EVIDENCE_COMMIT=abc123 CLI_LOG="$WORK/cli.log" \
+        GITHUB_SERVER_URL=https://github.example GITHUB_REPOSITORY=y/y GITHUB_RUN_ID=42 \
+        "$SCRIPT_DIR/ci-evidence.sh" dast SECURITY.DAST "$@" --tool zap --tool-version 2.17.0 -- \
+        validate --validation SECURITY.DAST findings --format findings --kind DAST --report "$1" > "$WORK/evidence.out" 2>&1
+}
+dast_evidence "$WORK/hostile-findings.json" "$WORK/manifest.json"; rc=$?
+assert_eq "0" "$rc" "evidence: the step succeeds"
+assert_eq "$WORK/evidence/SECURITY.DAST/SECURITY.DAST-findings.json
+$WORK/evidence/SECURITY.DAST/SECURITY.DAST-manifest.json
+$WORK/evidence/SECURITY.DAST/SECURITY.DAST-report.html" \
+    "$(grep -A1 -x -- --evidence "$WORK/cli.log" | grep -v -x -e --evidence -e --)" \
+    "evidence: the findings, the manifest and the HTML, under their stable names - never the report"
+html="$(cat "$WORK/evidence/SECURITY.DAST/SECURITY.DAST-report.html")"
+assert_not_contains "$html" "demo.example.com" "evidence: no URL can reach the HTML, from any field, the title included"
+assert_not_contains "$html" "title-param" "evidence: no parameter from a title"
+assert_not_contains "$html" "path-param" "evidence: no path with a query from a title"
+assert_not_contains "$html" "location-param" "evidence: no location"
+assert_not_contains "$html" "parameter-field" "evidence: no parameter"
+assert_not_contains "$html" "scanner-evidence" "evidence: no scanner evidence"
+assert_not_contains "$html" "instance-evidence" "evidence: nothing of an instance"
+assert_not_contains "$html" "attack-field" "evidence: no attack"
+assert_not_contains "$html" "evidence-in-raw-severity" "evidence: only the level"
+assert_not_contains "$html" "<b>XSS" "evidence: a finding title is escaped"
+assert_contains "$html" "Reflected &lt;b&gt;XSS" "evidence: the finding's title is there"
+assert_not_contains "$html" "schemeless.example.org" "evidence: no host without a scheme"
+assert_not_contains "$html" "host-path" "evidence: nor its path"
+assert_not_contains "$html" "env-path" "evidence: no bare path"
+assert_not_contains "$html" "demo.internal.example" "evidence: no bare host"
+assert_not_contains "$html" "example.com" "evidence: no bare domain"
+assert_not_contains "$html" "bare-param" "evidence: no bare parameter"
+assert_contains "$html" 'data-total="high">1<' "evidence: counted as the stamp counts them"
+assert_contains "$html" 'data-total="accepted">1<' "evidence: the accepted one apart"
+assert_contains "$html" "Tolerated rule" "evidence: an accepted finding is listed"
+assert_contains "$html" "dast/passive/2026/2026-11-02-6.0.0-42.md" "evidence: the manifest's path"
+assert_contains "$html" "$(sd_sha256 "$WORK/manifest.json")" "evidence: the header pins the manifest"
+assert_contains "$html" "$(sd_sha256 "$WORK/hostile-findings.json")" "evidence: and the findings"
+assert_contains "$html" "https://github.example/y/y/actions/runs/42" "evidence: the workflow run, the one URL allowed"
+
+# End to end, from the scanner's findings: the same fixture as `report` above.
+rm -rf "$WORK/evidence"
+dast_evidence "$WORK/real-dast-findings.json" "$WORK/manifest.json"; rc=$?
+assert_eq "0" "$rc" "evidence: from a real findings report"
+html="$(cat "$WORK/evidence/SECURITY.DAST/SECURITY.DAST-report.html")"
+assert_contains "$html" "CSP Header Not Set" "evidence: a real finding's title"
+assert_contains "$html" "Cross-Domain Misconfiguration" "evidence: a real title is not over-redacted"
+assert_not_contains "$html" "demo.example.com" "evidence: no URL from a real report"
+assert_not_contains "$html" "/graphql" "evidence: no path from a real report"
+
+# The version on the evidence comes from the scanners' own reports, not from a second pin.
+echo '{"scanner":"zap","version":"2.17.0","role":"scan-admin","findings":[]}' > "$WORK/doc-zap-admin.json"
+echo '{"scanner":"zap","version":"2.17.0","findings":[]}' > "$WORK/doc-zap-ui.json"
+echo '{"scanner":"graphql-cop","version":"1.16","findings":[]}' > "$WORK/doc-cop.json"
+echo '{"scanner":"access-control","findings":[]}' > "$WORK/doc-ac.json"
+assert_eq "graphql-cop 1.16, zap 2.17.0, access-control" \
+    "$(sd_main tool-versions "$WORK/doc-zap-admin.json" "$WORK/doc-zap-ui.json" "$WORK/doc-cop.json" "$WORK/doc-ac.json")" \
+    "tool-versions: each scanner once, with the version its report gives"
+echo 'not json' > "$WORK/doc-bad.json"
+out="$(sd_main tool-versions "$WORK/doc-bad.json" 2>/dev/null)"; rc=$?
+assert_eq "1" "$rc" "tool-versions: fails on what it cannot read"
+assert_eq "" "$out" "tool-versions: and prints nothing"
+
+# A manifest that could not be written leaves a gap, not a lost stamp.
+rm -rf "$WORK/evidence"
+dast_evidence "$WORK/real-dast-findings.json" "$WORK/no-manifest.json"; rc=$?
+assert_eq "1" "$rc" "evidence: no manifest, the step is red"
+assert_contains "$(cat "$WORK/cli.log")" "SECURITY.DAST" "evidence: no manifest, the stamp is sent all the same"
+assert_not_contains "$(cat "$WORK/cli.log")" "no-manifest" "evidence: no manifest, only what exists is passed"
+assert_eq false "$([ -e "$WORK/evidence/SECURITY.DAST/SECURITY.DAST-manifest.json" ] && echo true || echo false)" "evidence: no manifest, none is made up"
 
 # ===========================================================================
 # The command surface

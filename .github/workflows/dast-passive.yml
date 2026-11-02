@@ -39,6 +39,8 @@
 #   * the validation run points at this workflow run, never at the report, and carries the findings
 #     by rule - the rule, its title, its level, and the suppression accepting it - never where
 #     nor how (#1875);
+#   * its evidence is those findings, an HTML of them, and the path and SHA-256 of the report: the
+#     trail pins the report without exposing it (#2128). The report itself is never attached;
 #   * nothing goes to code scanning - see "No SARIF" below.
 #
 # Anything a scanner writes to its own stdout goes through `scripts/security-dast.sh scrub`
@@ -98,13 +100,13 @@ permissions:
 
 env:
   # Pinned: an unpinned CLI lets a Yontrack release turn a green pipeline red in a repository
-  # nobody touched. 5.8.0, as the other security workflows pin, for `validate … findings` (#1875);
+  # nobody touched. 6.1.0, as the other workflows pin, for `validate --evidence` (#2128);
   # the build lookup this shares with demo-smoke.yml needs `build search --with-display-name`,
   # which came with 5.2.0 - see scripts/yontrack-build.sh.
   #
   # `validate` is always called with --project/--branch/--build spelled out: the typed subcommands
   # read the build from their flag only and ignore YONTRACK_BUILD_NAME (yontrack/yontrack-cli#73).
-  YONTRACK_CLI_VERSION: "5.8.0"
+  YONTRACK_CLI_VERSION: "6.1.0"
   # Pinned by digest, not by the `stable` tag. A scanner whose version moves under you turns
   # "three new findings" into "or maybe three new rules", which is the one question a report must
   # never leave open.
@@ -549,7 +551,13 @@ jobs:
           # The findings report goes to Yontrack: what was found, never where nor how (#1875).
           DAST_FINDINGS_OUT="$WORK/out/findings.json" \
             scripts/security-dast.sh report "$WORK/out/report.md" "${documents[@]}"
-          echo "path=$(scripts/security-dast.sh report-path)" >> "$GITHUB_OUTPUT"
+          path="$(scripts/security-dast.sh report-path)"
+          echo "path=$path" >> "$GITHUB_OUTPUT"
+          # What the signed trail pins of that report (#2128). A manifest that could not be written
+          # must not lose the stamp: the step that attaches the evidence says so, in red.
+          echo "tool_version=$(scripts/security-dast.sh tool-versions "${documents[@]}" || true)" >> "$GITHUB_OUTPUT"
+          scripts/security-dast.sh manifest "$WORK/out/report.md" "$path" "$WORK/out/manifest.json" \
+            || echo "::warning title=SECURITY.DAST evidence::The manifest of the report could not be written."
 
       # The private repository, and the only place the detail exists. The token is fine-grained
       # to Contents on that repository alone: it cannot reach this one.
@@ -581,6 +589,8 @@ jobs:
       - name: Validate SECURITY.DAST
         env:
           REPORT: ${{ steps.prepare.outputs.work }}/out/findings.json
+          MANIFEST: ${{ steps.prepare.outputs.work }}/out/manifest.json
+          TOOL_VERSION: ${{ steps.report.outputs.tool_version }}
           STARTED: ${{ steps.job_start.outputs.started }}
           BUILD: ${{ steps.resolve.outputs.build }}
           VERSION: ${{ steps.login.outputs.version }}
@@ -593,7 +603,9 @@ jobs:
           run_info="--source-type github-workflow --source-uri $DAST_RUN_URL"
           run_info="$run_info --trigger-type ${GITHUB_EVENT_NAME} --trigger-data $VERSION"
           # shellcheck disable=SC2086  # deliberate: run info is a set of flags, not one word
-          yontrack validate \
+          scripts/ci-evidence.sh dast SECURITY.DAST "$REPORT" "$MANIFEST" \
+            --tool yontrack-dast --tool-version "$TOOL_VERSION" -- \
+            validate \
             --project "$YONTRACK_PROJECT" --branch "$YONTRACK_BRANCH" --build "$BUILD" \
             --validation SECURITY.DAST \
             findings --format findings --kind DAST --report "$REPORT" \

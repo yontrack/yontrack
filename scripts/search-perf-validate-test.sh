@@ -41,6 +41,8 @@ chmod +x "$CLI"
 
 RUN_URL="https://github.com/yontrack/yontrack/actions/runs/42"
 export SEARCH_PERF_RUN_URL="$RUN_URL"
+export GITHUB_SERVER_URL=https://github.com GITHUB_REPOSITORY=yontrack/yontrack GITHUB_RUN_ID=42
+export SEARCH_PERF_VERSION=6.0.0-beta.9 CI_EVIDENCE_COMMIT=abc123 CI_EVIDENCE_DIR="$WORK/evidence"
 
 # Runs the script with the recorder in place, and sets `calls`, `out` and `script_status`. Not a
 # command substitution: that would run it in a subshell and lose the exit code, which is half of
@@ -110,6 +112,42 @@ assert_contains "$calls" "--metric rebuild_seconds=139.7 --run-time 600 --source
     "the pass-through arguments come last, after the metrics subcommand"
 assert_contains "$calls" "--description All EXPLAIN assertions passed, every p95 within budget. See $RUN_URL, artefact search-perf-report." \
     "the description says so and points at the run"
+
+# ===============================================================================================
+# validate: the evidence (#2128)
+# ===============================================================================================
+
+write_report
+run_validate "$REPORT"
+EVIDENCE_DIR="$CI_EVIDENCE_DIR/SEARCH.PERFORMANCE"
+assert_contains "$calls" "--evidence $EVIDENCE_DIR/SEARCH.PERFORMANCE-report.json --evidence $EVIDENCE_DIR/SEARCH.PERFORMANCE-report.html" \
+    "the report the stamp was read from and its HTML, under their stable names"
+assert_contains "$calls" "--evidence-tool searchPerfTest --evidence-tool-version 6.0.0-beta.9 --evidence-source-url $RUN_URL" \
+    "with the test, the version measured and the run"
+assert_eq "$(cat "$REPORT")" "$(cat "$EVIDENCE_DIR/SEARCH.PERFORMANCE-report.json")" "the raw file is the test's own"
+assert_contains "$(cat "$EVIDENCE_DIR/SEARCH.PERFORMANCE-report.html")" "<td>palette_p95</td><td>361.6</td>" \
+    "the HTML is a table of its figures"
+assert_contains "$(cat "$EVIDENCE_DIR/SEARCH.PERFORMANCE-report.html")" "abc123" "the header names the commit measured"
+
+# A failed run attaches too: it is where the figures are worth having.
+write_report '.details.failures = ["palette_p95 past its ceiling"]'
+run_validate "$REPORT"
+assert_eq "1" "$script_status" "a failed run fails the step"
+assert_contains "$calls" "--status FAILED" "FAILED"
+assert_contains "$calls" "--evidence $EVIDENCE_DIR/SEARCH.PERFORMANCE-report.json" "with its report"
+
+# No report at all: a bare FAILED, as ever.
+run_validate "$WORK/no-such-report.json"
+assert_eq "1" "$script_status" "no report fails the step"
+assert_contains "$calls" "--status FAILED" "FAILED"
+assert_not_contains "$calls" "--evidence" "and no evidence to attach"
+
+# A report which cannot be read still goes, and the stamp still does.
+echo 'not json' > "$WORK/not-json.json"
+run_validate "$WORK/not-json.json"
+assert_eq "1" "$script_status" "an unreadable report fails the step"
+assert_contains "$calls" "--status FAILED" "FAILED"
+assert_contains "$calls" "--evidence $EVIDENCE_DIR/SEARCH.PERFORMANCE-report.json" "with the raw file, as it is the proof"
 
 # ===============================================================================================
 # validate: over budget is recorded, not failed

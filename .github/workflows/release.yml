@@ -78,7 +78,7 @@ permissions:
 env:
   # Pinned: an unpinned CLI lets a Yontrack release turn a green pipeline red in a repository
   # nobody touched.
-  YONTRACK_CLI_VERSION: '5.2.0'
+  YONTRACK_CLI_VERSION: '6.1.0'
   RELEASE_PROJECT: ${{ inputs.project }}
   RELEASE_BRANCH: ${{ inputs.branch }}
   RELEASE_REPOSITORY: ${{ github.repository }}

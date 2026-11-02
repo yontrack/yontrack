@@ -36,7 +36,7 @@ permissions:
 
 env:
   # Same CLI as ci.yml; see YONTRACK_CLI_VERSION there.
-  YONTRACK_CLI_VERSION: "5.8.0"
+  YONTRACK_CLI_VERSION: "6.1.0"
   # The Yontrack project ci.yml registers its builds in.
   YONTRACK_PROJECT: yontrack
 
@@ -44,6 +44,9 @@ jobs:
   analyze:
     name: Analyze (${{ matrix.language }})
     runs-on: ubuntu-latest
+    # What the evidence of SECURITY.CODE records. Written by each leg, all on one CodeQL bundle.
+    outputs:
+      codeql_version: ${{ steps.init.outputs.codeql-version }}
     timeout-minutes: 90
     permissions:
       # `actions: read` lets CodeQL read the workflow run; `security-events: write` uploads.
@@ -81,6 +84,7 @@ jobs:
           cache-read-only: true
 
       - name: Initialize CodeQL
+        id: init
         uses: github/codeql-action/init@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
         with:
           languages: ${{ matrix.language }}
@@ -179,6 +183,7 @@ jobs:
           BUILD: ${{ steps.build.outputs.build }}
           OUTCOME: ${{ steps.alerts.outcome }}
           REPORT: ${{ steps.alerts.outputs.report }}
+          CODEQL_VERSION: ${{ needs.analyze.outputs.codeql_version }}
           CRITICAL: ${{ steps.alerts.outputs.critical }}
           HIGH: ${{ steps.alerts.outputs.high }}
           MEDIUM: ${{ steps.alerts.outputs.medium }}
@@ -198,20 +203,27 @@ jobs:
             && started="$(date -u -d "$started" +%s 2>/dev/null)" \
             && run_time_flag="--run-time $(( $(date +%s) - started ))"
           # `--project`, `--branch` and `--build` all spelled out: nothing here exports them.
+          rc=0
           if [ "$OUTCOME" = "success" ]; then
             # shellcheck disable=SC2086  # deliberate: run info is a set of flags, not one word
-            yontrack validate --project "$PROJECT" --branch "$BRANCH" --build "$BUILD" \
+            scripts/ci-evidence.sh findings SECURITY.CODE "$REPORT" \
+              --tool codeql --tool-version "$CODEQL_VERSION" -- \
+              validate --project "$PROJECT" --branch "$BRANCH" --build "$BUILD" \
               --validation SECURITY.CODE \
               findings --format findings --kind CODE --report "$REPORT" \
-              $run_time_flag $RUN_INFO
+              $run_time_flag $RUN_INFO || rc=$?
           else
             # shellcheck disable=SC2086  # deliberate: run info is a set of flags, not one word
-            yontrack validate --project "$PROJECT" --branch "$BRANCH" --build "$BUILD" \
+            scripts/ci-evidence.sh findings SECURITY.CODE "$REPORT" \
+              --tool codeql --tool-version "$CODEQL_VERSION" -- \
+              validate --project "$PROJECT" --branch "$BRANCH" --build "$BUILD" \
               --validation SECURITY.CODE --status FAILED \
-              $run_time_flag $RUN_INFO
+              $run_time_flag $RUN_INFO || rc=$?
           fi
           {
             echo "### Open CodeQL security alerts (critical/high/medium/low)"
             echo
             echo "Build \`$PROJECT/$BRANCH/$BUILD\`: \`${CRITICAL:-?}/${HIGH:-?}/${MEDIUM:-?}/${LOW:-?}\`, and ${ACCEPTED:-?} dismissed, sent as accepted findings."
           } >> "$GITHUB_STEP_SUMMARY"
+          # The summary is written whatever came of it, and the step still says so.
+          exit "$rc"

@@ -45,10 +45,10 @@ permissions:
 
 env:
   # Pinned, like ci.yml's: an unpinned CLI lets a Yontrack release turn a green pipeline red in
-  # a repository nobody touched. Same version as ci.yml, for `validate … findings` (#1875). Only
+  # a repository nobody touched. Same version as ci.yml, for `validate --evidence` (#2128). Only
   # `validate` is used here, and always with `--project`, `--branch` and `--build` spelled out:
   # nothing in this workflow exports them.
-  YONTRACK_CLI_VERSION: "5.8.0"
+  YONTRACK_CLI_VERSION: "6.1.0"
   # The Yontrack project ci.yml registers its builds in.
   YONTRACK_PROJECT: yontrack
   # Oldest supported minor: an older one is never rescanned, even as "the previous minor". Until
@@ -235,13 +235,15 @@ jobs:
           fi
           if [ "$OUTCOME" = "success" ]; then
             # shellcheck disable=SC2086  # deliberate: run info is a set of flags, not one word
-            yontrack validate --project "$TARGET_PROJECT" --branch "$TARGET_BRANCH" --build "$TARGET_BUILD" \
+            scripts/ci-evidence.sh trivy SECURITY.IMAGE.BACKEND "$REPORT" -- \
+              validate --project "$TARGET_PROJECT" --branch "$TARGET_BRANCH" --build "$TARGET_BUILD" \
               --validation SECURITY.IMAGE.BACKEND \
               findings --format trivy --kind IMAGE --report "$REPORT" \
               $run_time_flag $YONTRACK_RUN_INFO
           else
             # shellcheck disable=SC2086  # deliberate: run info is a set of flags, not one word
-            yontrack validate --project "$TARGET_PROJECT" --branch "$TARGET_BRANCH" --build "$TARGET_BUILD" \
+            scripts/ci-evidence.sh trivy SECURITY.IMAGE.BACKEND "$REPORT" -- \
+              validate --project "$TARGET_PROJECT" --branch "$TARGET_BRANCH" --build "$TARGET_BUILD" \
               --validation SECURITY.IMAGE.BACKEND --status FAILED \
               $run_time_flag $YONTRACK_RUN_INFO
           fi
@@ -260,13 +262,15 @@ jobs:
           fi
           if [ "$OUTCOME" = "success" ]; then
             # shellcheck disable=SC2086  # deliberate: run info is a set of flags, not one word
-            yontrack validate --project "$TARGET_PROJECT" --branch "$TARGET_BRANCH" --build "$TARGET_BUILD" \
+            scripts/ci-evidence.sh trivy SECURITY.IMAGE.UI "$REPORT" -- \
+              validate --project "$TARGET_PROJECT" --branch "$TARGET_BRANCH" --build "$TARGET_BUILD" \
               --validation SECURITY.IMAGE.UI \
               findings --format trivy --kind IMAGE --report "$REPORT" \
               $run_time_flag $YONTRACK_RUN_INFO
           else
             # shellcheck disable=SC2086  # deliberate: run info is a set of flags, not one word
-            yontrack validate --project "$TARGET_PROJECT" --branch "$TARGET_BRANCH" --build "$TARGET_BUILD" \
+            scripts/ci-evidence.sh trivy SECURITY.IMAGE.UI "$REPORT" -- \
+              validate --project "$TARGET_PROJECT" --branch "$TARGET_BRANCH" --build "$TARGET_BUILD" \
               --validation SECURITY.IMAGE.UI --status FAILED \
               $run_time_flag $YONTRACK_RUN_INFO
           fi
@@ -353,6 +357,7 @@ jobs:
           report="$RUNNER_TEMP/secret-findings.json"
           scripts/security-rescan.sh secrets "$GITHUB_REPOSITORY" "$report"
           echo "report=$report" >> "$GITHUB_OUTPUT"
+          echo "api_version=$(scripts/security-rescan.sh api-version)" >> "$GITHUB_OUTPUT"
 
       # Alerts that could not be fetched are FAILED, never an empty report: a token that lost its
       # access must not read as a repository with no leaked secret.
@@ -361,6 +366,7 @@ jobs:
         env:
           OUTCOME: ${{ steps.alerts.outcome }}
           REPORT: ${{ steps.alerts.outputs.report }}
+          API_VERSION: ${{ steps.alerts.outputs.api_version }}
           STARTED: ${{ steps.job_start.outputs.started }}
         run: |
           set -uo pipefail
@@ -370,13 +376,17 @@ jobs:
           fi
           if [ "$OUTCOME" = "success" ]; then
             # shellcheck disable=SC2086  # deliberate: run info is a set of flags, not one word
-            yontrack validate --project "$TARGET_PROJECT" --branch "$TARGET_BRANCH" --build "$TARGET_BUILD" \
+            scripts/ci-evidence.sh findings SECURITY.SECRETS "$REPORT" \
+              --tool github-secret-scanning --tool-version "$API_VERSION" -- \
+              validate --project "$TARGET_PROJECT" --branch "$TARGET_BRANCH" --build "$TARGET_BUILD" \
               --validation SECURITY.SECRETS \
               findings --format findings --kind SECRETS --report "$REPORT" \
               $run_time_flag $YONTRACK_RUN_INFO
           else
             # shellcheck disable=SC2086  # deliberate: run info is a set of flags, not one word
-            yontrack validate --project "$TARGET_PROJECT" --branch "$TARGET_BRANCH" --build "$TARGET_BUILD" \
+            scripts/ci-evidence.sh findings SECURITY.SECRETS "$REPORT" \
+              --tool github-secret-scanning --tool-version "$API_VERSION" -- \
+              validate --project "$TARGET_PROJECT" --branch "$TARGET_BRANCH" --build "$TARGET_BUILD" \
               --validation SECURITY.SECRETS --status FAILED \
               $run_time_flag $YONTRACK_RUN_INFO
           fi

@@ -76,14 +76,16 @@ env:
   # here so the version shape does not depend on an implicit runner default.
   CI: "true"
   # Pinned: an unpinned CLI lets a Yontrack release turn a green pipeline red in a repository
-  # nobody touched. 5.8.0 for `validate … findings`, which the SECURITY stamps use (#1875).
-  YONTRACK_CLI_VERSION: "5.8.0"
+  # nobody touched. 6.1.0: `validate --evidence`, which the test and scan stamps use (#2128), came
+  # with 6.0.0. See doc/dev-guide/ci-evidence.md.
+  YONTRACK_CLI_VERSION: "6.1.0"
   # Run info reported with every validation. The Jenkins shared library computed this silently;
-  # the Go CLI is purely declarative and sends `runInfo: null` unless the flags are spelled out,
-  # which is how the migration dropped it (#1655) and left a hole in
-  # `ontrack_run_VALIDATION_RUN_time_seconds`. Held as one string because the four values are the
-  # same at every call site — a URL, an event name and a SHA, none of which contain whitespace,
-  # so the unquoted expansion below is safe. The run time is per-job and is added at each site.
+  # the Go CLI long sent `runInfo: null` unless the flags were spelled out, which is how the
+  # migration dropped it (#1655) and left a hole in `ontrack_run_VALIDATION_RUN_time_seconds`.
+  # Since 6.1.0 it has defaults for GitHub Actions, which these flags override. Held as one string
+  # because the four values are the same at every call site — a URL, an event name and a SHA, none
+  # of which contain whitespace, so the unquoted expansion below is safe. The run time is per-job
+  # and is added at each site.
   #
   # The source type matches what the GitHub ingestion already records (WorkflowRunInfo.TYPE), so
   # a run reported by this workflow and one reported by a webhook read the same way in the UI.
@@ -481,9 +483,6 @@ jobs:
       # validation in a stage that stage's duration. What is left out here is what the job does
       # afterwards: building and pushing the Docker image, which the stamp is not about.
       #
-      # `--run-time` goes after the `junit` subcommand: `validateJUnitTestsCmd` redeclares the five
-      # run-info flags on itself, so that is where they are read from.
-      #
       # The glob names `test-results/test` rather than the whole of `test-results`: this job runs
       # `build -x integrationTest`, so the integration results are not in this workspace anyway,
       # and the wider glob only read as if BUILD still covered them. They land on INTEGRATION,
@@ -498,7 +497,8 @@ jobs:
             run_time_flag="--run-time $(( $(date +%s) - STARTED ))"
           fi
           # shellcheck disable=SC2086  # deliberate: see YONTRACK_RUN_INFO
-          yontrack validate --validation BUILD \
+          scripts/ci-evidence.sh junit BUILD "**/build/test-results/test/*.xml" --tool gradle -- \
+            validate --validation BUILD \
             junit --pattern "**/build/test-results/test/*.xml" --fail-when-no-results \
             $run_time_flag $YONTRACK_RUN_INFO
 
@@ -673,9 +673,6 @@ jobs:
           fi
 
       # `outcome` is empty only when the step was skipped, so failing tests still record FAILED.
-      #
-      # `--run-time` goes after the `junit` subcommand: `validateJUnitTestsCmd` redeclares the five
-      # run-info flags on itself, so that is where they are read from.
       - name: Validate UI_UNIT
         if: ${{ !cancelled() && env.FULL_RUN == 'true' && steps.test.outcome != '' }}
         env:
@@ -686,7 +683,8 @@ jobs:
             run_time_flag="--run-time $(( $(date +%s) - STARTED ))"
           fi
           # shellcheck disable=SC2086  # deliberate: see YONTRACK_RUN_INFO
-          yontrack validate --validation UI_UNIT \
+          scripts/ci-evidence.sh junit UI_UNIT "ontrack-web-core/reports/*.xml" --tool jest -- \
+            validate --validation UI_UNIT \
             junit --pattern "ontrack-web-core/reports/*.xml" --fail-when-no-results \
             $run_time_flag $YONTRACK_RUN_INFO
 
@@ -1126,11 +1124,13 @@ jobs:
 
           if [ "$LAYOUT_OUTCOME" != "success" ] || [ "$unexplained" = "true" ]; then
             # shellcheck disable=SC2086  # deliberate: see YONTRACK_RUN_INFO
-            yontrack validate --validation INTEGRATION --status FAILED \
+            scripts/ci-evidence.sh junit INTEGRATION "integration-junit/*.xml" --tool gradle -- \
+              validate --validation INTEGRATION --status FAILED \
               $run_time_flag $YONTRACK_RUN_INFO
           else
             # shellcheck disable=SC2086  # deliberate: see YONTRACK_RUN_INFO
-            yontrack validate --validation INTEGRATION \
+            scripts/ci-evidence.sh junit INTEGRATION "integration-junit/*.xml" --tool gradle -- \
+              validate --validation INTEGRATION \
               junit --pattern "integration-junit/*.xml" --fail-when-no-results \
               $run_time_flag $YONTRACK_RUN_INFO
           fi
@@ -1439,11 +1439,13 @@ jobs:
 
           if [ "$LAYOUT_OUTCOME" != "success" ] || [ "$SHARDS_RESULT" != "success" ]; then
             # shellcheck disable=SC2086  # deliberate: see YONTRACK_RUN_INFO
-            yontrack validate --validation KDSL.ACCEPTANCE --status FAILED \
+            scripts/ci-evidence.sh junit KDSL.ACCEPTANCE "kdsl-junit/*.xml" --tool gradle -- \
+              validate --validation KDSL.ACCEPTANCE --status FAILED \
               $run_time_flag $YONTRACK_RUN_INFO
           else
             # shellcheck disable=SC2086  # deliberate: see YONTRACK_RUN_INFO
-            yontrack validate --validation KDSL.ACCEPTANCE \
+            scripts/ci-evidence.sh junit KDSL.ACCEPTANCE "kdsl-junit/*.xml" --tool gradle -- \
+              validate --validation KDSL.ACCEPTANCE \
               junit --pattern "kdsl-junit/*.xml" --fail-when-no-results \
               $run_time_flag $YONTRACK_RUN_INFO
           fi
@@ -1552,11 +1554,13 @@ jobs:
           fi
           if [ "$TEST_OUTCOME" != "success" ]; then
             # shellcheck disable=SC2086  # deliberate: see YONTRACK_RUN_INFO
-            yontrack validate --validation KDSL.HA --status FAILED \
+            scripts/ci-evidence.sh junit KDSL.HA "ontrack-kdsl-acceptance/build/test-results/kdslHaTest/*.xml" --tool gradle -- \
+              validate --validation KDSL.HA --status FAILED \
               $run_time_flag $YONTRACK_RUN_INFO
           else
             # shellcheck disable=SC2086  # deliberate: see YONTRACK_RUN_INFO
-            yontrack validate --validation KDSL.HA \
+            scripts/ci-evidence.sh junit KDSL.HA "ontrack-kdsl-acceptance/build/test-results/kdslHaTest/*.xml" --tool gradle -- \
+              validate --validation KDSL.HA \
               junit --pattern "ontrack-kdsl-acceptance/build/test-results/kdslHaTest/*.xml" \
               --fail-when-no-results \
               $run_time_flag $YONTRACK_RUN_INFO
@@ -1930,11 +1934,13 @@ jobs:
           # The matrix result decides, not what turned up.
           if [ "$LAYOUT_OUTCOME" != "success" ] || [ "$UI_TESTS_RESULT" != "success" ]; then
             # shellcheck disable=SC2086  # deliberate: see YONTRACK_RUN_INFO
-            yontrack validate --validation PLAYWRIGHT --status FAILED \
+            scripts/ci-evidence.sh junit PLAYWRIGHT "ontrack-web-tests/reports/*/junit/*.xml" --tool playwright -- \
+              validate --validation PLAYWRIGHT --status FAILED \
               $run_time_flag $YONTRACK_RUN_INFO
           else
             # shellcheck disable=SC2086  # deliberate: see YONTRACK_RUN_INFO
-            yontrack validate --validation PLAYWRIGHT \
+            scripts/ci-evidence.sh junit PLAYWRIGHT "ontrack-web-tests/reports/*/junit/*.xml" --tool playwright -- \
+              validate --validation PLAYWRIGHT \
               junit --pattern "ontrack-web-tests/reports/*/junit/*.xml" --fail-when-no-results \
               $run_time_flag $YONTRACK_RUN_INFO
           fi
@@ -2267,12 +2273,14 @@ jobs:
           fi
           if [ "$OUTCOME" = "success" ]; then
             # shellcheck disable=SC2086  # deliberate: see YONTRACK_RUN_INFO
-            yontrack validate --validation SECURITY.IMAGE.BACKEND \
+            scripts/ci-evidence.sh trivy SECURITY.IMAGE.BACKEND "$REPORT" -- \
+              validate --validation SECURITY.IMAGE.BACKEND \
               findings --format trivy --kind IMAGE --report "$REPORT" \
               $run_time_flag $YONTRACK_RUN_INFO
           else
             # shellcheck disable=SC2086  # deliberate: see YONTRACK_RUN_INFO
-            yontrack validate --validation SECURITY.IMAGE.BACKEND --status FAILED \
+            scripts/ci-evidence.sh trivy SECURITY.IMAGE.BACKEND "$REPORT" -- \
+              validate --validation SECURITY.IMAGE.BACKEND --status FAILED \
               $run_time_flag $YONTRACK_RUN_INFO
           fi
 
@@ -2289,12 +2297,14 @@ jobs:
           fi
           if [ "$OUTCOME" = "success" ]; then
             # shellcheck disable=SC2086  # deliberate: see YONTRACK_RUN_INFO
-            yontrack validate --validation SECURITY.IMAGE.UI \
+            scripts/ci-evidence.sh trivy SECURITY.IMAGE.UI "$REPORT" -- \
+              validate --validation SECURITY.IMAGE.UI \
               findings --format trivy --kind IMAGE --report "$REPORT" \
               $run_time_flag $YONTRACK_RUN_INFO
           else
             # shellcheck disable=SC2086  # deliberate: see YONTRACK_RUN_INFO
-            yontrack validate --validation SECURITY.IMAGE.UI --status FAILED \
+            scripts/ci-evidence.sh trivy SECURITY.IMAGE.UI "$REPORT" -- \
+              validate --validation SECURITY.IMAGE.UI --status FAILED \
               $run_time_flag $YONTRACK_RUN_INFO
           fi
 

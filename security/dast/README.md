@@ -152,7 +152,22 @@ The rules the workflows follow, in one place:
   evidence;
 - there are **no workflow artifacts** for a DAST run;
 - the full detail goes to `yontrack/security-reports` only, one file per run, never rewritten;
-- the validation run points at the workflow run, never at the report.
+- the validation run points at the workflow run, never at the report;
+- the evidence on the validation run (#2128) holds nothing more than the stamp already receives:
+  - `<STAMP>-findings.json` is the file the stamp is computed from: the rule, its title, its level
+    and the suppression accepting it, never a URL, a parameter or scanner evidence;
+  - `<STAMP>-report.html` is rendered from that file and the manifest **only**, and shows each
+    finding's title, level and accepted state, any word of a title that reads as a URL, a host, a
+    path or a parameter being redacted;
+  - `<STAMP>-manifest.json` holds the path of the private report and its SHA-256, and no count and
+    no finding;
+- the full report stays Markdown in `yontrack/security-reports`, and is never attached.
+
+The evidence is allowed because it tells nothing the stamp does not. A title and a level say that a
+rule tripped, not where nor how to exploit it, and that is already public on the validation run. A
+path in a private repository opens nothing, and its SHA-256 lets the signed trail pin the full report
+without exposing it. `scripts/security-dast-test.sh` asserts that no URL, parameter or scanner
+evidence can appear in the HTML, whatever a findings file carries.
 
 `scripts/security-dast.sh` prints counts and nothing else, and everything a scanner writes to its
 own stdout goes through `sd_scrub` before it can reach a log.

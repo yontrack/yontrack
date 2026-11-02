@@ -62,7 +62,7 @@ permissions:
 
 env:
   # Pinned, as everywhere else: an unpinned CLI lets a Yontrack release turn a green pipeline red.
-  YONTRACK_CLI_VERSION: '5.2.0'
+  YONTRACK_CLI_VERSION: '6.1.0'
   GITLAB_REAL_PROJECT: ${{ inputs.project }}
   GITLAB_REAL_BRANCH: ${{ inputs.branch }}
   GITLAB_REAL_VERSION: ${{ inputs.version }}
@@ -243,7 +243,8 @@ jobs:
             echo "| Real pipeline tests | ${TEST:-skipped} |"
           } >> "$GITHUB_STEP_SUMMARY"
           # shellcheck disable=SC2086  # deliberate: run info is a set of flags, not one word
-          yontrack validate \
+          scripts/ci-evidence.sh junit GITLAB.REAL "ontrack-extension-gitlab/build/test-results/integrationTest/*.xml" --tool gradle -- \
+            validate \
             --project "$GITLAB_REAL_PROJECT" --branch "$GITLAB_REAL_BRANCH" --build "$BUILD" \
             --validation GITLAB.REAL --status "$status" \
             $run_time_flag \

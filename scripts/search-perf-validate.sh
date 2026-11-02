@@ -28,6 +28,8 @@
 # Environment:
 #   SEARCH_PERF_RUN_URL       the workflow run; it goes in every description.
 #   SEARCH_PERF_MAX_COMMITS   how far back `resolve` looks (default 30).
+#   SEARCH_PERF_VERSION       the version measured, recorded on the evidence as the test's own.
+#   CI_EVIDENCE_COMMIT        the commit measured, named by the evidence.
 #   SEARCH_PERF_CLI           the CLI to call (default: `yontrack`). Only the tests set it.
 #
 # Which build
@@ -69,8 +71,16 @@
 #
 # The description is cut to 500 characters: VALIDATION_RUN_STATUSES.DESCRIPTION is a
 # VARCHAR(500), and a longer one would lose the stamp altogether.
+#
+# Evidence
+# --------
+# Whatever is sent, the report goes with it, and an HTML table of its figures (#2128):
+# scripts/ci-evidence.sh, whose rules these are. A FAILED stamp carries no figure, but its evidence
+# does. A stamp whose evidence could not be made is still sent, and the step is red.
 
 set -uo pipefail
+
+SP_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 SP_METRICS=(palette_p95 results_p95 commit_lookup_p95 exact_build_p95 palette_restricted_p95 results_restricted_p95 rebuild_seconds)
 SP_STAMP=SEARCH.PERFORMANCE
@@ -79,6 +89,12 @@ SP_DESCRIPTION_MAX=500
 sp_fail() { echo "ERROR: $*" >&2; return 1; }
 
 sp_cli() { "${SEARCH_PERF_CLI:-yontrack}" "$@"; }
+
+# The validation, with the report at $SP_REPORT as its evidence.
+sp_send() {
+    CI_EVIDENCE_CLI="${SEARCH_PERF_CLI:-yontrack}" "$SP_SCRIPT_DIR/ci-evidence.sh" search-perf "$SP_STAMP" "$SP_REPORT" \
+        --tool searchPerfTest --tool-version "${SEARCH_PERF_VERSION:-}" -- "$@"
+}
 
 sp_output() {
     echo "$1=$2"
@@ -141,6 +157,7 @@ sp_validate() {
     local -a target=(--project "$project" --branch "$branch" --build "$build")
     local run_url="${SEARCH_PERF_RUN_URL:-}"
     local see="See ${run_url:-the run}, artefact search-perf-report."
+    SP_REPORT="$report"
 
     local json=""
     if [ -f "$report" ] && jq -e 'type == "object"' "$report" > /dev/null 2>&1; then
@@ -200,10 +217,10 @@ sp_validate() {
     else
         description="All EXPLAIN assertions passed, every p95 within budget. $see"
     fi
-    sp_cli validate "${target[@]}" --validation "$SP_STAMP" \
+    sp_send validate "${target[@]}" --validation "$SP_STAMP" \
         --description "$(sp_truncate "$description")" \
         metrics "${metrics[@]}" "${extra[@]+"${extra[@]}"}" \
-        || { sp_fail "Could not post $SP_STAMP"; return 1; }
+        || { sp_fail "Could not post $SP_STAMP, or its evidence"; return 1; }
 }
 
 # sp_failed --project P --branch B --build N DESCRIPTION [EXTRA...]
@@ -214,9 +231,9 @@ sp_failed() {
     local -a target=("$1" "$2" "$3" "$4" "$5" "$6")
     local description="$7"
     shift 7
-    sp_cli validate "${target[@]}" --validation "$SP_STAMP" --status FAILED \
+    sp_send validate "${target[@]}" --validation "$SP_STAMP" --status FAILED \
         --description "$(sp_truncate "$description")" "$@" \
-        || sp_fail "Could not post $SP_STAMP"
+        || sp_fail "Could not post $SP_STAMP, or its evidence"
     echo "::error title=SEARCH.PERFORMANCE::$description"
 }
 
