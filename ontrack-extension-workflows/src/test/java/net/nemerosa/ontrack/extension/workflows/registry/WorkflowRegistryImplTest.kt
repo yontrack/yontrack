@@ -8,6 +8,7 @@ import net.nemerosa.ontrack.extension.workflows.definition.WorkflowValidationExc
 import net.nemerosa.ontrack.extension.workflows.engine.WorkflowInstance
 import net.nemerosa.ontrack.extension.workflows.execution.WorkflowNodeExecutor
 import net.nemerosa.ontrack.extension.workflows.execution.WorkflowNodeExecutorConfigException
+import net.nemerosa.ontrack.extension.workflows.execution.WorkflowNodeValidationException
 import net.nemerosa.ontrack.extension.workflows.execution.WorkflowNodeExecutorResult
 import net.nemerosa.ontrack.extension.workflows.execution.WorkflowNodeExecutorServiceImpl
 import net.nemerosa.ontrack.it.MockSecurityService
@@ -241,7 +242,10 @@ class WorkflowRegistryImplTest {
         ).asJson()
         val validation = workflowRegistry.validateJsonWorkflow(json)
         assertTrue(validation.error)
-        assertEquals("Text is required for mock node executor", validation.errors.firstOrNull())
+        assertEquals(
+            """Configuration of node "start" in workflow "Bad node data" is not valid > Text is required for mock node executor""",
+            validation.errors.firstOrNull()
+        )
     }
 
     @Test
@@ -277,9 +281,13 @@ class WorkflowRegistryImplTest {
                   data:
                     text: ""
         """.trimIndent()
-        assertFailsWith<WorkflowNodeExecutorConfigException> {
+        val ex = assertFailsWith<WorkflowNodeValidationException> {
             workflowRegistry.saveYamlWorkflow(yaml)
         }
+        assertEquals(
+            """Configuration of node "start" in workflow "Bad node data" is not valid > Text is required for mock node executor""",
+            ex.message
+        )
     }
 
 }

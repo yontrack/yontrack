@@ -5,7 +5,7 @@ import net.nemerosa.ontrack.extension.environments.workflows.SlotWorkflowTestFix
 import net.nemerosa.ontrack.extension.workflows.definition.Workflow
 import net.nemerosa.ontrack.extension.workflows.definition.WorkflowNode
 import net.nemerosa.ontrack.extension.workflows.definition.WorkflowValidationException
-import net.nemerosa.ontrack.extension.workflows.execution.WorkflowNodeExecutorConfigException
+import net.nemerosa.ontrack.extension.workflows.execution.WorkflowNodeValidationException
 import net.nemerosa.ontrack.it.AbstractDSLTestSupport
 import net.nemerosa.ontrack.it.AsAdminTest
 import net.nemerosa.ontrack.json.asJson
@@ -33,11 +33,15 @@ class SlotWorkflowNodeValidationIT : AbstractDSLTestSupport() {
     @Test
     fun `Adding a slot workflow whose node data is not valid is rejected`() {
         slotTestSupport.withSlot { slot ->
-            assertFailsWith<WorkflowNodeExecutorConfigException> {
+            val ex = assertFailsWith<WorkflowNodeValidationException> {
                 slotWorkflowService.addSlotWorkflow(
                     slotWorkflow(slot, invalidWorkflow())
                 )
             }
+            assertTrue(
+                """node "test"""" in (ex.message ?: ""),
+                "Rejected node is named in the error: ${ex.message}"
+            )
             assertEquals(
                 emptyList(),
                 slotWorkflowService.getSlotWorkflowsBySlot(slot),
@@ -84,7 +88,7 @@ class SlotWorkflowNodeValidationIT : AbstractDSLTestSupport() {
             val slotWorkflow = slotWorkflow(slot, SlotWorkflowTestFixtures.testWorkflow())
             slotWorkflowService.addSlotWorkflow(slotWorkflow)
 
-            assertFailsWith<WorkflowNodeExecutorConfigException> {
+            assertFailsWith<WorkflowNodeValidationException> {
                 slotWorkflowService.updateSlotWorkflow(
                     slotWorkflow.withWorkflow(invalidWorkflow())
                 )
@@ -135,7 +139,7 @@ class SlotWorkflowNodeValidationIT : AbstractDSLTestSupport() {
     @Test
     fun `Adding a slot workflow whose pipeline-creation node has no environment is rejected`() {
         slotTestSupport.withSlot { slot ->
-            assertFailsWith<WorkflowNodeExecutorConfigException> {
+            val ex = assertFailsWith<WorkflowNodeValidationException> {
                 slotWorkflowService.addSlotWorkflow(
                     slotWorkflow(
                         slot,
@@ -152,6 +156,10 @@ class SlotWorkflowNodeValidationIT : AbstractDSLTestSupport() {
                     )
                 )
             }
+            assertTrue(
+                """node "creation"""" in (ex.message ?: ""),
+                "Rejected node is named in the error: ${ex.message}"
+            )
             assertEquals(
                 emptyList(),
                 slotWorkflowService.getSlotWorkflowsBySlot(slot),

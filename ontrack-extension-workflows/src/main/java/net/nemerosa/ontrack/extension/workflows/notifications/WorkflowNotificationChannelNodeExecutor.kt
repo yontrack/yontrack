@@ -14,6 +14,7 @@ import net.nemerosa.ontrack.extension.workflows.WorkflowConfigurationProperties
 import net.nemerosa.ontrack.extension.workflows.WorkflowsExtensionFeature
 import net.nemerosa.ontrack.extension.workflows.engine.WorkflowInstance
 import net.nemerosa.ontrack.extension.workflows.execution.WorkflowNodeExecutor
+import net.nemerosa.ontrack.extension.workflows.execution.WorkflowNodeExecutorConfigException
 import net.nemerosa.ontrack.extension.workflows.execution.WorkflowNodeExecutorResult
 import net.nemerosa.ontrack.extension.workflows.templating.WorkflowTemplatingContext
 import net.nemerosa.ontrack.json.asJson
@@ -75,7 +76,9 @@ class WorkflowNotificationChannelNodeExecutor(
         val channel = notificationChannelRegistry.getChannel(channelType)
         val validation = channel.validate(channelConfig)
         if (!validation.isOk()) {
-            validation.throwException()
+            // Not an error about a subscription: this notification is a node of a workflow, whichever
+            // way this workflow is saved.
+            throw WorkflowNodeExecutorConfigException(validation.errorMessage(), validation.exception)
         }
     }
 

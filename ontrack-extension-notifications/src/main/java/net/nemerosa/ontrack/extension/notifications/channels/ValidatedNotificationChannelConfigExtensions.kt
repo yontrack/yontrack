@@ -2,8 +2,11 @@ package net.nemerosa.ontrack.extension.notifications.channels
 
 import net.nemerosa.ontrack.extension.notifications.subscriptions.EventSubscriptionConfigException
 
-fun ValidatedNotificationChannelConfig<*>.throwException(): Nothing {
-    val message = if (exception != null) {
+fun ValidatedNotificationChannelConfig<*>.throwException(): Nothing =
+    throw EventSubscriptionConfigException(errorMessage())
+
+fun ValidatedNotificationChannelConfig<*>.errorMessage(): String =
+    if (exception != null) {
         if (message.isNullOrBlank()) {
             exception.message ?: exception::class.java.simpleName
         } else {
@@ -21,8 +24,6 @@ fun ValidatedNotificationChannelConfig<*>.throwException(): Nothing {
     } else {
         "Unexpected notification configuration error"
     }
-    throw EventSubscriptionConfigException(message)
-}
 
 fun <C> ValidatedNotificationChannelConfig<C>.getConfigIfOk(): C {
     if (isOk()) {

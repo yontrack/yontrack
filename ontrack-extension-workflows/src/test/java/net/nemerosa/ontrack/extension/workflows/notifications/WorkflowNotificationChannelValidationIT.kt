@@ -264,7 +264,7 @@ class WorkflowNotificationChannelValidationIT : AbstractDSLTestSupport() {
                     promotionLevel {
                         assertFailsWithEventSubscriptionConfigException(
                             """
-                                Text is required for mock node executor
+                                Configuration of node "start" in workflow "Some workflow" is not valid > Text is required for mock node executor
                             """.trimIndent()
                         ) {
                             eventSubscriptionService.subscribe(
@@ -303,7 +303,7 @@ class WorkflowNotificationChannelValidationIT : AbstractDSLTestSupport() {
                     promotionLevel {
                         assertFailsWithEventSubscriptionConfigException(
                             """
-                            Configuration for the notification in node "start" is not valid > Target cannot be blank
+                            Configuration of node "start" in workflow "Some workflow" is not valid > Target cannot be blank
                         """.trimIndent()
                         ) {
                             eventSubscriptionService.subscribe(
@@ -344,7 +344,7 @@ class WorkflowNotificationChannelValidationIT : AbstractDSLTestSupport() {
                     promotionLevel {
                         assertFailsWithEventSubscriptionConfigException(
                             """
-                                Configuration for the notification in node "start" is not valid > There was a problem parsing the JSON at path 'target': Instantiation of [simple type, class net.nemerosa.ontrack.extension.notifications.mock.MockNotificationChannelConfig] value failed for JSON property target due to missing (therefore NULL) value for creator parameter target which is a non-nullable type
+                                Configuration of node "start" in workflow "Some workflow" is not valid > There was a problem parsing the JSON at path 'target': Instantiation of [simple type, class net.nemerosa.ontrack.extension.notifications.mock.MockNotificationChannelConfig] value failed for JSON property target due to missing (therefore NULL) value for creator parameter target which is a non-nullable type
                             """.trimIndent()
                         ) {
                             eventSubscriptionService.subscribe(

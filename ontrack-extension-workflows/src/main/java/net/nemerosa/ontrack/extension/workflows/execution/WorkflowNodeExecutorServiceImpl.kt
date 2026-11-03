@@ -1,10 +1,11 @@
 package net.nemerosa.ontrack.extension.workflows.execution
 
+import net.nemerosa.ontrack.common.UserException
 import net.nemerosa.ontrack.extension.api.ExtensionManager
-import net.nemerosa.ontrack.extension.notifications.subscriptions.EventSubscriptionConfigException
 import net.nemerosa.ontrack.extension.workflows.definition.Workflow
 import net.nemerosa.ontrack.extension.workflows.definition.WorkflowNode
 import net.nemerosa.ontrack.extension.workflows.definition.WorkflowValidationException
+import net.nemerosa.ontrack.json.JsonParseException
 import org.springframework.stereotype.Service
 
 @Service
@@ -82,14 +83,11 @@ class WorkflowNodeExecutorServiceImpl(
             )
         try {
             executor.validate(node.data)
-        } catch (ex: EventSubscriptionConfigException) {
-            // Only the notification executor reports its errors this way, so naming the notification
-            // here is accurate for every case which reaches this branch.
-            throw EventSubscriptionConfigException(
-                innerMessage = """
-                    Configuration for the notification in node "${node.id}" is not valid > ${ex.innerMessage}
-                """.trimIndent(),
-            )
+        } catch (ex: UserException) {
+            throw WorkflowNodeValidationException(workflow.name, node.id, ex)
+        } catch (ex: JsonParseException) {
+            // Not a user exception, but data which cannot be parsed is what the user gets wrong first.
+            throw WorkflowNodeValidationException(workflow.name, node.id, ex)
         }
     }
 

@@ -13,6 +13,12 @@ abstract class InputException : UserException {
     constructor(message: String) : super(message)
 
     /**
+     * A message, used as it is, and the error it reports. The order is the one of
+     * [BaseException]: the other way round, this would be taken for a pattern and its parameter.
+     */
+    constructor(cause: Exception?, message: String) : super(message, cause)
+
+    /**
      * A format pattern and its parameters.
      */
     constructor(pattern: String, vararg parameters: Any) : super(BaseException.format(pattern, *parameters))

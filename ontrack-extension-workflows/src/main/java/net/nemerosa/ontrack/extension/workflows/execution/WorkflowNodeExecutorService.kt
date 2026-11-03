@@ -29,6 +29,8 @@ interface WorkflowNodeExecutorService {
      * levels, as a validation error like any other.
      *
      * @param workflow Workflow whose nodes must be validated
+     * @throws WorkflowNodeValidationException When an executor rejects the data of its node. Any other
+     * failure of an executor is not about the data, and is left to propagate as it is.
      */
     fun validateWorkflowNodes(workflow: Workflow)
 
