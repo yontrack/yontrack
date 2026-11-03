@@ -14,19 +14,26 @@ class BranchPage {
         this.changeLogButton = this.page.getByRole('button', {name: 'Change log', exact: true})
     }
 
-    async checkOnPage() {
+    /**
+     * @param withBuilds Waits for the builds to have arrived. An opt-in, because a branch may
+     *   legitimately have none, and the page offers no signal for "loaded, and empty": the title
+     *   comes before the table, and the table shows its "No data" placeholder while it is loading.
+     */
+    async checkOnPage({withBuilds = false} = {}) {
         // Scoped to the page header on purpose: after a client-side navigation, Next mirrors the
         // document title — which carries the branch name — into its route announcer, so looking for
         // the name anywhere on the page matches twice
         await expect(this.page.getByTestId('branch-title')).toContainText(this.branch.name)
-        // Loading finished
-        await expect(this.page.getByTestId('loading-builds')).toBeHidden()
+        if (withBuilds) {
+            // Only a populated row carries `data-row-key`, the placeholder does not
+            await expect(this.page.locator('.ant-table-row[data-row-key]').first()).toBeVisible()
+        }
     }
 
-    async goTo({view} = {}) {
+    async goTo({view, withBuilds} = {}) {
         const query = view === undefined ? '' : `?view=${encodeURIComponent(view)}`
         await this.page.goto(`${this.branch.ontrack.connection.ui}/branch/${this.branch.id}${query}`)
-        await this.checkOnPage()
+        await this.checkOnPage({withBuilds})
     }
 
     contentViewMenuButton() {

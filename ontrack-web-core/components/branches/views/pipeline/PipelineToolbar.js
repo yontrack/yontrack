@@ -77,7 +77,7 @@ export default function PipelineToolbar({
             <AutoRefreshButton/>
             {
                 loading &&
-                <Popover data-testid="loading-builds" content="Loading builds...">
+                <Popover content="Loading builds...">
                     <Spin/>
                 </Popover>
             }
