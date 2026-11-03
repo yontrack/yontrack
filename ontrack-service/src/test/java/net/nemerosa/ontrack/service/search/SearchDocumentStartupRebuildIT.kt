@@ -65,6 +65,17 @@ class SearchDocumentStartupRebuildIT : AbstractDSLTestSupport() {
         storageService.delete(SearchDocumentStartupRebuild.STORE, indexer.searchResultType.id)
     }
 
+    /**
+     * Fires the rebuild of what is out of date, once the trigger of any previous fire of the test
+     * type is gone: Quartz deletes it just after its run, after the completion of its future, and
+     * until then the fire returns 0 (#2105).
+     */
+    private fun launchOnceTriggerGone(startupDelay: Duration) {
+        waitUntil("The rebuild is fired", interval = 100.milliseconds, timeout = 10.seconds) {
+            searchDocumentStartupRebuild.launch(startupDelay) > 0
+        }
+    }
+
     @Test
     fun `The rebuild of every type is a job`() {
         val keys = jobScheduler.getJobKeysOfType(SearchDocumentStartupRebuild.startupRebuildJobType)
@@ -78,8 +89,8 @@ class SearchDocumentStartupRebuildIT : AbstractDSLTestSupport() {
     fun `The documents of a type out of date are rebuilt once, after the startup delay`() {
         outOfDate()
         val before = runs()
-        assertEquals(1, searchDocumentStartupRebuild.launch(Duration.ofSeconds(2)), "Rebuild fired")
-        assertEquals(0, searchDocumentStartupRebuild.launch(Duration.ofSeconds(2)), "No second rebuild while the first one is pending")
+        launchOnceTriggerGone(Duration.ofSeconds(2))
+        assertEquals(0, searchDocumentStartupRebuild.fire(listOf(indexer), Duration.ofSeconds(2)), "No second rebuild while the first one is pending")
         assertEquals(before, runs(), "Not rebuilt before the delay")
         searchDocumentStartupRebuild.awaitCompletion()
         assertEquals(before + 1, runs(), "Rebuilt once")
@@ -98,7 +109,7 @@ class SearchDocumentStartupRebuildIT : AbstractDSLTestSupport() {
     @Test
     fun `The documents of a type up to date are not rebuilt`() {
         outOfDate()
-        searchDocumentStartupRebuild.launch(Duration.ZERO)
+        launchOnceTriggerGone(Duration.ZERO)
         searchDocumentStartupRebuild.awaitCompletion()
         val before = runs()
         assertEquals(0, searchDocumentStartupRebuild.launch(Duration.ZERO), "No rebuild fired")
@@ -126,8 +137,7 @@ class SearchDocumentStartupRebuildIT : AbstractDSLTestSupport() {
         outOfDate()
         val runsBefore = runs()
         val rebuildsBefore = rebuilds()
-        assertEquals(1, searchDocumentStartupRebuild.launch(Duration.ZERO), "First replica")
-        searchDocumentStartupRebuild.awaitCompletion()
+        fireAs("First replica")
         fireAs("Second replica")
         assertEquals(runsBefore + 2, runs(), "Two runs")
         assertEquals(rebuildsBefore + 1, rebuilds(), "One rebuild")
