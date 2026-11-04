@@ -24,7 +24,7 @@ data class ProjectConfiguration(
 
 
     fun merge(project: ProjectConfiguration, ciConfigExtensionService: CIConfigExtensionService) = ProjectConfiguration(
-        properties = this.properties + project.properties,
+        properties = mergeProperties(this.properties, project.properties),
         projectName = project.projectName ?: this.projectName,
         issueServiceIdentifier = project.issueServiceIdentifier ?: this.issueServiceIdentifier,
         scmIndexationInterval = project.scmIndexationInterval ?: this.scmIndexationInterval,

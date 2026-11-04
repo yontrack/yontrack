@@ -7,6 +7,7 @@ import net.nemerosa.ontrack.it.AsAdminTest
 import net.nemerosa.ontrack.json.asJson
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
+import tools.jackson.databind.node.NullNode
 import kotlin.test.assertEquals
 
 class GQLRootQueryCIConfigurationIT : AbstractQLKTITSupport() {
@@ -91,6 +92,42 @@ class GQLRootQueryCIConfigurationIT : AbstractQLKTITSupport() {
                     scmEngine = "mock",
                 ),
                 config
+            )
+        }
+    }
+
+    @Test
+    @AsAdminTest
+    fun `The effective configuration shows a deletion as a null, once per property type`() {
+        configTestSupport.graphQLEffectiveConfiguration(
+            yaml = """
+                version: v1
+                configuration:
+                  defaults:
+                    branch:
+                      properties:
+                        notGrantedMedals: true
+                  custom:
+                    configs:
+                      - conditions:
+                          - name: branch
+                            config: release.*
+                        branch:
+                          properties:
+                            notGrantedMedals: null
+            """.trimIndent(),
+            ci = "generic",
+            scm = "mock",
+            env = mapOf("BRANCH_NAME" to "release/1.0"),
+        ) { config ->
+            assertEquals(
+                listOf(
+                    PropertyConfiguration(
+                        type = "net.nemerosa.ontrack.extension.general.NotGrantedMedalsPropertyType",
+                        data = NullNode.instance,
+                    )
+                ),
+                config.configuration.branch.properties,
             )
         }
     }

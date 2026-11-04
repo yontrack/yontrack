@@ -16,7 +16,7 @@ data class BuildConfiguration(
 
     fun merge(build: BuildConfiguration, ciConfigExtensionService: CIConfigExtensionService) = BuildConfiguration(
         buildName = build.buildName ?: this.buildName,
-        properties = this.properties + build.properties,
+        properties = mergeProperties(this.properties, build.properties),
         extensions = ciConfigExtensionService.merge(this.extensions, build.extensions),
     )
 }

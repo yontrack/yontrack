@@ -297,8 +297,12 @@ class CoreConfigurationServiceImpl(
         env: Map<String, String>,
     ) {
         defaults.forEach { config ->
-            val type = propertyService.getPropertyTypeByName<Any>(config.type)
-            configureProperty(entity, type, config.data, env)
+            if (config.data.isNull) {
+                propertyService.deleteProperty(entity, config.type)
+            } else {
+                val type = propertyService.getPropertyTypeByName<Any>(config.type)
+                configureProperty(entity, type, config.data, env)
+            }
         }
     }
 

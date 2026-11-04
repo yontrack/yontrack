@@ -21,7 +21,7 @@ data class BranchConfiguration(
         branch: BranchConfiguration,
         ciConfigExtensionService: CIConfigExtensionService,
     ) = BranchConfiguration(
-        properties = this.properties + branch.properties,
+        properties = mergeProperties(this.properties, branch.properties),
         validations = mergeList(this.validations, branch.validations, { it.name }, { a, b -> a.merge(b) }),
         promotions = mergeList(this.promotions, branch.promotions, { it.name }, { a, b -> a.merge(b) }),
         extensions = ciConfigExtensionService.merge(this.extensions, branch.extensions),

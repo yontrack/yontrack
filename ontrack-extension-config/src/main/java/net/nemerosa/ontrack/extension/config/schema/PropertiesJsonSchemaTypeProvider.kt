@@ -23,11 +23,11 @@ class PropertiesJsonSchemaTypeProvider(
             if (!ignore && propertyType.supportedEntityTypes.contains(entityType)) {
                 val typeName = propertyType.typeName
                 val jsonType = propertyType.createConfigJsonType(jsonTypeBuilder)
-                properties[typeName] = jsonType
+                properties[typeName] = deletable(jsonType)
                 // Alias?
                 propertyAliases.forEach { alias ->
                     if (alias.type == typeName) {
-                        properties[alias.alias] = alias.createJsonType(jsonTypeBuilder)
+                        properties[alias.alias] = deletable(alias.createJsonType(jsonTypeBuilder))
                     }
                 }
             }
@@ -42,5 +42,8 @@ class PropertiesJsonSchemaTypeProvider(
             oneOf = null,
         )
     }
+
+    private fun deletable(jsonType: JsonType) =
+        JsonNullableType(jsonType, nullDescription = "Deletes the property")
 
 }

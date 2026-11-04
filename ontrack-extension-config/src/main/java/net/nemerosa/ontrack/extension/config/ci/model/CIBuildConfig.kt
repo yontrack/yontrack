@@ -17,7 +17,7 @@ data class CIBuildConfig(
         provider = PropertiesJsonSchemaTypeProvider::class,
         configuration = "BUILD",
     )
-    override val properties: Map<String, JsonNode> = emptyMap(),
+    override val properties: Map<String, JsonNode?> = emptyMap(),
     @JsonSchemaPropertiesContributor(
         provider = CIConfigExtensionJsonSchemaPropertiesContributorProvider::class,
         configuration = "BUILD",

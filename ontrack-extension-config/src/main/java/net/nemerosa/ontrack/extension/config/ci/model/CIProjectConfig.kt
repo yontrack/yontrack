@@ -16,7 +16,7 @@ data class CIProjectConfig(
         provider = PropertiesJsonSchemaTypeProvider::class,
         configuration = "PROJECT",
     )
-    override val properties: Map<String, JsonNode> = emptyMap(),
+    override val properties: Map<String, JsonNode?> = emptyMap(),
     @APIDescription("Overriding the name of the project")
     val name: String? = null,
     @APIDescription("Name of the SCM configuration to use for this project")

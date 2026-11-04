@@ -13,6 +13,7 @@ import net.nemerosa.ontrack.model.structure.PropertyService
 import net.nemerosa.ontrack.model.structure.PropertyType
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 class PropertiesJsonSchemaTypeProviderTest {
 
@@ -35,7 +36,7 @@ class PropertiesJsonSchemaTypeProviderTest {
         propertyAliases = listOf(alias),
     )
 
-    private fun errors(entityType: ProjectEntityType, value: Map<String, Any>) =
+    private fun errors(entityType: ProjectEntityType, value: Map<String, Any?>) =
         SchemaRegistry.withDefaultDialect(SpecificationVersion.DRAFT_2020_12)
             .getSchema(provider.createType(entityType.name, mockk()).asJson())
             .validate(value.asJson())
@@ -49,6 +50,22 @@ class PropertiesJsonSchemaTypeProviderTest {
                 "Several properties on $entityType",
             )
         }
+    }
+
+    @Test
+    fun `A null is accepted for a property, by its class name and by its alias`() {
+        listOf(ProjectEntityType.PROJECT, ProjectEntityType.BRANCH, ProjectEntityType.BUILD).forEach { entityType ->
+            assertEquals(
+                emptyList(),
+                errors(entityType, mapOf("first" to null, "net.nemerosa.First" to null, "net.nemerosa.Second" to null)),
+                "Null properties on $entityType",
+            )
+        }
+    }
+
+    @Test
+    fun `A value of the wrong type is still rejected`() {
+        assertTrue(errors(ProjectEntityType.BRANCH, mapOf("first" to "not a boolean")).isNotEmpty())
     }
 
 }

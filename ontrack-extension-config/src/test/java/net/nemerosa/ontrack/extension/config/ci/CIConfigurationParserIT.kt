@@ -1,15 +1,18 @@
 package net.nemerosa.ontrack.extension.config.ci
 
+import tools.jackson.databind.node.NullNode
 import tools.jackson.databind.node.StringNode
 import net.nemerosa.ontrack.extension.config.model.*
 import net.nemerosa.ontrack.it.AbstractDSLTestSupport
 import net.nemerosa.ontrack.json.asJson
+import net.nemerosa.ontrack.model.exceptions.PropertyTypeNotFoundException
 import net.nemerosa.ontrack.model.structure.PromotionLevelConfiguration
 import net.nemerosa.ontrack.model.structure.PromotionLevelField
 import net.nemerosa.ontrack.model.structure.PromotionLevelFieldType
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 
 class CIConfigurationParserIT : AbstractDSLTestSupport() {
 
@@ -327,6 +330,66 @@ class CIConfigurationParserIT : AbstractDSLTestSupport() {
             ),
             config
         )
+    }
+
+    private fun branchProperties(property: String) = parser.parseConfig(
+        """
+            version: v1
+            configuration:
+              defaults:
+                branch:
+                  properties:
+                    $property
+        """.trimIndent()
+    ).configuration.defaults.branch.properties
+
+    @Test
+    fun `A null property with an alias is a deletion of its type`() {
+        assertEquals(
+            listOf(
+                PropertyConfiguration(
+                    type = "net.nemerosa.ontrack.extension.general.NotGrantedMedalsPropertyType",
+                    data = NullNode.instance,
+                )
+            ),
+            branchProperties("notGrantedMedals: null")
+        )
+    }
+
+    @Test
+    fun `A null property with a class name is a deletion of its type`() {
+        assertEquals(
+            listOf(
+                PropertyConfiguration(
+                    type = "net.nemerosa.ontrack.extension.general.MessagePropertyType",
+                    data = NullNode.instance,
+                )
+            ),
+            branchProperties("net.nemerosa.ontrack.extension.general.MessagePropertyType: null")
+        )
+    }
+
+    @Test
+    fun `A tilde and an empty key are the same as null`() {
+        listOf("notGrantedMedals: ~", "notGrantedMedals:").forEach { property ->
+            assertEquals(
+                listOf(
+                    PropertyConfiguration(
+                        type = "net.nemerosa.ontrack.extension.general.NotGrantedMedalsPropertyType",
+                        data = NullNode.instance,
+                    )
+                ),
+                branchProperties(property),
+                property,
+            )
+        }
+    }
+
+    @Test
+    fun `A null property on an unknown type fails`() {
+        assertFailsWith<PropertyTypeNotFoundException> {
+            branchProperties("unknownProperty: null")
+        }
     }
 
 }

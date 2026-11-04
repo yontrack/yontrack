@@ -629,6 +629,8 @@ When a custom configuration conditions are met, it is merged with the default co
 The rules to merge a custom configuration into a default one are:
 
 * properties, validations and promotions are merged at key level
+* properties are merged by property type and the last one wins: a custom `null` cancels a default value, and a custom
+  value overrides a default `null` - see [Deleting a property](#deleting-a-property)
 * in lists:
     * custom elements not present in the default list are added
     * default elements not present in the custom list are left
@@ -1061,15 +1063,50 @@ branch:
     notGrantedMedals: false
 ```
 
-!!! note "Removing a property from the configuration"
-
-    The CI configuration only ever sets properties. A key removed from the YAML leaves the last value in place, and
-    as long as a key is present, each CI run overwrites what was edited in the UI. To go back to inheriting, remove the
-    key and delete the property, in the UI or through the API.
-
 !!! note
 
     You can use the [JSON schema](#json-schema) to see which other properties are available and what is their configuration.
+
+#### Deleting a property
+
+A property is deleted explicitly, with a `null` value, by its alias or by its class name:
+
+```yaml
+branch:
+  properties:
+    notGrantedMedals: null
+```
+
+Each key of a `properties` block is in one of three states:
+
+| In the YAML      | On every CI run                  | UI and API edits |
+|------------------|----------------------------------|------------------|
+| Key with a value | CI sets the value                | Overwritten      |
+| Key with `null`  | CI keeps the property absent     | Deleted          |
+| No key           | CI leaves the property untouched | Kept             |
+
+So removing a key from the YAML does not remove the property. The last value stays on the entity until a `null` is set
+in the YAML, or until the property is deleted in the UI or through the API. To clear a property which is not wanted any
+more, add its key with `null` and run the CI once.
+
+This works the same at project, branch and build level, in `defaults` and in `custom`. On a build, it only matters when
+a stable [build name](#build-name) runs again on an existing build.
+
+A `null` left in the YAML is harmless: when the property is absent, nothing happens and no event is posted. A `null` on
+an unknown property type or alias fails, as a value does.
+
+!!! warning "An empty key is a `null`"
+
+    In YAML, `null`, `~` and an empty `key:` are the same value, and all three delete the property. A key whose value
+    was forgotten deletes the property instead of being ignored. Their quoted forms, `"~"` and `""`, delete it as well.
+
+!!! warning "Properties set by the engines"
+
+    A `null` also applies to what the SCM engine or the auto-validation extension has just set: it deletes it on every
+    run, and this may break the steps which come later. The other way around, a [CI Config extension](#extensions) which
+    runs after the properties sets its property again, whatever the `null`. So does the `VERSION` environment variable
+    for the `release` property of a build: it is set again at the end of the run, so that `release: null` only keeps the
+    release absent when no `VERSION` is defined.
 
 ## JSON schema
 

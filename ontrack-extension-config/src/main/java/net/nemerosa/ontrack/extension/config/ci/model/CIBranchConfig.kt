@@ -17,7 +17,7 @@ data class CIBranchConfig(
         provider = PropertiesJsonSchemaTypeProvider::class,
         configuration = "BRANCH",
     )
-    override val properties: Map<String, JsonNode> = emptyMap(),
+    override val properties: Map<String, JsonNode?> = emptyMap(),
     @APIDescription("List of validation stamps to define for the branch.")
     @JsonSchemaMapValueType(
         provider = ValidationJsonSchemaMapValueTypeProvider::class,

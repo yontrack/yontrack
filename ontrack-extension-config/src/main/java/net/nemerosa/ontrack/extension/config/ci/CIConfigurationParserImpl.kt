@@ -1,6 +1,7 @@
 package net.nemerosa.ontrack.extension.config.ci
 
 import tools.jackson.databind.JsonNode
+import tools.jackson.databind.node.NullNode
 import tools.jackson.databind.node.ObjectNode
 import net.nemerosa.ontrack.extension.api.ExtensionManager
 import net.nemerosa.ontrack.extension.config.ci.model.*
@@ -255,10 +256,16 @@ class CIConfigurationParserImpl(
 
     private fun convertProperty(
         type: String,
-        data: JsonNode
+        data: JsonNode?
     ): PropertyConfiguration {
         val propertyAlias = propertyAliasService.findPropertyAlias(type)
-        return if (propertyAlias != null) {
+        return if (data == null || isYamlNull(data)) {
+            // A deletion: neither the alias nor the property type are asked to read a value
+            PropertyConfiguration(
+                type = propertyService.getPropertyTypeByName<Any>(propertyAlias?.type ?: type).typeName,
+                data = NullNode.instance,
+            )
+        } else if (propertyAlias != null) {
             convertActualProperty(
                 type = propertyAlias.type,
                 data = propertyAlias.parseConfig(data),
@@ -270,6 +277,12 @@ class CIConfigurationParserImpl(
             )
         }
     }
+
+    /**
+     * The YAML parser only reads `null` as a null. It gives `~` and an empty value as strings, which cannot be told
+     * from their quoted forms.
+     */
+    private fun isYamlNull(data: JsonNode) = data.isNull || (data.isString && data.asString() in setOf("~", ""))
 
     private fun convertActualProperty(
         type: String,
