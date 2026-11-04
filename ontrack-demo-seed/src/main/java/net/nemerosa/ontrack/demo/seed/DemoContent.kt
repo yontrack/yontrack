@@ -319,6 +319,15 @@ object DemoContent {
     /** The manual admission rule of the staging slot of [VETS], which only a person can answer. */
     const val VETS_APPROVAL = "approval"
 
+    // The people writing the commits of the change logs - fictional, and people only: see DemoPerson.
+    private val amaraOkafor = DemoPerson("Amara Okafor", "amara.okafor@example.com")
+    private val jonasLindqvist = DemoPerson("Jonas Lindqvist", "jonas.lindqvist@example.com")
+    private val mariaEscobar = DemoPerson("Maria Escobar", "maria.escobar@example.com")
+    private val priyaNair = DemoPerson("Priya Nair", "priya.nair@example.com")
+    private val tomasHerrera = DemoPerson("Tomas Herrera", "tomas.herrera@example.com")
+
+    private fun DemoPerson.wrote(message: String) = CommitSpec(message, this)
+
     /**
      * The whole dataset, curated part and changelog project together.
      *
@@ -776,8 +785,8 @@ object DemoContent {
                         links = listOf(BuildRef(LIBRARY, MAIN, "41")),
                         scans = serviceScans(webMvcFixed = false),
                         commits = listOf(
-                            "feat(api): search owners by their phone number, closes PETCLINIC-142",
-                            "test: cover the owner search endpoint",
+                            priyaNair.wrote("feat(api): search owners by their phone number, closes PETCLINIC-142"),
+                            jonasLindqvist.wrote("test: cover the owner search endpoint"),
                         ),
                     ),
                     BuildSpec(
@@ -795,8 +804,8 @@ object DemoContent {
                         links = listOf(BuildRef(LIBRARY, MAIN, "41")),
                         scans = serviceScans(webMvcFixed = false),
                         commits = listOf(
-                            "feat(ui): paginate the visit history, closes PETCLINIC-157",
-                            "docs: describe the visit history endpoint",
+                            amaraOkafor.wrote("feat(ui): paginate the visit history, closes PETCLINIC-157"),
+                            priyaNair.wrote("docs: describe the visit history endpoint"),
                         ),
                     ),
                     BuildSpec(
@@ -812,8 +821,8 @@ object DemoContent {
                         links = listOf(BuildRef(LIBRARY, MAIN, "41")),
                         scans = serviceScans(webMvcFixed = false),
                         commits = listOf(
-                            "feat(admin): administer the vet specialities, closes PETCLINIC-165",
-                            "refactor: extract the speciality repository",
+                            jonasLindqvist.wrote("feat(admin): administer the vet specialities, closes PETCLINIC-165"),
+                            jonasLindqvist.wrote("refactor: extract the speciality repository"),
                         ),
                     ),
                     BuildSpec(
@@ -831,8 +840,8 @@ object DemoContent {
                         links = listOf(BuildRef(LIBRARY, MAIN, "42")),
                         scans = serviceScans(webMvcFixed = true),
                         commits = listOf(
-                            "fix(tests): stabilise the visit scheduling test, closes PETCLINIC-163",
-                            "chore(deps): bump common-library to 3.2.1",
+                            amaraOkafor.wrote("fix(tests): stabilise the visit scheduling test, closes PETCLINIC-163"),
+                            jonasLindqvist.wrote("chore(deps): bump common-library to 3.2.1"),
                         ),
                     ),
                     BuildSpec(
@@ -855,8 +864,8 @@ object DemoContent {
                         links = listOf(BuildRef(LIBRARY, MAIN, "42")),
                         scans = serviceScans(webMvcFixed = true),
                         commits = listOf(
-                            "perf(api): cache the pet type reference data, closes PETCLINIC-171",
-                            "docs: note when the pet type cache is evicted",
+                            priyaNair.wrote("perf(api): cache the pet type reference data, closes PETCLINIC-171"),
+                            priyaNair.wrote("docs: note when the pet type cache is evicted"),
                         ),
                     ),
                     BuildSpec(
@@ -871,8 +880,8 @@ object DemoContent {
                         links = listOf(BuildRef(LIBRARY, MAIN, "42")),
                         scans = serviceScans(webMvcFixed = true),
                         commits = listOf(
-                            "feat(export): export the owners as CSV, closes PETCLINIC-178",
-                            "style: reformat the export writer",
+                            amaraOkafor.wrote("feat(export): export the owners as CSV, closes PETCLINIC-178"),
+                            amaraOkafor.wrote("style: reformat the export writer"),
                         ),
                     ),
                     BuildSpec(
@@ -896,8 +905,8 @@ object DemoContent {
                         links = listOf(BuildRef(LIBRARY, MAIN, "42")),
                         scans = serviceScans(webMvcFixed = true),
                         commits = listOf(
-                            "fix(export): write the CSV in UTF-8, closes PETCLINIC-181",
-                            "ci: run the export tests on the canary pipeline",
+                            amaraOkafor.wrote("fix(export): write the CSV in UTF-8, closes PETCLINIC-181"),
+                            jonasLindqvist.wrote("ci: run the export tests on the canary pipeline"),
                         ),
                     ),
                 ),
@@ -922,7 +931,7 @@ object DemoContent {
                             ValidationSpec(INTEGRATION_TESTS, PASSED),
                         ),
                         commits = listOf(
-                            "feat(api): backport the owner search by phone number, closes PETCLINIC-149",
+                            jonasLindqvist.wrote("feat(api): backport the owner search by phone number, closes PETCLINIC-149"),
                         ),
                     ),
                     BuildSpec(
@@ -938,8 +947,8 @@ object DemoContent {
                             ValidationSpec(SECURITY_SCAN, PASSED),
                         ),
                         commits = listOf(
-                            "fix(security): mark the session cookie as SameSite",
-                            "test: cover the session cookie attributes",
+                            priyaNair.wrote("fix(security): mark the session cookie as SameSite"),
+                            priyaNair.wrote("test: cover the session cookie attributes"),
                         ),
                     ),
                     BuildSpec(
@@ -955,8 +964,8 @@ object DemoContent {
                             ValidationSpec(SECURITY_SCAN, PASSED),
                         ),
                         commits = listOf(
-                            "fix(security): shorten the session cookie lifetime",
-                            "docs: record the session cookie settings",
+                            jonasLindqvist.wrote("fix(security): shorten the session cookie lifetime"),
+                            jonasLindqvist.wrote("docs: record the session cookie settings"),
                         ),
                     ),
                     // The head of this branch, and the only build of the demo which ARRIVED
@@ -981,7 +990,7 @@ object DemoContent {
                             ValidationSpec(BUILD, FAILED, "Unresolved symbol in the session config."),
                         ),
                         commits = listOf(
-                            "feat(security): make the session cookie lifetime configurable",
+                            priyaNair.wrote("feat(security): make the session cookie lifetime configurable"),
                         ),
                     ),
                 ),
@@ -1901,8 +1910,8 @@ object DemoContent {
                         description = "The vets and their specialities.",
                         creation = DaysAgo(12),
                         commits = listOf(
-                            "feat(vets): list the vets with their specialities, closes VETS-1",
-                            "test: cover the vet listing",
+                            mariaEscobar.wrote("feat(vets): list the vets with their specialities, closes VETS-1"),
+                            tomasHerrera.wrote("test: cover the vet listing"),
                         ),
                         validations = listOf(
                             ValidationSpec(BUILD, PASSED),
@@ -1917,12 +1926,14 @@ object DemoContent {
                         description = "Vets filtered by speciality. Not assisted: its co-author is a person.",
                         creation = DaysAgo(8),
                         commits = listOf(
-                            """
-                                |feat(vets): filter the vets by speciality, closes VETS-4
-                                |
-                                |Co-authored-by: Maria Escobar <maria.escobar@example.com>
-                            """.trimMargin(),
-                            "fix(vets): sort the specialities by name",
+                            tomasHerrera.wrote(
+                                """
+                                    |feat(vets): filter the vets by speciality, closes VETS-4
+                                    |
+                                    |Co-authored-by: Maria Escobar <maria.escobar@example.com>
+                                """.trimMargin()
+                            ),
+                            mariaEscobar.wrote("fix(vets): sort the specialities by name"),
                         ),
                         validations = listOf(
                             ValidationSpec(BUILD, PASSED),
@@ -1937,10 +1948,10 @@ object DemoContent {
                         creation = DaysAgo(4),
                         agent = vetsSessionReviewed,
                         commits = listOf(
-                            withClaude("feat(schedule): book a visit slot with a vet, closes VETS-7", vetsSessionReviewed),
-                            withClaude("test(schedule): cover overlapping bookings", vetsSessionReviewed),
-                            withCodex("refactor(schedule): extract the slot calendar"),
-                            "docs: describe the booking rules",
+                            mariaEscobar.wrote(withClaude("feat(schedule): book a visit slot with a vet, closes VETS-7", vetsSessionReviewed)),
+                            mariaEscobar.wrote(withClaude("test(schedule): cover overlapping bookings", vetsSessionReviewed)),
+                            tomasHerrera.wrote(withCodex("refactor(schedule): extract the slot calendar")),
+                            mariaEscobar.wrote("docs: describe the booking rules"),
                         ),
                         validations = listOf(
                             ValidationSpec(BUILD, PASSED),
@@ -1957,8 +1968,8 @@ object DemoContent {
                         creation = HoursAgo(6),
                         agent = vetsSessionBlocked,
                         commits = listOf(
-                            withClaude("feat(schedule): cancel a booked visit, closes VETS-9", vetsSessionBlocked),
-                            withClaude("fix(schedule): free the slot of a cancelled visit", vetsSessionBlocked),
+                            tomasHerrera.wrote(withClaude("feat(schedule): cancel a booked visit, closes VETS-9", vetsSessionBlocked)),
+                            tomasHerrera.wrote(withClaude("fix(schedule): free the slot of a cancelled visit", vetsSessionBlocked)),
                         ),
                         validations = listOf(
                             ValidationSpec(BUILD, PASSED),
@@ -2040,7 +2051,7 @@ object DemoContent {
                         description = "Release candidate of 2.4.0.",
                         creation = DaysAgo(3),
                         token = CI_TOKEN,
-                        commits = listOf("feat(audit): record who changed what on a release (AUDIT-12)"),
+                        commits = listOf(amaraOkafor.wrote("feat(audit): record who changed what on a release (AUDIT-12)")),
                         promotionLevels = listOf(BRONZE),
                         validations = listOf(
                             ValidationSpec(BUILD, PASSED),
@@ -2056,8 +2067,8 @@ object DemoContent {
                         creation = HoursAgo(14),
                         token = CI_TOKEN,
                         commits = listOf(
-                            "fix(audit): record the evidence of a deleted validation run (AUDIT-13)",
-                            "chore(release): 2.4.0",
+                            jonasLindqvist.wrote("fix(audit): record the evidence of a deleted validation run (AUDIT-13)"),
+                            amaraOkafor.wrote("chore(release): 2.4.0"),
                         ),
                         promotionLevels = listOf(BRONZE, SILVER, GOLD),
                         validations = listOf(

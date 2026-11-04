@@ -12229,6 +12229,10 @@ input MockScmDeleteRepositoryInput {
 
 "Input type for the mockScmRegisterCommit mutation."
 input MockScmRegisterCommitInput {
+  "Name of the author of the commit, `unknown` if not set"
+  author: String
+  "Email of the author of the commit"
+  authorEmail: String
   "Commit message"
   message: String!
   "Name of the mock SCM repository"

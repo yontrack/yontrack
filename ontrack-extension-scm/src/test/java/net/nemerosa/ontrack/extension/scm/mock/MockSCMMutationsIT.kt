@@ -35,6 +35,60 @@ class MockSCMMutationsIT : AbstractQLKTITSupport() {
     }
 
     @Test
+    fun `Registering a commit with its author`() {
+        val repository = uid("repo-")
+        asAdmin {
+            run(
+                """
+                    mutation {
+                        mockScmRegisterCommit(input: {
+                            repository: "$repository",
+                            scmBranch: "main",
+                            message: "feat: something",
+                            author: "Maria Escobar",
+                            authorEmail: "maria.escobar@example.com"
+                        }) {
+                            commit { author authorEmail }
+                            errors { message }
+                        }
+                    }
+                """
+            ) { data ->
+                assertNoUserError(data, "mockScmRegisterCommit")
+                val commit = data.path("mockScmRegisterCommit").path("commit")
+                assertEquals("Maria Escobar", commit.path("author").asText())
+                assertEquals("maria.escobar@example.com", commit.path("authorEmail").asText())
+            }
+        }
+    }
+
+    @Test
+    fun `Registering a commit without an author`() {
+        val repository = uid("repo-")
+        asAdmin {
+            run(
+                """
+                    mutation {
+                        mockScmRegisterCommit(input: {
+                            repository: "$repository",
+                            scmBranch: "main",
+                            message: "feat: something"
+                        }) {
+                            commit { author authorEmail }
+                            errors { message }
+                        }
+                    }
+                """
+            ) { data ->
+                assertNoUserError(data, "mockScmRegisterCommit")
+                val commit = data.path("mockScmRegisterCommit").path("commit")
+                assertEquals("unknown", commit.path("author").asText())
+                assertTrue(commit.path("authorEmail").isNull, "No email")
+            }
+        }
+    }
+
+    @Test
     fun `Registering an issue and linking it to a commit`() {
         val repository = uid("repo-")
         asAdmin {

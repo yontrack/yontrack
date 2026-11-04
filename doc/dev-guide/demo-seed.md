@@ -67,7 +67,7 @@ which for the demo means an environment variable in its Helm values:
 |---------|----------|------------|
 | **Simulated gate** node executor (`executorId: mock`), which the two staging slot workflows are built on | `ontrack.config.extension.workflows.mock.enabled` | `ONTRACK_CONFIG_EXTENSION_WORKFLOWS_MOCK_ENABLED` |
 | **Mock Jenkins** notification channel (`mock-jenkins`), which the two Jenkins jobs of the CANARY promotion workflow run on | `ontrack.config.extension.jenkins.mock.enabled` | `ONTRACK_CONFIG_EXTENSION_JENKINS_MOCK_ENABLED` |
-| **Mock SCM**, which the change log on `petclinic` is read from | `ontrack.config.extension.scm.mock.enabled` | `ONTRACK_CONFIG_EXTENSION_SCM_MOCK_ENABLED` |
+| **Mock SCM**, which the change logs of `petclinic`, `petclinic-vets` and `audit-trail-demo` are read from | `ontrack.config.extension.scm.mock.enabled` | `ONTRACK_CONFIG_EXTENSION_SCM_MOCK_ENABLED` |
 
 The mock Jenkins needs no Jenkins configuration: a `mock-jenkins` node naming a configuration the
 instance does not have runs on a mock Jenkins of that name (`demo-jenkins` for the demo), because
@@ -165,10 +165,16 @@ the warning in the log is the only signal.
 
 ### The change log
 
-`petclinic` is the only project with an SCM, and it is the **mock** one: the seed registers
-the commits behind the demo's change logs itself, over REST, rather than pointing the project
-at a real repository. A real Git configuration would trade a self-contained reset for one
-depending on credentials and network egress.
+`petclinic`, `petclinic-vets` and `audit-trail-demo` are the projects with an SCM, and it is the
+**mock** one: the seed registers the commits behind the demo's change logs itself, rather than
+pointing the projects at a real repository. A real Git configuration would trade a self-contained
+reset for one depending on credentials and network egress.
+
+**A commit has an author.** A `CommitSpec` takes its message and a `DemoPerson`, and the author is
+required because the mock SCM otherwise shows `unknown`. The people are fictional, on `example.com`,
+and always people: the server reads the author of a commit to recognise assistants, so a bot or an
+agent as an author would change the assisted reading of a build. An assistant is a co-author, in a
+trailer of the message. Authors need no account on the instance: they are only text on the commit.
 
 The commit subjects are conventional-commit ones on purpose. The semantic change log groups
 commits by their type and `SemanticChangelogRenderingServiceImpl` drops every commit carrying
@@ -551,7 +557,7 @@ fetched, and a link to a real service would lead nowhere.
   runs as - records the runs of a stamp taking evidence from non-agents only
   (`ValidationStampSpec.nonAgentEvidence`), promotes on every other level, and backdates the build,
   which is an edit the policy denies an agent; the signature of the build keeps its agent.
-- **The commits carry full messages.** `BuildSpec.commits` are messages, not subjects: Claude Code's
+- **The commits carry full messages.** `CommitSpec.message` is a message, not a subject: Claude Code's
   `Co-Authored-By` and `Claude-Session` trailers, Codex's `Co-authored-by`, and one co-author who is
   a person and does not count. The server computes the assisted change of each build from them.
 - **The seed waits for the assisted change before promoting to a gated level.** The server computes

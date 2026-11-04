@@ -120,7 +120,7 @@ class DemoAgentsSeedTest {
     @Test
     fun `the commits of the agents carry the trailers of their tools, and the Claude session`() {
         val repository = DemoContent.dataset(emptyList()).projects.single { it.name == DemoContent.VETS }
-        val messages = repository.branches.single().builds.flatMap { it.commits }
+        val messages = repository.branches.single().builds.flatMap { it.commits }.map { it.message }
 
         assertTrue(messages.any { "Co-Authored-By: Claude <noreply@anthropic.com>" in it })
         assertTrue(messages.any { "Claude-Session: https://" in it })
@@ -130,6 +130,45 @@ class DemoAgentsSeedTest {
             "One commit has a co-author who is a person",
         )
     }
+
+    /**
+     * The server reads the author of a commit too (`SCMCommitAssistants`), and an author it took for
+     * an assistant would change the assisted reading of a build: authors are people, an assistant
+     * being a co-author beside them. The markers are the built-in ones of the server, which the seed
+     * does not depend on, and the server ignores their case.
+     */
+    @Test
+    fun `no author of the demo reads as an assistant`() {
+        val assistantLogins = setOf("copilot-swe-agent[bot]", "devin-ai-integration[bot]")
+        val assistantNames = setOf("claude", "claude code", "codex", "copilot", "devin")
+        val assistantEmails = setOf("copilot@github.com", "noreply@anthropic.com", "codex@openai.com")
+
+        val authors = demoCommits().map { it.author }.toSet()
+
+        assertTrue(authors.isNotEmpty(), "The demo has authors")
+        authors.forEach { author ->
+            val name = author.name.lowercase()
+            assertFalse(name in assistantLogins, "$author is not a bot")
+            assertFalse(name in assistantNames, "$author is not an assistant")
+            assertFalse(name.endsWith("[agent]"), "$author is not an agent")
+            assertFalse(name.endsWith("[bot]"), "$author is not a bot")
+            assertFalse(author.email.lowercase() in assistantEmails, "$author does not use the address of an assistant")
+        }
+    }
+
+    @Test
+    fun `nobody is the co-author of their own commit`() {
+        demoCommits().forEach { commit ->
+            assertFalse(
+                commit.message.lines().any { line ->
+                    line.startsWith("Co-authored-by:", ignoreCase = true) && commit.author.email in line
+                },
+                "${commit.author} co-authors their own commit: ${commit.message}",
+            )
+        }
+    }
+
+    private fun demoCommits() = DemoContent.dataset(emptyList()).projects.flatMap { it.commits() }
 
     @Test
     fun `an agent creates and validates its builds, and promotes them where agents are admitted`() {

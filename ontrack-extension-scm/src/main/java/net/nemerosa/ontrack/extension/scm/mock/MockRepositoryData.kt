@@ -49,6 +49,11 @@ data class MockCommitData(
     val revision: Long,
     val message: String,
     val timestamp: LocalDateTime,
+    /**
+     * Defaults for a snapshot written before the commits of the mock SCM had authors.
+     */
+    val author: String = MockCommit.UNKNOWN_AUTHOR,
+    val authorEmail: String? = null,
 )
 
 data class MockFileData(

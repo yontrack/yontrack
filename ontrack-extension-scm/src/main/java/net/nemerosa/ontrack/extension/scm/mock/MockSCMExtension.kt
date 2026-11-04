@@ -131,8 +131,15 @@ class MockSCMExtension(
          *
          * @param scmBranch Branch where to generate the commit
          * @param message Commit message
+         * @param author Name of the author of the commit, [MockCommit.UNKNOWN_AUTHOR] if null or blank
+         * @param authorEmail Email of the author of the commit, none if null or blank
          */
-        fun registerCommit(scmBranch: String, message: String): String {
+        fun registerCommit(
+            scmBranch: String,
+            message: String,
+            author: String? = null,
+            authorEmail: String? = null,
+        ): String {
             val branch = branches.find { it.name == scmBranch } ?: branches.run {
                 val newBranch = MockBranch(scmBranch)
                 add(newBranch)
@@ -151,6 +158,8 @@ class MockSCMExtension(
                 revision = revisionCount.incrementAndGet(),
                 id = id,
                 message = message,
+                author = author?.takeIf { it.isNotBlank() } ?: MockCommit.UNKNOWN_AUTHOR,
+                authorEmail = authorEmail?.takeIf { it.isNotBlank() },
             )
 
             // Collects associated issues and associates the commit to them
@@ -401,6 +410,8 @@ class MockSCMExtension(
                             revision = commit.revision,
                             message = commit.message,
                             timestamp = commit.timestamp,
+                            author = commit.author,
+                            authorEmail = commit.authorEmail,
                         )
                     },
                 )
@@ -450,6 +461,8 @@ class MockSCMExtension(
                             id = commitData.id,
                             message = commitData.message,
                             timestamp = commitData.timestamp,
+                            author = commitData.author,
+                            authorEmail = commitData.authorEmail,
                         )
                     }.toMutableList(),
                 )

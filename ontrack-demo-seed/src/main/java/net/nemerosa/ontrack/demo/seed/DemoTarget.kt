@@ -282,7 +282,7 @@ interface DemoBranch {
      * @return The id of the commit, which the mock SCM derives from the branch and the
      * position of the commit on it.
      */
-    fun registerCommit(message: String): String
+    fun registerCommit(commit: CommitSpec): String
 
     fun createPromotionLevel(name: String, description: String, workflow: WorkflowSpec? = null)
     /**

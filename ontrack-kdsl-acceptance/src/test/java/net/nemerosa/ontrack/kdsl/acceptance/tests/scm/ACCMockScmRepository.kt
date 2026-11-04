@@ -1,12 +1,35 @@
 package net.nemerosa.ontrack.kdsl.acceptance.tests.scm
 
 import net.nemerosa.ontrack.kdsl.acceptance.tests.AbstractACCDSLTestSupport
+import net.nemerosa.ontrack.kdsl.spec.extension.scm.MockScmRepositoryContext.MockSCMCommitAuthor
 import net.nemerosa.ontrack.kdsl.spec.extension.scm.withMockScmRepository
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
 
 class ACCMockScmRepository : AbstractACCDSLTestSupport() {
+
+    @Test
+    fun `a commit is read back with the author it was registered with`() {
+        withMockScmRepository(ontrack, prefix = "acc-mock-scm") {
+            project {
+                configuredForMockScm()
+
+                val withAuthor = repositoryCommit(
+                    "feat: something",
+                    author = "Maria Escobar",
+                    authorEmail = "maria.escobar@example.com",
+                )
+                val withoutAuthor = repositoryCommit("feat: something else")
+
+                assertEquals(
+                    MockSCMCommitAuthor("Maria Escobar", "maria.escobar@example.com"),
+                    commitAuthor(withAuthor),
+                )
+                assertEquals(MockSCMCommitAuthor("unknown", null), commitAuthor(withoutAuthor))
+            }
+        }
+    }
 
     /**
      * The mock SCM keeps its repositories on the server, where they outlive the entities

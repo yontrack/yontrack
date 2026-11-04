@@ -609,14 +609,19 @@ private class KdslDemoBranch(
 
     override fun markAsFavourite() = branch.favourite()
 
-    override fun registerCommit(message: String): String {
+    override fun registerCommit(commit: CommitSpec): String {
         val repository = requireNotNull(project.scm) {
             "No SCM configured on ${project.name}"
         }
         val scmBranch = requireNotNull(scmBranch) {
             "No SCM branch configured on ${project.name}/$name"
         }
-        return repository.repositoryCommit(message = message, branch = scmBranch)
+        return repository.repositoryCommit(
+            message = commit.message,
+            branch = scmBranch,
+            author = commit.author.name,
+            authorEmail = commit.author.email,
+        )
     }
 
     override fun createPromotionLevel(name: String, description: String, workflow: WorkflowSpec?) {

@@ -262,7 +262,7 @@ class InMemoryDemoTarget(
                 val repository = scmRepositories.getValue(repositoryName)
                 add("  scm ${repository.name}")
                 repository.issues.forEach { add("    issue ${it.key} \"${it.summary}\" ${it.type}") }
-                repository.commits.forEach { add("    commit ${it.id} \"${it.message}\"") }
+                repository.commits.forEach { add("    commit ${it.id} \"${it.message}\" by ${it.author.name} <${it.author.email}>") }
             }
             project.branches.forEach { branch ->
                 add("  branch ${branch.name} \"${branch.description}\"")
@@ -517,14 +517,14 @@ class InMemoryDemoTarget(
             this.scmBranch = scmBranch
         }
 
-        override fun registerCommit(message: String): String {
+        override fun registerCommit(commit: CommitSpec): String {
             val repository = requireNotNull(project.scmRepositoryName?.let(scmRepositories::get)) {
                 "No SCM configured on ${project.name}"
             }
             val scmBranch = requireNotNull(scmBranch) {
                 "No SCM branch configured on ${project.name}/$name"
             }
-            return repository.registerCommit(scmBranch, message)
+            return repository.registerCommit(scmBranch, commit)
         }
 
         override fun createPromotionLevel(name: String, description: String, workflow: WorkflowSpec?) {
@@ -1282,7 +1282,7 @@ class InMemoryDemoTarget(
             issues += issue
         }
 
-        fun registerCommit(scmBranch: String, message: String): String {
+        fun registerCommit(scmBranch: String, commit: CommitSpec): String {
             val index = commits.count { it.scmBranch == scmBranch } + 1
             val prefix = "${scmBranch.replace("[^a-zA-Z0-9.]".toRegex(), "-")}-$index"
             val digest = MessageDigest.getInstance("SHA-1")
@@ -1290,11 +1290,11 @@ class InMemoryDemoTarget(
                 .joinToString("") { "%02x".format(it) }
                 .take(7)
             val id = "$prefix-$digest"
-            commits += Commit(scmBranch, id, message)
+            commits += Commit(scmBranch, id, commit.message, commit.author)
             return id
         }
 
-        data class Commit(val scmBranch: String, val id: String, val message: String)
+        data class Commit(val scmBranch: String, val id: String, val message: String, val author: DemoPerson)
     }
 
     companion object {

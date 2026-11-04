@@ -24,7 +24,7 @@ class DemoChangeLogSeedTest {
     private fun dataset(
         scm: ScmSpec? = ScmSpec(repository = "one-repo"),
         scmBranch: String? = "main",
-        commits: List<String> = listOf("feat: something", "fix: something else"),
+        commits: List<CommitSpec> = listOf(commit("feat: something"), commit("fix: something else")),
     ) = DemoDataset(
         projects = listOf(
             ProjectSpec(
@@ -50,6 +50,11 @@ class DemoChangeLogSeedTest {
         ),
     )
 
+    private fun commit(
+        message: String,
+        author: DemoPerson = DemoPerson("Maria Escobar", "maria.escobar@example.com"),
+    ) = CommitSpec(message, author)
+
     @Test
     fun `a project declaring an SCM is pointed at its repository`() {
         val target = InMemoryDemoTarget()
@@ -64,7 +69,7 @@ class DemoChangeLogSeedTest {
     fun `every declared commit is registered, and the build points at the last one`() {
         val target = InMemoryDemoTarget()
 
-        seed(target).run(dataset(commits = listOf("feat: first", "fix: second")))
+        seed(target).run(dataset(commits = listOf(commit("feat: first"), commit("fix: second"))))
 
         val snapshot = target.snapshot()
         assertTrue("commit main-1-b0bd943 \"feat: first\"" in snapshot, snapshot)
@@ -72,6 +77,57 @@ class DemoChangeLogSeedTest {
         // The build is built from the last commit declared for it: the ones before are the
         // work that went into it, and are what the change log with the previous build shows.
         assertTrue("built from main-2-dfbccd9" in snapshot, snapshot)
+    }
+
+    @Test
+    fun `each commit is registered with its own author`() {
+        val target = InMemoryDemoTarget()
+
+        seed(target).run(
+            dataset(
+                commits = listOf(
+                    commit("feat: first", DemoPerson("Maria Escobar", "maria.escobar@example.com")),
+                    commit("fix: second", DemoPerson("Tomas Herrera", "tomas.herrera@example.com")),
+                )
+            )
+        )
+
+        val snapshot = target.snapshot()
+        assertTrue(
+            "commit main-1-b0bd943 \"feat: first\" by Maria Escobar <maria.escobar@example.com>" in snapshot,
+            snapshot,
+        )
+        assertTrue(
+            "commit main-2-dfbccd9 \"fix: second\" by Tomas Herrera <tomas.herrera@example.com>" in snapshot,
+            snapshot,
+        )
+    }
+
+    /**
+     * A change log where one name reads on every line looks as made up as one reading `unknown`.
+     */
+    @Test
+    fun `the change log of every project with an SCM is written by several people`() {
+        val projects = DemoContent.dataset(emptyList()).projects.filter { it.scm != null }
+
+        assertTrue(projects.isNotEmpty(), "The demo has projects with an SCM")
+        projects.forEach { project ->
+            val authors = project.commits().map { it.author }.toSet()
+            assertTrue(authors.size > 1, "${project.name} has several authors: $authors")
+        }
+    }
+
+    /**
+     * The domain reserved for examples, so that the demo never names anybody's real address.
+     */
+    @Test
+    fun `the authors of the demo have example addresses`() {
+        val authors = DemoContent.dataset(emptyList()).projects.flatMap { it.commits() }.map { it.author }.toSet()
+
+        assertTrue(authors.isNotEmpty(), "The demo has authors")
+        authors.forEach { author ->
+            assertTrue(author.email.endsWith("@example.com"), "$author has an example address")
+        }
     }
 
     @Test
@@ -84,7 +140,7 @@ class DemoChangeLogSeedTest {
                     repository = "one-repo",
                     issues = listOf(IssueSpec("ONE-1", "An issue", type = "feature")),
                 ),
-                commits = listOf("feat: something, closes ONE-1"),
+                commits = listOf(commit("feat: something, closes ONE-1")),
             )
         )
 
@@ -204,3 +260,6 @@ class DemoChangeLogSeedTest {
         assertEquals(null, changelogProject.scm)
     }
 }
+
+/** Every commit a project declares, on all its branches. */
+internal fun ProjectSpec.commits() = branches.flatMap { it.builds }.flatMap { it.commits }

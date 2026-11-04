@@ -2,11 +2,15 @@ mutation MockScmRegisterCommit(
     $repository: String!,
     $scmBranch: String!,
     $message: String!,
+    $author: String,
+    $authorEmail: String,
 ) {
     mockScmRegisterCommit(input: {
         repository: $repository,
         scmBranch: $scmBranch,
         message: $message,
+        author: $author,
+        authorEmail: $authorEmail,
     }) {
         commit {
             id

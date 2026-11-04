@@ -168,6 +168,31 @@ data class LabelSpec(
 }
 
 /**
+ * A commit of a mock SCM repository.
+ *
+ * @property message The FULL message: the subject on its first line, and, after a blank line, a
+ * body and trailers - `Co-Authored-By`, `Claude-Session`... - which are what the change log reads
+ * its assistants from, and the assisted change of the build is computed from (#2020, #2028).
+ * @property author Who wrote it. Required, so that no commit of the demo reads `unknown`, the
+ * author the mock SCM gives a commit it was told nothing about (#2136).
+ */
+data class CommitSpec(
+    val message: String,
+    val author: DemoPerson,
+)
+
+/**
+ * A fictional person of the demo, on the `example.com` domain reserved for such examples.
+ *
+ * Always a person: the server reads the author of a commit to recognise assistants, so a bot or an
+ * agent as an author would change the assisted reading of a build. An assistant is a co-author.
+ */
+data class DemoPerson(
+    val name: String,
+    val email: String,
+)
+
+/**
  * A mock SCM repository behind a project.
  *
  * @property repository Name of the repository, unique on the instance. The seed empties it
@@ -440,12 +465,9 @@ enum class CHML {
  * @property release Version carried by the build, set as its release property, which is
  * what Yontrack shows as the build display name.
  * @property links Builds this build uses, resolved after every project exists.
- * @property commits Commit messages, oldest first, registered on the branch's SCM branch
- * when the build is created. The last one is the commit the build was built from; the ones
- * before it are the work that went into it, and are what the change log with the previous
- * build shows. Each is a FULL message: the subject on its first line, and, after a blank line,
- * a body and trailers - `Co-Authored-By`, `Claude-Session`... - which are what the change log
- * reads its assistants from, and the assisted change of the build is computed from (#2020, #2028).
+ * @property commits Commits, oldest first, registered on the branch's SCM branch when the build
+ * is created. The last one is the commit the build was built from; the ones before it are the
+ * work that went into it, and are what the change log with the previous build shows.
  * @property scans Security scans of the build, each posted through `validateBuildWithFindings`
  * as the report of the scan, on a `security-findings` stamp. They take their rungs on the build's
  * ladder after its [validations] and its [tests], and before its promotions.
@@ -472,7 +494,7 @@ data class BuildSpec(
     val promotionLevels: List<String> = emptyList(),
     val validations: List<ValidationSpec> = emptyList(),
     val links: List<BuildRef> = emptyList(),
-    val commits: List<String> = emptyList(),
+    val commits: List<CommitSpec> = emptyList(),
     val scans: List<ScanSpec> = emptyList(),
     val tests: List<TestRunSpec> = emptyList(),
     val token: String? = null,

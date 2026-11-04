@@ -7,6 +7,7 @@ import net.nemerosa.ontrack.kdsl.connector.graphql.convert
 import net.nemerosa.ontrack.kdsl.connector.graphql.schema.MockScmDeleteRepositoryMutation
 import net.nemerosa.ontrack.kdsl.connector.graphql.schema.MockScmRegisterCommitMutation
 import net.nemerosa.ontrack.kdsl.connector.graphql.schema.MockScmRegisterIssueMutation
+import net.nemerosa.ontrack.kdsl.connector.graphql.schema.ProjectScmCommitAuthorQuery
 import net.nemerosa.ontrack.kdsl.connector.graphqlConnector
 import net.nemerosa.ontrack.kdsl.connector.parse
 import net.nemerosa.ontrack.kdsl.spec.Branch
@@ -109,16 +110,23 @@ class MockScmRepositoryContext(
      *
      * @return The id of the registered commit, deterministic for a given branch and
      * position on it: `<branch>-<index>-<sha1 prefix>`.
+     *
+     * @param author Name of the author of the commit, `unknown` if not set
+     * @param authorEmail Email of the author of the commit
      */
     fun repositoryCommit(
         message: String,
         branch: String = "main",
+        author: String? = null,
+        authorEmail: String? = null,
     ): String =
         ontrack.graphqlConnector.mutate(
             MockScmRegisterCommitMutation(
                 repository = repository,
                 scmBranch = branch,
                 message = message,
+                author = Optional.presentIfNotNull(author),
+                authorEmail = Optional.presentIfNotNull(authorEmail),
             )
         ) {
             it?.mockScmRegisterCommit?.payloadUserErrors?.convert()
@@ -141,6 +149,16 @@ class MockScmRepositoryContext(
         // OK
         return this
     }
+
+    /**
+     * Author of a commit, as the project reads it from its SCM.
+     */
+    fun Project.commitAuthor(commitId: String): MockSCMCommitAuthor =
+        ontrack.graphqlConnector.query(ProjectScmCommitAuthorQuery(project = name, commitId = commitId))
+            ?.projects?.firstOrNull()
+            ?.scmCommitInfo?.scmDecoratedCommit?.commit
+            ?.let { MockSCMCommitAuthor(name = it.author, email = it.authorEmail) }
+            ?: throw GraphQLMissingDataException("Did not get back the commit $commitId")
 
     fun Project.configuredForMockScm() {
         mockScmProjectProperty = repository
@@ -193,6 +211,11 @@ class MockScmRepositoryContext(
         val approved: Boolean,
         val status: String,
         val reviewers: List<String>,
+    )
+
+    data class MockSCMCommitAuthor(
+        val name: String,
+        val email: String?,
     )
 
     data class MockSCMFileContent(

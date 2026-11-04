@@ -15,9 +15,16 @@ data class MockCommit(
      * instead of dating every commit from the restart.
      */
     override val timestamp: LocalDateTime = Time.now(),
+    override val author: String = UNKNOWN_AUTHOR,
+    override val authorEmail: String? = null,
 ) : SCMCommit {
     override val shortId: String = id
-    override val author: String = "unknown"
-    override val authorEmail: String? = null
     override val link: String = "mock://$repository/$id"
+
+    companion object {
+        /**
+         * Author of a commit registered without one.
+         */
+        const val UNKNOWN_AUTHOR = "unknown"
+    }
 }

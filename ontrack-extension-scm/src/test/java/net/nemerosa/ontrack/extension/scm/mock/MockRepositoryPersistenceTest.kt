@@ -52,6 +52,84 @@ class MockRepositoryPersistenceTest {
     }
 
     @Test
+    fun `A commit keeps its author and their email`() {
+        val repository = MockRepository("petclinic")
+        val id = repository.registerCommit(
+            "main",
+            "feat: something",
+            author = "Maria Escobar",
+            authorEmail = "maria.escobar@example.com",
+        )
+
+        val commit = assertNotNull(repository.getCommit(id))
+        assertEquals("Maria Escobar", commit.author)
+        assertEquals("maria.escobar@example.com", commit.authorEmail)
+    }
+
+    @Test
+    fun `A commit with no author, or a blank one, is by nobody known`() {
+        val repository = MockRepository("petclinic")
+        listOf(
+            repository.registerCommit("main", "feat: nothing given"),
+            repository.registerCommit("main", "feat: blank given", author = " ", authorEmail = ""),
+        ).forEach { id ->
+            val commit = assertNotNull(repository.getCommit(id))
+            assertEquals("unknown", commit.author)
+            assertNull(commit.authorEmail)
+        }
+    }
+
+    /**
+     * What a persistent mock SCM would silently lose on a restart otherwise, going back to
+     * `unknown` until the next reset of the demo.
+     */
+    @Test
+    fun `A restored repository keeps the authors of its commits`() {
+        val repository = MockRepository("petclinic")
+        val id = repository.registerCommit(
+            "main",
+            "feat: something",
+            author = "Maria Escobar",
+            authorEmail = "maria.escobar@example.com",
+        )
+
+        val commit = assertNotNull(roundTrip(repository).getCommit(id))
+
+        assertEquals("Maria Escobar", commit.author)
+        assertEquals("maria.escobar@example.com", commit.authorEmail)
+    }
+
+    /**
+     * A snapshot written before commits had authors, as a long-lived instance holds one.
+     */
+    @Test
+    fun `A snapshot without authors still loads`() {
+        val json = mapOf(
+            "name" to "petclinic",
+            "revision" to 1,
+            "branches" to listOf(
+                mapOf(
+                    "name" to "main",
+                    "commits" to listOf(
+                        mapOf(
+                            "id" to "main-1-abcdefg",
+                            "revision" to 1,
+                            "message" to "feat: something",
+                            "timestamp" to "2026-09-01T10:15:30",
+                        ),
+                    ),
+                ),
+            ),
+        ).asJson()
+
+        val restored = MockRepository.fromData(json.parseInto(MockRepositoryData::class))
+
+        val commit = assertNotNull(restored.getCommit("main-1-abcdefg"))
+        assertEquals("unknown", commit.author)
+        assertNull(commit.authorEmail)
+    }
+
+    @Test
     fun `A restored repository numbers the next commit where the snapshot stopped`() {
         val original = populated()
         val expected = original.registerCommit("main", "ISS-2 Fourth commit")

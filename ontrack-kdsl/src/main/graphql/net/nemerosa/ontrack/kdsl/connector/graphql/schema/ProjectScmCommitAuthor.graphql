@@ -1,0 +1,15 @@
+query ProjectScmCommitAuthor(
+    $project: String!,
+    $commitId: String!,
+) {
+    projects(name: $project) {
+        scmCommitInfo(commitId: $commitId) {
+            scmDecoratedCommit {
+                commit {
+                    author
+                    authorEmail
+                }
+            }
+        }
+    }
+}

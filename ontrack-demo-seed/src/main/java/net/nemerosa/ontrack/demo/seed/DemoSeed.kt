@@ -477,7 +477,7 @@ class DemoSeed(
             // the work that went into it, and are what the change log with the previous
             // build shows.
             buildSpec.commits
-                .map { message -> branch.registerCommit(message) }
+                .map { commit -> branch.registerCommit(commit) }
                 .lastOrNull()
                 ?.let { build.setCommit(it) }
             // One hour per step, so the validations and the promotions of a build are ordered and

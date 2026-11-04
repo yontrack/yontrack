@@ -51,7 +51,7 @@ class MockSCMMutations(
         ) { input ->
             securityService.checkGlobalFunction(GlobalSettings::class.java)
             val repository = mockSCMExtension.repositoryOrCreate(input.repository)
-            val id = repository.registerCommit(input.scmBranch, input.message)
+            val id = repository.registerCommit(input.scmBranch, input.message, input.author, input.authorEmail)
             repository.getCommit(id) ?: error("Commit $id was not registered")
         },
 
@@ -92,6 +92,10 @@ data class MockScmRegisterCommitInput(
     val scmBranch: String,
     @APIDescription("Commit message")
     val message: String,
+    @APIDescription("Name of the author of the commit, `unknown` if not set")
+    val author: String? = null,
+    @APIDescription("Email of the author of the commit")
+    val authorEmail: String? = null,
 )
 
 @APIDescription("Input for the `mockScmRegisterIssue` mutation")
