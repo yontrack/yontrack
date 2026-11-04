@@ -174,7 +174,7 @@ export default function WorkflowInstanceView({id}) {
         {
             key: 'status',
             label: 'Status',
-            children: <Space>
+            children: <Space wrap>
                 <WorkflowInstanceStatus id="workflow-instance-status" status={refreshableInstanceData.status}/>
                 <AutoRefreshButton/>
                 {
@@ -254,12 +254,13 @@ export default function WorkflowInstanceView({id}) {
                 <AutoRefreshContextProvider onRefresh={reloadInstanceNodeExecutions}>
                     <WorkflowNodeExecutorContextProvider>
                         <Skeleton loading={loading || !finished} active>
-                            <Space orientation="vertical">
+                            <Space orientation="vertical" className="ot-line">
                                 <Descriptions
                                     items={items}
                                     column={12}
                                 />
                                 <PageSection
+                                    id="workflow-instance-graph"
                                     title={undefined}
                                     padding={false}>
                                     <WorkflowInstanceGraph

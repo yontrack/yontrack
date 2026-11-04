@@ -1,7 +1,7 @@
 import WorkflowInstanceGraphNode from "@components/extension/workflows/WorkflowInstanceGraphNode";
-import {useCallback, useEffect, useState} from "react";
+import {useCallback, useEffect, useRef, useState} from "react";
 import {autoLayout} from "@components/links/GraphUtils";
-import {applyNodeChanges, Background, ControlButton, Controls, ReactFlow} from "reactflow";
+import {applyNodeChanges, Background, ControlButton, Controls, ReactFlow, useReactFlow} from "reactflow";
 import {Skeleton} from "antd";
 import {FaEye, FaEyeSlash} from "react-icons/fa";
 import {useLocalWorkflowShowDetails} from "@components/storage/local";
@@ -10,21 +10,47 @@ const nodeTypes = {
     workflowNode: WorkflowInstanceGraphNode,
 }
 
+// Heights of a node, before React Flow has measured it
+const nodeHeight = (showDetails) => showDetails ? 220 : 120
+
 export function WorkflowInstanceGraphFlow({instance, instanceNodeExecutions, onNodeSelected}) {
 
     const {showDetails, toggleShowDetails} = useLocalWorkflowShowDetails()
 
+    const {fitView} = useReactFlow()
+
+    // The nodes change height with their details: they are laid out again, without the
+    // height which was measured with the previous details.
     useEffect(() => {
-        setNodes(nodes => nodes.map(node => {
-            return {
-                ...node,
-                data: {
-                    ...node.data,
-                    showDetails,
-                }
-            }
-        }))
+        if (nodes.length > 0) {
+            autoLayout({
+                nodes: nodes.map(({width, height, ...node}) => ({
+                    ...node,
+                    data: {
+                        ...node.data,
+                        showDetails,
+                    },
+                })),
+                edges,
+                nodeWidth: 180,
+                nodeHeight: nodeHeight(showDetails),
+                setNodes,
+                setEdges,
+            }).then(() => {
+                window.setTimeout(() => fitView(), 100)
+            })
+        }
     }, [showDetails])
+
+    // Refitting the graph when its width changes. Deferred, for React Flow to know its new size first.
+    const containerRef = useRef()
+    useEffect(() => {
+        const observer = new ResizeObserver(() => {
+            window.requestAnimationFrame(() => fitView())
+        })
+        observer.observe(containerRef.current)
+        return () => observer.disconnect()
+    }, [fitView])
 
     const workflowNode = (nodeExecution, workflowNodes) => {
         return {
@@ -79,7 +105,7 @@ export function WorkflowInstanceGraphFlow({instance, instanceNodeExecutions, onN
                 nodes,
                 edges,
                 nodeWidth: 180, // Can be a function
-                nodeHeight: 120, // Can be a function
+                nodeHeight: nodeHeight(showDetails), // Can be a function
                 setNodes,
                 setEdges,
             })
@@ -127,7 +153,7 @@ export function WorkflowInstanceGraphFlow({instance, instanceNodeExecutions, onN
 
     return (
         <>
-            <div style={{height: '600px'}}>
+            <div ref={containerRef} style={{height: '600px'}}>
                 <Skeleton active loading={loading}>
                     <ReactFlow
                         nodes={nodes}
