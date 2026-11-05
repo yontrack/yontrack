@@ -136,6 +136,22 @@ interface FindingQueryService {
     ): List<RankedFinding>
 
     /**
+     * The external IDs of the findings of all the projects containing a text, ranked as
+     * [getSearchedFindings] ranks them. Only the projects having such a finding are looked into:
+     * the branches which count are not worked out for the others.
+     *
+     * @param text Text the external IDs contain, trimmed. A blank one finds nothing. The LIKE
+     * wildcards in it match themselves.
+     * @param size Maximum number of external IDs to return, at most [MAX_RANKED_FINDINGS]
+     * @param date Day against which the expiry of the acceptances is evaluated
+     */
+    fun getSearchedFindingsAcrossProjects(
+        text: String,
+        size: Int = DEFAULT_RANKED_FINDINGS,
+        date: LocalDate = Time.now.toLocalDate(),
+    ): List<RankedFinding>
+
+    /**
      * Finding by ID, `null` when it does not exist or cannot be seen.
      */
     fun findFindingById(id: Int): Finding?
@@ -152,10 +168,35 @@ interface FindingQueryService {
     fun getFindingState(finding: Finding, date: LocalDate = Time.now.toLocalDate()): FindingState?
 
     /**
+     * States of some findings in their project, worked out per project rather than per finding,
+     * so that the branches of a project are not listed again for each of its findings.
+     *
+     * @param findings Findings, of one or several projects
+     * @param date Day against which the expiry of the acceptances is evaluated
+     * @return By finding ID. The findings the user cannot see, and the ones exposed only on
+     * disabled branches, are left out.
+     */
+    fun getFindingStates(
+        findings: Collection<Finding>,
+        date: LocalDate = Time.now.toLocalDate(),
+    ): Map<Int, FindingState>
+
+    /**
      * Exposure of a finding on the enabled branches of its project, resolved or not, by branch then
      * stamp, each saying whether its branch counts toward the state of the finding in the project.
      */
     fun getFindingExposures(finding: Finding): List<FindingExposureView>
+
+    /**
+     * Exposures of some findings, each as [getFindingExposures] gives them, worked out per project
+     * rather than per finding, so that the branches of a project are not listed again for each of
+     * its findings.
+     *
+     * @param findings Findings, of one or several projects
+     * @return By finding ID. The findings the user cannot see, and the ones without any exposure on
+     * an enabled branch, are left out.
+     */
+    fun getFindingsExposures(findings: Collection<Finding>): Map<Int, List<FindingExposureView>>
 
     /**
      * Observations of a finding, the most recent first. The ones of the disabled branches are left

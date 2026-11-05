@@ -70,6 +70,14 @@ interface FindingRepository {
     fun findFindingsByExternalId(externalId: String, projectIds: Collection<Int>? = null): List<Finding>
 
     /**
+     * The IDs of the projects having a finding whose external ID contains a text, ignoring case.
+     *
+     * @param text Text the external IDs contain, ignoring case. The LIKE wildcards in it match
+     * themselves.
+     */
+    fun findProjectIdsByExternalIdContaining(text: String): List<Int>
+
+    /**
      * The external IDs of the findings open in at least one of the given projects, ranked by the
      * number of these projects in which they are open, then by severity, the highest first, then
      * by external ID — aggregated by the database.

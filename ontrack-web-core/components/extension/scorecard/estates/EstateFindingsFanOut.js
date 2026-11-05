@@ -1,24 +1,12 @@
-import {useEffect} from "react";
 import {gql} from "graphql-request";
-import Link from "next/link";
-import {Alert, Button, Empty, Input, Skeleton, Space, Tag, theme, Tooltip, Typography} from "antd";
-import Table from "@components/common/table/Table";
+import {Alert, Button, Empty, Input, Skeleton, Space} from "antd";
 import {useQuery} from "@components/services/GraphQL";
-import {branchUri, findingUri, projectUri} from "@components/common/Links";
-import TimestampText from "@components/common/TimestampText";
 import SecondaryText from "@components/extension/scorecard/SecondaryText";
-import FindingSeverityTag from "@components/extension/findings/FindingSeverityTag";
-import FindingStateTag from "@components/extension/findings/FindingStateTag";
-import {kindName} from "@components/extension/findings/findingsModel";
-import {
-    fanOutExternalId,
-    fanOutRows,
-    fanOutSummary,
-    rankedFindingProjectsText,
-    rankedFindingRows,
-    rankedFindingsCaption,
-    searchedFindingsCaption,
-} from "@components/extension/scorecard/estates/estateFanOutModel";
+import FindingFanOutTable, {gqlFindingFanOutFields} from "@components/extension/findings/FindingFanOutTable";
+import FindingsRankTable from "@components/extension/findings/FindingsRankTable";
+import FindingsSearchResult from "@components/extension/findings/FindingsSearchResult";
+import {fanOutExternalId, rankedFindingRows} from "@components/extension/findings/findingFanOutModel";
+import {rankedFindingsCaption} from "@components/extension/scorecard/estates/estateViewModel";
 
 /**
  * Number of ranked findings listed when nothing is searched, and of findings listed for a search
@@ -61,111 +49,12 @@ export const gqlEstateFindingsFanOut = gql`
     query EstateFindingsFanOut($name: String!, $externalId: String!) {
         estate(name: $name) {
             findings(externalId: $externalId) {
-                id
-                project {
-                    id
-                    name
-                }
-                externalId
-                location
-                scanner
-                kind
-                title
-                url
-                maxSeverity
-                state
-                firstSeen
-                resolvedAt
-                exposures {
-                    branch {
-                        id
-                        name
-                    }
-                    validationStamp {
-                        id
-                        name
-                    }
-                    since
-                    state
-                    counts
-                    acceptanceExpiresAt
-                }
+                ...FindingFanOutFields
             }
         }
     }
+    ${gqlFindingFanOutFields}
 `
-
-const DAY_FORMAT = "YYYY MMM DD"
-
-/**
- * Why a branch exposing the finding does not count toward the state of the finding in its project.
- * The server gives no disabled branch.
- */
-const NOT_COUNTING_REASON = "Outside the branch model: does not count toward the project's state"
-
-/**
- * One branch a finding is exposed on, since the start of its exposure.
- *
- * A branch which does not count toward the state of the project is greyed, with a dashed border
- * rather than by its colour alone, and says why on hover and on keyboard focus — and to a screen
- * reader, in a text it alone reads.
- */
-function FanOutBranch({project, branch, state, since, acceptanceExpiresAt, counts}) {
-    const {token} = theme.useToken()
-    const greyed = counts ? undefined : {color: token.colorTextSecondary}
-    const tag =
-        <Tag
-            data-testid={`estate-fanout-branch-${project.name}-${branch.name}`}
-            data-counts={counts ? 'true' : 'false'}
-            style={counts ? undefined : {...greyed, borderStyle: 'dashed', background: 'transparent'}}
-        >
-            <Link href={branchUri(branch)} style={greyed}>{branch.name}</Link>
-            {' '}
-            <TimestampText value={since} prefix="since" format={DAY_FORMAT}/>
-            {
-                state === 'ACCEPTED' &&
-                <>
-                    {' · '}
-                    {acceptanceExpiresAt ? `accepted until ${acceptanceExpiresAt}` : 'accepted without expiry'}
-                </>
-            }
-            {
-                !counts && <span className="ot-visually-hidden">{` (${NOT_COUNTING_REASON})`}</span>
-            }
-        </Tag>
-    return counts ?
-        tag :
-        <Tooltip title={NOT_COUNTING_REASON} trigger={['hover', 'focus']}>{tag}</Tooltip>
-}
-
-/**
- * The branches a finding is exposed on, each since the start of its exposure — the ones which do
- * not count toward the state of the project after the ones which count — or when the finding was
- * resolved when it is exposed on none.
- */
-function FanOutBranches({project, finding, branches}) {
-    return (
-        <span data-testid={`estate-fanout-branches-${project.name}`}>
-            {
-                branches.length > 0 ?
-                    <Space size={4} wrap>
-                        {
-                            branches.map(exposure =>
-                                <FanOutBranch key={exposure.branch.id} project={project} {...exposure}/>
-                            )
-                        }
-                    </Space> :
-                    <SecondaryText>
-                        {
-                            finding.resolvedAt ?
-                                <TimestampText value={finding.resolvedAt} prefix="Resolved" format={DAY_FORMAT}/> :
-                                'No branch'
-                        }
-                    </SecondaryText>
-            }
-        </span>
-    )
-}
 
 /**
  * `2 projects of this estate report CVE-1: exposed in 1, accepted in 0, resolved in 1`
@@ -173,176 +62,6 @@ function FanOutBranches({project, finding, branches}) {
 const summaryText = (externalId, {projects, exposed, accepted, resolved}) =>
     `${projects} ${projects === 1 ? 'project of this estate reports' : 'projects of this estate report'} ${externalId}: ` +
     `exposed in ${exposed}, accepted in ${accepted}, resolved in ${resolved}`
-
-/**
- * The projects of an estate reporting one finding, by its external ID.
- */
-function FanOutResult({externalId, findings}) {
-
-    if (findings.length === 0) {
-        return <Empty
-            image={Empty.PRESENTED_IMAGE_SIMPLE}
-            description={`No project of this estate reports ${externalId}.`}
-        />
-    }
-
-    const rows = fanOutRows(findings)
-    const summary = fanOutSummary(findings)
-    // The external ID gives the same weakness whatever the project: its title and link are the
-    // ones of its most exposed finding
-    const reference = rows[0].finding
-
-    const columns = [
-        {
-            key: 'project',
-            title: 'Project',
-            onCell: (row) => ({rowSpan: row.projectRowSpan}),
-            render: (_, {project}) =>
-                <Link href={projectUri(project)} data-testid={`estate-fanout-project-${project.name}`}>
-                    {project.name}
-                </Link>,
-        },
-        {
-            key: 'state',
-            title: 'State',
-            render: (_, {project, finding}) =>
-                <span data-testid={`estate-fanout-state-${project.name}`}>
-                    <FindingStateTag state={finding.state}/>
-                </span>,
-        },
-        {
-            key: 'severity',
-            title: 'Severity',
-            render: (_, {finding}) => <FindingSeverityTag severity={finding.maxSeverity}/>,
-        },
-        {
-            key: 'finding',
-            title: 'Location',
-            render: (_, {finding}) =>
-                <Space orientation="vertical" size={0}>
-                    <Link href={findingUri(finding)}>
-                        <Typography.Text code style={{wordBreak: 'break-all'}}>
-                            {finding.location || 'No location'}
-                        </Typography.Text>
-                    </Link>
-                    <SecondaryText style={{fontSize: 12}}>{finding.scanner} · {kindName(finding.kind)}</SecondaryText>
-                </Space>,
-        },
-        {
-            key: 'branches',
-            title: 'Exposed on',
-            render: (_, {project, finding, branches}) =>
-                <FanOutBranches project={project} finding={finding} branches={branches}/>,
-        },
-        {
-            key: 'firstSeen',
-            title: 'First seen',
-            render: (_, {finding}) => <TimestampText value={finding.firstSeen} relative={true}/>,
-        },
-    ]
-
-    return (
-        <Space orientation="vertical" size={16} style={{width: '100%'}}>
-            <Space orientation="vertical" size={4}>
-                <Space size={8} wrap>
-                    <span data-testid="estate-fanout-title">
-                        <Typography.Text code strong>{reference.externalId}</Typography.Text>
-                        <Typography.Text strong>{reference.title}</Typography.Text>
-                    </span>
-                    {
-                        reference.url &&
-                        <Typography.Link href={reference.url} target="_blank" rel="noopener noreferrer">
-                            More information
-                        </Typography.Link>
-                    }
-                </Space>
-                <SecondaryText data-testid="estate-fanout-summary">{summaryText(externalId, summary)}</SecondaryText>
-            </Space>
-            <Table
-                data-testid="estate-fanout-table"
-                size="small"
-                rowKey="key"
-                columns={columns}
-                dataSource={rows}
-                pagination={false}
-                scroll={{x: 'max-content'}}
-            />
-        </Space>
-    )
-}
-
-/**
- * Findings of an estate, one row per external ID, with the number of its projects where each is
- * open, accepted and resolved: a click on a row opens the fan-out of its finding.
- *
- * @param rows Rows of the findings, from `rankedFindingRows`
- * @param caption What the list shows
- * @param testId Prefix of the test IDs of the list, of its caption and of its rows
- * @param onSelect Called with the external ID of the finding whose row is clicked
- */
-function FindingsRankTable({rows, caption, testId, onSelect}) {
-
-    const columns = [
-        {
-            key: 'finding',
-            title: 'Finding',
-            render: (_, row) =>
-                <Space orientation="vertical" size={0}>
-                    {/* A button: the click stays on the page, which keeps the finding in its URL */}
-                    <Button
-                        type="link"
-                        size="small"
-                        style={{padding: 0, height: 'auto'}}
-                        onClick={(event) => {
-                            event.stopPropagation()
-                            onSelect(row.externalId)
-                        }}
-                    >
-                        <Typography.Text code>{row.externalId}</Typography.Text>
-                    </Button>
-                    <Typography.Text>{row.title}</Typography.Text>
-                </Space>,
-        },
-        {
-            key: 'severity',
-            title: 'Severity',
-            render: (_, row) => <FindingSeverityTag severity={row.severity}/>,
-        },
-        {
-            key: 'projects',
-            title: 'Projects',
-            render: (_, row) =>
-                <span data-testid={`${testId}-projects-${row.externalId}`} style={{whiteSpace: 'nowrap'}}>
-                    {rankedFindingProjectsText(row)}
-                </span>,
-        },
-        {
-            key: 'firstSeen',
-            title: 'First seen',
-            render: (_, row) => <TimestampText value={row.firstSeen} relative={true}/>,
-        },
-    ]
-
-    return (
-        <Space orientation="vertical" size={8} style={{width: '100%'}}>
-            <SecondaryText data-testid={`${testId}-findings-caption`}>{caption}</SecondaryText>
-            <Table
-                data-testid={`${testId}-findings`}
-                size="small"
-                rowKey="key"
-                columns={columns}
-                dataSource={rows}
-                pagination={false}
-                scroll={{x: 'max-content'}}
-                onRow={row => ({
-                    'data-testid': `${testId}-finding-${row.externalId}`,
-                    onClick: () => onSelect(row.externalId),
-                    style: {cursor: 'pointer'},
-                })}
-            />
-        </Space>
-    )
-}
 
 /**
  * The findings open in the most projects of the estate, one row per external ID: a click on a row
@@ -404,35 +123,16 @@ function SearchedFindings({estate, text, onSelect, onOnlyOne}) {
         }
     )
 
-    const rows = finished && !error ? rankedFindingRows(searchedFindings) : []
-    const onlyOne = rows.length === 1 ? rows[0].externalId : null
-
-    // Opening the fan-out is a change of the state of the page, kept by its parent: not while
-    // rendering. Once per finding found, whatever the identity of the callback, recreated by each
-    // render of the parent.
-    useEffect(() => {
-        if (onlyOne) {
-            onOnlyOne(onlyOne)
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [onlyOne])
-
-    if (!finished || onlyOne) {
-        return <Skeleton active/>
-    } else if (error) {
-        return <Alert type="error" showIcon title={error}/>
-    } else if (rows.length === 0) {
-        return <Empty
-            image={Empty.PRESENTED_IMAGE_SIMPLE}
-            description={`No finding of this estate has an external ID containing "${text}".`}
-        />
-    }
-
-    return <FindingsRankTable
-        rows={rows}
-        caption={searchedFindingsCaption(rows.length, FINDINGS_LIST_SIZE, text)}
+    return <FindingsSearchResult
+        findings={searchedFindings}
+        finished={finished}
+        error={error}
+        text={text}
+        size={FINDINGS_LIST_SIZE}
+        emptyDescription={`No finding of this estate has an external ID containing "${text}".`}
         testId="estate-searched"
         onSelect={onSelect}
+        onOnlyOne={onOnlyOne}
     />
 }
 
@@ -470,7 +170,12 @@ export default function EstateFindingsFanOut({estate, finding = null, search = n
         } else if (error) {
             result = <Alert type="error" showIcon title={error}/>
         } else {
-            result = <FanOutResult externalId={finding} findings={findings ?? []}/>
+            result = <FindingFanOutTable
+                findings={findings ?? []}
+                summaryText={summary => summaryText(finding, summary)}
+                emptyDescription={`No project of this estate reports ${finding}.`}
+                testId="estate-fanout"
+            />
         }
     } else if (search) {
         result = <SearchedFindings

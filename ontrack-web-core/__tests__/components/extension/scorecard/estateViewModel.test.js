@@ -10,6 +10,7 @@ import {
     estateRows,
     formatMedian,
     hasEstimatedReading,
+    rankedFindingsCaption,
     metText,
     rollUp,
     sortEstateRows,
@@ -346,5 +347,16 @@ describe('The state of the estate page in the query of its URL', () => {
         expect(estatePageState(estatePageQuery(state))).toEqual(state)
         const searched = {tab: 'fanout', finding: 'CVE-2024-38816', search: 'cve-2024'}
         expect(estatePageState(estatePageQuery(searched))).toEqual(searched)
+    })
+})
+
+describe('The caption of the ranked findings of an estate', () => {
+    it('says the list is the top of the ranking when it is as long as asked for', () => {
+        expect(rankedFindingsCaption(20, 20)).toBe('The 20 findings open in the most projects of this estate, the most widespread first')
+    })
+
+    it('says how many findings are open in the estate when they are all listed', () => {
+        expect(rankedFindingsCaption(1, 20)).toBe('1 finding open in this estate')
+        expect(rankedFindingsCaption(3, 20)).toBe('3 findings open in this estate, the most widespread first')
     })
 })

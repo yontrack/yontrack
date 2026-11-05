@@ -1,11 +1,11 @@
 import Link from "next/link";
-import {Descriptions, Typography} from "antd";
+import {Descriptions, Space, Typography} from "antd";
 import {FaExternalLinkAlt} from "react-icons/fa";
 import FindingSeverityTag from "@components/extension/findings/FindingSeverityTag";
 import FindingStateTag from "@components/extension/findings/FindingStateTag";
 import TimestampText from "@components/common/TimestampText";
 import {kindName} from "@components/extension/findings/findingsModel";
-import {branchUri} from "@components/common/Links";
+import {branchUri, findingFanOutUri} from "@components/common/Links";
 import PeriodBuild from "@components/extension/findings/finding/PeriodBuild";
 
 /**
@@ -36,7 +36,12 @@ export default function FindingSummary({finding}) {
         {
             key: 'externalId',
             label: 'External ID',
-            children: <Typography.Text code copyable>{finding.externalId}</Typography.Text>,
+            children: <Space size={16} wrap>
+                <Typography.Text code copyable>{finding.externalId}</Typography.Text>
+                <Link href={findingFanOutUri(finding.externalId)} data-testid="finding-in-all-projects">
+                    In all projects →
+                </Link>
+            </Space>,
         },
         {
             key: 'title',

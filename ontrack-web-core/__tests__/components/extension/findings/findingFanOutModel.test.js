@@ -1,13 +1,14 @@
 import {
     branchExposures,
     fanOutExternalId,
+    fanOutPageQuery,
+    fanOutPageState,
     fanOutRows,
     fanOutSummary,
     rankedFindingProjectsText,
     rankedFindingRows,
-    rankedFindingsCaption,
     searchedFindingsCaption,
-} from "@components/extension/scorecard/estates/estateFanOutModel";
+} from "@components/extension/findings/findingFanOutModel";
 
 const branch = (id, name) => ({id, name})
 const stamp = (id, name) => ({id, name})
@@ -64,19 +65,60 @@ describe('branchExposures', () => {
             exposure(main, {validationStamp: stamp(1, 'image'), since: '2026-09-12T10:00:00Z'}),
             exposure(main, {validationStamp: stamp(2, 'code'), since: '2026-09-05T10:00:00Z'}),
         ])).toEqual([
-            {branch: main, state: 'EXPOSED', since: '2026-09-05T10:00:00Z', acceptanceExpiresAt: null, counts: true},
+            {branch: main, state: 'EXPOSED', since: '2026-09-05T10:00:00Z', resolvedAt: null, acceptanceExpiresAt: null, counts: true},
         ])
     })
 
-    it('leaves out the branches where the finding is resolved', () => {
+    it('lists a branch as resolved once all its stamps are, with the latest resolution', () => {
         const main = branch(10, 'main')
-        const release = branch(11, 'release')
         expect(branchExposures([
-            exposure(main, {state: 'RESOLVED', resolvedAt: '2026-09-20T10:00:00Z'}),
-            exposure(release, {since: '2026-09-15T10:00:00Z'}),
+            exposure(main, {validationStamp: stamp(1, 'image'), state: 'RESOLVED', resolvedAt: '2026-09-20T10:00:00Z'}),
+            exposure(main, {validationStamp: stamp(2, 'code'), state: 'RESOLVED', resolvedAt: '2026-09-25T10:00:00Z'}),
+            exposure(main, {validationStamp: stamp(3, 'dast'), state: 'RESOLVED', resolvedAt: '2026-09-22T10:00:00Z'}),
         ])).toEqual([
-            {branch: release, state: 'EXPOSED', since: '2026-09-15T10:00:00Z', acceptanceExpiresAt: null, counts: true},
+            {
+                branch: main,
+                state: 'RESOLVED',
+                since: '2026-09-10T10:00:00Z',
+                resolvedAt: '2026-09-25T10:00:00Z',
+                acceptanceExpiresAt: null,
+                counts: true,
+            },
         ])
+    })
+
+    it('keeps a branch exposed on any stamp exposed, since the start of what is still exposed', () => {
+        const main = branch(10, 'main')
+        expect(branchExposures([
+            exposure(main, {validationStamp: stamp(1, 'image'), state: 'RESOLVED', since: '2026-08-01T10:00:00Z', resolvedAt: '2026-09-20T10:00:00Z'}),
+            exposure(main, {validationStamp: stamp(2, 'code'), state: 'EXPOSED', since: '2026-09-15T10:00:00Z'}),
+        ])).toEqual([
+            {branch: main, state: 'EXPOSED', since: '2026-09-15T10:00:00Z', resolvedAt: null, acceptanceExpiresAt: null, counts: true},
+        ])
+    })
+
+    it('keeps a branch accepted on a stamp and resolved on another accepted', () => {
+        const main = branch(10, 'main')
+        expect(branchExposures([
+            exposure(main, {validationStamp: stamp(1, 'image'), state: 'RESOLVED', resolvedAt: '2026-09-20T10:00:00Z'}),
+            exposure(main, {validationStamp: stamp(2, 'code'), state: 'ACCEPTED', accepted: true, acceptanceExpiresAt: '2026-12-31'}),
+        ])[0]).toMatchObject({state: 'ACCEPTED', resolvedAt: null, acceptanceExpiresAt: '2026-12-31'})
+    })
+
+    it('lists the resolved branches after the exposed and accepted ones, whether they count or not', () => {
+        const fixed = branch(10, 'a-fixed')
+        const fixedOutside = branch(11, 'b-fixed-outside')
+        const main = branch(12, 'main')
+        const release = branch(13, 'release')
+        const spike = branch(14, 'spike')
+        const resolved = {state: 'RESOLVED', resolvedAt: '2026-09-20T10:00:00Z'}
+        expect(branchExposures([
+            exposure(fixed, resolved),
+            exposure(fixedOutside, {...resolved, counts: false}),
+            exposure(main),
+            exposure(release, {state: 'ACCEPTED', accepted: true}),
+            exposure(spike, {counts: false}),
+        ]).map(it => it.branch.name)).toEqual(['main', 'release', 'spike', 'a-fixed', 'b-fixed-outside'])
     })
 
     it('says a branch is accepted when every stamp reports the finding accepted, until the expiry', () => {
@@ -84,7 +126,7 @@ describe('branchExposures', () => {
         expect(branchExposures([
             exposure(main, {state: 'ACCEPTED', accepted: true, acceptanceExpiresAt: '2026-12-31'}),
         ])).toEqual([
-            {branch: main, state: 'ACCEPTED', since: '2026-09-10T10:00:00Z', acceptanceExpiresAt: '2026-12-31', counts: true},
+            {branch: main, state: 'ACCEPTED', since: '2026-09-10T10:00:00Z', resolvedAt: null, acceptanceExpiresAt: '2026-12-31', counts: true},
         ])
     })
 
@@ -207,15 +249,6 @@ describe('The ranked findings of an estate', () => {
         expect(rankedFindingProjectsText(ranked('CVE-1', {openProjects: 3, acceptedProjects: 1, resolvedProjects: 0})))
             .toBe('Open in 3 · accepted in 1 · resolved in 0')
     })
-
-    it('says the list is the top of the ranking when it is as long as asked for', () => {
-        expect(rankedFindingsCaption(20, 20)).toBe('The 20 findings open in the most projects of this estate, the most widespread first')
-    })
-
-    it('says how many findings are open in the estate when they are all listed', () => {
-        expect(rankedFindingsCaption(1, 20)).toBe('1 finding open in this estate')
-        expect(rankedFindingsCaption(3, 20)).toBe('3 findings open in this estate, the most widespread first')
-    })
 })
 
 describe('The caption of the findings found by a search', () => {
@@ -229,5 +262,27 @@ describe('The caption of the findings found by a search', () => {
         expect(searchedFindingsCaption(1, 20, 'cve-2024')).toBe('1 finding whose external ID contains "cve-2024"')
         expect(searchedFindingsCaption(3, 20, 'cve-2024'))
             .toBe('3 findings whose external ID contains "cve-2024", the most widespread first')
+    })
+})
+
+describe('The state of the page of a finding across projects in the query of its URL', () => {
+    it('reads the finding and the text searched, trimmed', () => {
+        expect(fanOutPageState({finding: ' CVE-2024-38816 ', search: ' cve-2024 '}))
+            .toEqual({finding: 'CVE-2024-38816', search: 'cve-2024'})
+    })
+
+    it('has none of them by default', () => {
+        expect(fanOutPageState({finding: '  '})).toEqual({finding: null, search: null})
+        expect(fanOutPageState(undefined)).toEqual({finding: null, search: null})
+    })
+
+    it('reads the first of a repeated parameter', () => {
+        expect(fanOutPageState({finding: ['CVE-1', 'CVE-2']})).toEqual({finding: 'CVE-1', search: null})
+    })
+
+    it('leaves out what is not set from the query', () => {
+        expect(fanOutPageQuery({finding: 'CVE-1', search: 'cve'})).toEqual({finding: 'CVE-1', search: 'cve'})
+        expect(fanOutPageQuery({finding: null, search: ' '})).toEqual({})
+        expect(fanOutPageQuery()).toEqual({})
     })
 })

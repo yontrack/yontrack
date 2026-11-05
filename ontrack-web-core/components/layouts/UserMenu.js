@@ -105,6 +105,7 @@ export default function UserMenu({userMenu}) {
         'extension/notifications/recordings': <FaMailBulk/>,
         'extension/workflows/audit': <FaProjectDiagram/>,
         'extension/environments/environments': <FaServer/>,
+        'extension/findings/fan-out': <FaShieldAlt/>,
         'extension/license/info': <FaCertificate/>,
         'extension/audit-trail/status': <FaShieldAlt/>,
         'extension/casc/casc': <FaCode/>,

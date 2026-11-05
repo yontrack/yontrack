@@ -289,9 +289,10 @@ test('estate view: the fan-out of one finding over the projects of the estate', 
         await expect(estatePage.fanOutBranches(exposed.name)).not.toContainText('does not count')
         await expect(estatePage.fanOutBranches(exposed.name)).not.toContainText('old')
 
-        // Fixed: no branch left, resolved
+        // Fixed: resolved, its branch listed with the date of the fix
+        await expect(page.getByRole('columnheader', {name: 'Branches'})).toBeVisible()
         await expect(estatePage.fanOutState(fixed.name)).toHaveText('Resolved')
-        await expect(estatePage.fanOutBranches(fixed.name)).toContainText('Resolved')
+        await expect(estatePage.fanOutBranch(fixed.name, 'main')).toContainText('Resolved')
 
         // An external ID no project of the estate reports
         const unknown = generate('CVE-NONE-')

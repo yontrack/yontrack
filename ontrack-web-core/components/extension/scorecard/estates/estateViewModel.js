@@ -13,7 +13,7 @@ import {
     readingUnit,
     RUNG,
 } from "@components/extension/scorecard/scorecardModel";
-import {fanOutExternalId} from "@components/extension/scorecard/estates/estateFanOutModel";
+import {fanOutExternalId} from "@components/extension/findings/findingFanOutModel";
 
 /**
  * Judgements of a reading which carry a measured value.
@@ -233,6 +233,23 @@ export const sortEstateRows = (rows, sort = {}) => {
         if (vb === null) return -1
         return direction * (va - vb) || byName(a, b)
     })
+}
+
+/**
+ * What the list of the ranked findings shows: the top of the ranking when it is as long as asked
+ * for, else every finding open in the estate.
+ *
+ * @param count Number of ranked findings listed
+ * @param size Number of ranked findings asked for
+ */
+export function rankedFindingsCaption(count, size) {
+    if (count >= size) {
+        return `The ${size} findings open in the most projects of this estate, the most widespread first`
+    } else if (count === 1) {
+        return '1 finding open in this estate'
+    } else {
+        return `${count} findings open in this estate, the most widespread first`
+    }
 }
 
 /**

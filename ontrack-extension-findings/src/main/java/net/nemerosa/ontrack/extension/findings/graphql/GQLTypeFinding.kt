@@ -16,6 +16,7 @@ import net.nemerosa.ontrack.extension.findings.model.FindingSeverity
 import net.nemerosa.ontrack.extension.findings.model.FindingState
 import net.nemerosa.ontrack.extension.findings.query.FindingExposedFor
 import net.nemerosa.ontrack.extension.findings.query.FindingExposedForView
+import net.nemerosa.ontrack.extension.findings.query.FindingExposureView
 import net.nemerosa.ontrack.extension.findings.query.FindingHistoryEntryView
 import net.nemerosa.ontrack.extension.findings.query.FindingObservationFilter
 import net.nemerosa.ontrack.extension.findings.query.FindingObservationView
@@ -99,7 +100,12 @@ class GQLTypeFinding(
                     .type(GQLScalarLocalDateTime.INSTANCE)
                     .dataFetcher { env ->
                         val finding: Finding = env.getSource()!!
-                        finding.resolvedAt?.takeIf { findingQueryService.getFindingState(finding) != null }
+                        val resolvedAt = finding.resolvedAt
+                        if (resolvedAt == null) {
+                            null
+                        } else {
+                            env.findingStateLoader.load(finding).thenApply { state -> resolvedAt.takeIf { state != null } }
+                        }
                     }
             }
             .field {
@@ -118,7 +124,7 @@ class GQLTypeFinding(
                     .type(GraphQLTypeReference(FindingState::class.java.simpleName))
                     .dataFetcher { env ->
                         val finding: Finding = env.getSource()!!
-                        findingQueryService.getFindingState(finding)
+                        env.findingStateLoader.load(finding)
                     }
             }
             .field {
@@ -142,7 +148,7 @@ class GQLTypeFinding(
                     .type(listType(gqlTypeFindingExposure.typeRef))
                     .dataFetcher { env ->
                         val finding: Finding = env.getSource()!!
-                        findingQueryService.getFindingExposures(finding)
+                        env.findingExposuresLoader.load(finding)
                     }
             }
             .field {
@@ -249,6 +255,14 @@ class GQLTypeFinding(
                 )
             )
             .build()
+
+    private val DataFetchingEnvironment.findingStateLoader: DataLoader<Finding, FindingState>
+        get() = dataLoaderRegistry.getDataLoader(FindingStateDataLoader.NAME)
+            ?: error("No ${FindingStateDataLoader.NAME} data loader is registered.")
+
+    private val DataFetchingEnvironment.findingExposuresLoader: DataLoader<Finding, List<FindingExposureView>>
+        get() = dataLoaderRegistry.getDataLoader(FindingExposuresDataLoader.NAME)
+            ?: error("No ${FindingExposuresDataLoader.NAME} data loader is registered.")
 
     private fun DataFetchingEnvironment.dateTimeArgument(name: String): LocalDateTime? =
         when (val value = getArgument<Any>(name)) {

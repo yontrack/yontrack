@@ -136,6 +136,13 @@ export function findingUri(finding) {
 }
 
 /**
+ * Page following a finding across all the projects, by its external ID.
+ */
+export function findingFanOutUri(externalId) {
+    return `/extension/findings/fan-out?finding=${encodeURIComponent(externalId)}`
+}
+
+/**
  * Findings page of a project, optionally filtered. The filter goes in the query of the URL, with
  * the criteria of `Project.findings(filter)`: severity, state, branch, scanner and kind.
  */

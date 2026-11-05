@@ -1,4 +1,4 @@
-import {searchResultHref} from "@components/search/palette/searchResultHref";
+import {searchResultAcrossProjectsHref, searchResultHref} from "@components/search/palette/searchResultHref";
 
 const href = (type, data) => searchResultHref({type: {id: type}, data})
 
@@ -49,4 +49,19 @@ describe('where a search result opens', () => {
         expect(href('project', {})).toBeNull()
     })
 
+})
+
+describe('searchResultAcrossProjectsHref', () => {
+    const acrossProjects = (type, data) => searchResultAcrossProjectsHref({type: {id: type}, data})
+
+    it('follows a finding across all the projects, by its external ID', () => {
+        expect(acrossProjects('finding', {finding: {id: 42, externalId: 'GHSA-1/2'}}))
+            .toBe('/extension/findings/fan-out?finding=GHSA-1%2F2')
+    })
+
+    it('is for the findings only', () => {
+        expect(acrossProjects('project', {project: {id: 1, externalId: 'CVE-1'}})).toBeNull()
+        expect(acrossProjects('finding', {})).toBeNull()
+        expect(searchResultAcrossProjectsHref(null)).toBeNull()
+    })
 })

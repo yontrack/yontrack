@@ -183,6 +183,30 @@ describe('the URL drives the search', () => {
 
 describe('the results', () => {
 
+    it('links a finding, and only a finding, to the page following it across all the projects', () => {
+        const FINDING = type('finding', 'Security finding')
+        searchAnswer = answer({
+            total: 2,
+            facets: [{type: FINDING, count: 1}, {type: PROJECT, count: 1}],
+            items: [
+                {
+                    type: FINDING,
+                    title: 'CVE-2024-38816',
+                    description: '',
+                    data: {finding: {id: 42, externalId: 'CVE-2024-38816'}, project: {id: 1, name: 'billing'}},
+                    highlight: null,
+                },
+                project('billing'),
+            ],
+        })
+        renderView({q: 'billing'})
+        const results = within(screen.getByRole('list', {name: 'Search results'})).getAllByRole('listitem')
+        const link = within(results[0]).getByTestId('finding-in-all-projects')
+        expect(link).toHaveTextContent(/^In all projects →$/)
+        expect(link).toHaveAttribute('href', '/extension/findings/fan-out?finding=CVE-2024-38816')
+        expect(within(results[1]).queryByTestId('finding-in-all-projects')).toBeNull()
+    })
+
     it('lists the results, with their count', () => {
         searchAnswer = answer({
             total: 2,

@@ -100,6 +100,9 @@ describe('mobileEquivalent', () => {
         expect(describeDesktopRoute('/extension/findings/project/12')).toEqual("a project's security findings")
         expect(mobileEquivalent('/extension/findings/finding/42')).toBeNull()
         expect(describeDesktopRoute('/extension/findings/finding/42')).toEqual('a security finding')
+        expect(mobileEquivalent('/extension/findings/fan-out')).toBeNull()
+        expect(isRedirectExempt('/extension/findings/fan-out')).toBe(false)
+        expect(describeDesktopRoute('/extension/findings/fan-out')).toEqual('a security finding across all the projects')
     })
 
     it('leaves the scorecard page desktop-only', () => {

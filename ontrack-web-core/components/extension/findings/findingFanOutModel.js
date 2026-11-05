@@ -1,6 +1,6 @@
 /**
- * The findings fan-out of an estate: one finding, by its external ID, over the projects of the
- * estate — which ones are exposed, on which branches, since when.
+ * The fan-out of a finding: one finding, by its external ID, over some projects — all of them, or
+ * the ones of an estate — which ones are exposed, on which branches, since when.
  */
 import {FINDING_SEVERITIES} from "@components/extension/findings/findingsModel";
 
@@ -25,47 +25,64 @@ const severityRank = (severity) => {
     return index < 0 ? FINDING_SEVERITIES.length : index
 }
 
+const isActive = ({state}) => state === 'EXPOSED' || state === 'ACCEPTED'
+
 /**
- * The branches a finding is exposed on, from its exposure per branch and stamp: a branch is listed
- * once, exposed as soon as one of its stamps reports the finding without any acceptance holding,
- * else accepted, since the earliest start of the exposure of its stamps. Branches where the finding
- * is resolved are left out.
+ * Some ISO times, the earliest first, without the missing ones.
+ */
+const chronological = (times) => times.filter(it => it).sort()
+
+/**
+ * One branch, from the exposures of its stamps: exposed as soon as one of its stamps reports the
+ * finding without any acceptance holding, else accepted, else resolved, since the earliest start of
+ * the exposures still ongoing — of all of them when it is resolved, at the latest of its resolutions.
+ */
+const branchExposure = (branch, stamps) => {
+    const active = stamps.filter(isActive)
+    const state = active.length === 0 ? 'RESOLVED' : active.some(it => it.state === 'EXPOSED') ? 'EXPOSED' : 'ACCEPTED'
+    return {
+        branch,
+        state,
+        since: chronological((active.length > 0 ? active : stamps).map(it => it.since))[0] ?? null,
+        resolvedAt: state === 'RESOLVED' ? chronological(stamps.map(it => it.resolvedAt)).at(-1) ?? null : null,
+        acceptanceExpiresAt: state === 'ACCEPTED' ? (active[0].acceptanceExpiresAt ?? null) : null,
+        // Whether a branch counts depends on the branch only, not on the stamp
+        counts: stamps[0].counts !== false,
+    }
+}
+
+const countingFirst = (branches) => [...branches.filter(it => it.counts), ...branches.filter(it => !it.counts)]
+
+/**
+ * The branches a finding has been exposed on, from its exposure per branch and stamp: a branch is
+ * listed once. A branch exposed on any stamp stays exposed, and one with an acceptance holding on
+ * any stamp, accepted. A branch is resolved once all its stamps are, and gives the latest of their
+ * resolutions (`resolvedAt`). The resolved branches come after the exposed and accepted ones.
  *
  * Each branch says whether it `counts` toward the state of the finding in the project — matched by
  * the branch model of the project (every branch when it has none). The branches which do not count
- * are still listed, after the ones which count. The server gives no disabled branch.
+ * are still listed, after the ones which count, within the resolved branches as well. The server
+ * gives no disabled branch.
  *
- * @param {Array} exposures The `exposures` of a finding: `{branch, since, state, acceptanceExpiresAt,
- * counts}` per branch and stamp
- * @returns {Array} `{branch, state, since, acceptanceExpiresAt, counts}` per branch, the ones which
- * count first, each group in the order of the exposures
+ * @param {Array} exposures The `exposures` of a finding: `{branch, since, state, resolvedAt,
+ * acceptanceExpiresAt, counts}` per branch and stamp
+ * @returns {Array} `{branch, state, since, resolvedAt, acceptanceExpiresAt, counts}` per branch,
+ * each group in the order of the exposures
  */
 export function branchExposures(exposures = []) {
     const byBranch = new Map()
-    ;(exposures ?? []).forEach(({branch, since, state, acceptanceExpiresAt, counts}) => {
-        if (state !== 'EXPOSED' && state !== 'ACCEPTED') return
-        const current = byBranch.get(branch.id)
-        if (!current) {
-            byBranch.set(branch.id, {
-                branch,
-                state,
-                since,
-                acceptanceExpiresAt: state === 'ACCEPTED' ? (acceptanceExpiresAt ?? null) : null,
-                // Whether a branch counts depends on the branch only, not on the stamp
-                counts: counts !== false,
-            })
-        } else {
-            if (since && (!current.since || since < current.since)) {
-                current.since = since
-            }
-            if (state === 'EXPOSED') {
-                current.state = 'EXPOSED'
-                current.acceptanceExpiresAt = null
-            }
+    ;(exposures ?? []).forEach(exposure => {
+        const id = exposure.branch.id
+        if (!byBranch.has(id)) {
+            byBranch.set(id, {branch: exposure.branch, stamps: []})
         }
+        byBranch.get(id).stamps.push(exposure)
     })
-    const branches = [...byBranch.values()]
-    return [...branches.filter(it => it.counts), ...branches.filter(it => !it.counts)]
+    const branches = [...byBranch.values()].map(({branch, stamps}) => branchExposure(branch, stamps))
+    return [
+        ...countingFirst(branches.filter(isActive)),
+        ...countingFirst(branches.filter(it => !isActive(it))),
+    ]
 }
 
 /**
@@ -146,11 +163,11 @@ export function fanOutSummary(findings = []) {
 }
 
 /**
- * The rows of the ranked findings of an estate, in the order of the server — by number of projects
- * where the finding is open, then by severity, then by external ID — one per external ID, with the
- * number of projects reporting it.
+ * The rows of ranked findings, in the order of the server — by number of projects where the finding
+ * is open, then by severity, then by external ID — one per external ID, with the number of projects
+ * reporting it.
  *
- * @param {Array} rankedFindings `Estate.rankedFindings`
+ * @param {Array} rankedFindings `Estate.rankedFindings`, or any `searchedFindings`
  * @returns {Array} The ranked findings, each with its `key` and its number of `projects`
  */
 export function rankedFindingRows(rankedFindings) {
@@ -162,28 +179,11 @@ export function rankedFindingRows(rankedFindings) {
 }
 
 /**
- * `Open in 3 · accepted in 1 · resolved in 0`: in how many projects of the estate a ranked finding
- * is open, accepted and resolved.
+ * `Open in 3 · accepted in 1 · resolved in 0`: in how many projects a ranked finding is open,
+ * accepted and resolved.
  */
 export const rankedFindingProjectsText = ({openProjects, acceptedProjects, resolvedProjects}) =>
     `Open in ${openProjects} · accepted in ${acceptedProjects} · resolved in ${resolvedProjects}`
-
-/**
- * What the list of the ranked findings shows: the top of the ranking when it is as long as asked
- * for, else every finding open in the estate.
- *
- * @param count Number of ranked findings listed
- * @param size Number of ranked findings asked for
- */
-export function rankedFindingsCaption(count, size) {
-    if (count >= size) {
-        return `The ${size} findings open in the most projects of this estate, the most widespread first`
-    } else if (count === 1) {
-        return '1 finding open in this estate'
-    } else {
-        return `${count} findings open in this estate, the most widespread first`
-    }
-}
 
 /**
  * What the list of the findings found by a search shows: the top of them when it is as long as
@@ -201,4 +201,37 @@ export function searchedFindingsCaption(count, size, text) {
     } else {
         return `${count} findings whose external ID contains "${text}", the most widespread first`
     }
+}
+
+const single = (value) => Array.isArray(value) ? value[0] : value
+
+/**
+ * The state of the page of a finding across projects from the query of its URL —
+ * `?finding=CVE-2024-38816`, or `?search=cve-2024` — so that a fan-out or a search can be shared by
+ * its link: the external ID of the finding whose fan-out is shown, and the text searched among the
+ * external IDs — each trimmed, `null` when there is none.
+ *
+ * A finding picked among the results of a search keeps the search, to go back to its results.
+ */
+export function fanOutPageState(query = {}) {
+    return {
+        finding: fanOutExternalId(single(query?.finding)),
+        search: fanOutExternalId(single(query?.search)),
+    }
+}
+
+/**
+ * The query of the URL from the state of the page of a finding across projects.
+ */
+export function fanOutPageQuery({finding, search} = {}) {
+    const query = {}
+    const externalId = fanOutExternalId(finding)
+    if (externalId) {
+        query.finding = externalId
+    }
+    const text = fanOutExternalId(search)
+    if (text) {
+        query.search = text
+    }
+    return query
 }

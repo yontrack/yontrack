@@ -327,13 +327,29 @@ describe('The findings fan-out of an estate', () => {
         expect(screen.getByTestId('estate-fanout-state-beta')).toHaveTextContent('Open')
     })
 
-    it('shows a resolved project with no branch, and when the finding was resolved', () => {
+    it('lists a branch where the finding is resolved, with its date', () => {
         mockFindings()
         renderFanOut()
         search('CVE-2021-44228')
         expect(screen.getByTestId('estate-fanout-state-alpha')).toHaveTextContent('Resolved')
+        expect(screen.getByTestId('estate-fanout-branch-alpha-main')).toHaveTextContent(/Resolved 2026/)
+    })
+
+    it('says when the finding was resolved when it has no branch left', () => {
+        mockFindings([
+            finding(1, {id: 7, name: 'alpha'}, {state: 'RESOLVED', resolvedAt: '2026-09-15T10:00:00Z', exposures: []}),
+        ])
+        renderFanOut()
+        search('CVE-2021-44228')
         expect(screen.queryByTestId('estate-fanout-branch-alpha-main')).toBeNull()
         expect(screen.getByTestId('estate-fanout-branches-alpha')).toHaveTextContent(/Resolved 2026/)
+    })
+
+    it('calls the column of the branches Branches', () => {
+        mockFindings()
+        renderFanOut()
+        search('CVE-2021-44228')
+        expect(screen.getByRole('columnheader', {name: 'Branches'})).toBeInTheDocument()
     })
 
     it('links each finding to its page', () => {

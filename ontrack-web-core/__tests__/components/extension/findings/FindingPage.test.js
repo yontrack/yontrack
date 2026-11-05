@@ -53,6 +53,13 @@ beforeEach(() => {
 
 describe('Summary of a finding', () => {
 
+    it('links to the finding across all the projects, beside its external ID, without any count', () => {
+        render(<FindingSummary finding={finding}/>)
+        const link = screen.getByTestId('finding-in-all-projects')
+        expect(link).toHaveTextContent(/^In all projects →$/)
+        expect(link).toHaveAttribute('href', '/extension/findings/fan-out?finding=CVE-2021-44228')
+    })
+
     it('shows the finding and links to its URL outside of Yontrack', () => {
         render(<FindingSummary finding={finding}/>)
         expect(screen.getByText('CVE-2021-44228')).toBeInTheDocument()

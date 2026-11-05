@@ -6971,6 +6971,13 @@ type Query {
   ): SearchResults!
   "List of types of search results"
   searchResultTypes: [SearchResultType!]!
+  "Security findings of all the projects whose external ID contains the given text, ignoring case, one per external ID, open, accepted or resolved, ranked by the number of projects in which they are open, then by severity, the highest first, then by external ID. A blank text finds nothing. Only the projects whose findings the user is granted the view of are searched. The findings exposed only on disabled branches are left out."
+  searchedFindings(
+    "Maximum number of findings to return, at most 100"
+    size: Int = 20,
+    "Text the external IDs contain, ignoring case"
+    text: String!
+  ): [RankedFinding!]!
   "Ontrack settings"
   settings: Settings!
   "List of existing admission rules"

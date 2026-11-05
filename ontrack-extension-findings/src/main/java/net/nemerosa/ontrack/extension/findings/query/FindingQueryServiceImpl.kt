@@ -268,6 +268,17 @@ class FindingQueryServiceImpl(
         )
     }
 
+    override fun getSearchedFindingsAcrossProjects(text: String, size: Int, date: LocalDate): List<RankedFinding> {
+        val searched = text.trim()
+        if (searched.isEmpty()) return emptyList()
+        return getSearchedFindings(
+            projectIds = findingRepository.findProjectIdsByExternalIdContaining(searched),
+            text = searched,
+            size = size,
+            date = date,
+        )
+    }
+
     /**
      * The branches which count toward the state of the findings, for each of the projects whose
      * findings the user can see, by project ID.
@@ -310,33 +321,46 @@ class FindingQueryServiceImpl(
             null
         }
 
-    override fun getFindingExposures(finding: Finding): List<FindingExposureView> {
-        if (!canSeeFindings(finding.projectId)) return emptyList()
-        val project = structureService.getProject(ID.of(finding.projectId))
-        val disabledBranches = findingStateService.getDisabledBranchIds(project)
-        val exposures = findingRepository.findExposuresByFinding(finding.id)
-            .filter { it.branchId !in disabledBranches }
-        if (exposures.isEmpty()) return emptyList()
-        val countingBranches = findingStateService.getCountingBranchIds(project)
+    override fun getFindingStates(findings: Collection<Finding>, date: LocalDate): Map<Int, FindingState> =
+        findings.groupBy { it.projectId }.flatMap { (projectId, projectFindings) ->
+            visibleProject(projectId)
+                ?.let { project -> findingStateService.getFindingStates(project, projectFindings, date).toList() }
+                ?: emptyList()
+        }.toMap()
+
+    override fun getFindingExposures(finding: Finding): List<FindingExposureView> =
+        getFindingsExposures(listOf(finding))[finding.id] ?: emptyList()
+
+    override fun getFindingsExposures(findings: Collection<Finding>): Map<Int, List<FindingExposureView>> {
         val branches = mutableMapOf<Int, Branch>()
         val stamps = mutableMapOf<Int, ValidationStamp>()
-        return exposures
-            .map { exposure ->
-                FindingExposureView(
-                    exposure = exposure,
-                    branch = branches.getOrPut(exposure.branchId) {
-                        structureService.getBranch(ID.of(exposure.branchId))
-                    },
-                    validationStamp = stamps.getOrPut(exposure.validationStampId) {
-                        structureService.getValidationStamp(ID.of(exposure.validationStampId))
-                    },
-                    counts = exposure.branchId in countingBranches,
-                )
+        return findings.groupBy { it.projectId }.flatMap { (projectId, projectFindings) ->
+            val project = visibleProject(projectId) ?: return@flatMap emptyList()
+            val disabledBranches = findingStateService.getDisabledBranchIds(project)
+            val exposures = findingRepository.findExposuresByFindings(projectFindings.map { it.id })
+                .filter { it.branchId !in disabledBranches }
+            if (exposures.isEmpty()) return@flatMap emptyList()
+            val countingBranches = findingStateService.getCountingBranchIds(project)
+            exposures.groupBy { it.findingId }.map { (findingId, findingExposures) ->
+                findingId to findingExposures
+                    .map { exposure ->
+                        FindingExposureView(
+                            exposure = exposure,
+                            branch = branches.getOrPut(exposure.branchId) {
+                                structureService.getBranch(ID.of(exposure.branchId))
+                            },
+                            validationStamp = stamps.getOrPut(exposure.validationStampId) {
+                                structureService.getValidationStamp(ID.of(exposure.validationStampId))
+                            },
+                            counts = exposure.branchId in countingBranches,
+                        )
+                    }
+                    .sortedWith(
+                        compareBy<FindingExposureView> { it.branch.name }
+                            .thenBy { it.validationStamp.name }
+                    )
             }
-            .sortedWith(
-                compareBy<FindingExposureView> { it.branch.name }
-                    .thenBy { it.validationStamp.name }
-            )
+        }.toMap()
     }
 
     override fun getFindingObservations(

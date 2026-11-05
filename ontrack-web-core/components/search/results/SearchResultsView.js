@@ -13,7 +13,7 @@ import {Dynamic} from "@components/common/Dynamic";
 import {useQuery} from "@components/services/GraphQL";
 import {useRefData} from "@components/providers/RefDataProvider";
 import {countLabel, MIN_SEARCH_LENGTH} from "@components/search/palette/paletteSections";
-import {searchResultHref} from "@components/search/palette/searchResultHref";
+import {searchResultAcrossProjectsHref, searchResultHref} from "@components/search/palette/searchResultHref";
 import {resultContext} from "@components/search/searchResultContext";
 import {PAGE_SIZE, searchResultsParams, searchResultsRoute} from "@components/search/results/searchResultsParams";
 import {highlightText} from "@components/search/results/highlightText";
@@ -79,12 +79,14 @@ const plural = (count, capped) => count === 1 && !capped ? '1 result' : `${count
 
 /**
  * One result: the icon of its type, its title - highlighted, linking to its page - its type and
- * where it is, and an excerpt of its free text.
+ * where it is, for a finding the link following it across all the projects, and an excerpt of its
+ * free text.
  */
 function SearchResultItem({result, q}) {
     const href = searchResultHref(result)
     const title = <HighlightedText parts={highlightText(result.title, q)}/>
     const context = resultContext(result)
+    const acrossProjects = searchResultAcrossProjectsHref(result)
     return (
         <ItemList.Item
             data-testid="search-result"
@@ -98,6 +100,7 @@ function SearchResultItem({result, q}) {
                     {href ? <Link href={href}>{title}</Link> : <Typography.Text strong>{title}</Typography.Text>}
                     <Typography.Text type="secondary">{result.type.name}</Typography.Text>
                     {context && <Typography.Text type="secondary">{context}</Typography.Text>}
+                    {acrossProjects && <Link href={acrossProjects} data-testid="finding-in-all-projects">In all projects →</Link>}
                 </Space>
             }
             description={

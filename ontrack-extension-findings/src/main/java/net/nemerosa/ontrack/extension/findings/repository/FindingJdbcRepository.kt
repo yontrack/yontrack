@@ -131,6 +131,12 @@ class FindingJdbcRepository(
             ) { rs, _ -> toFinding(rs) }
         }
 
+    override fun findProjectIdsByExternalIdContaining(text: String): List<Int> =
+        namedParameterJdbcTemplate!!.query(
+            "SELECT DISTINCT PROJECT_ID FROM FINDINGS WHERE EXTERNAL_ID ILIKE :pattern ESCAPE '\\'",
+            mapOf("pattern" to "%${likeEscape(text)}%"),
+        ) { rs, _ -> rs.getInt("PROJECT_ID") }
+
     override fun findRankedFindings(
         countingBranchIds: Map<Int, Set<Int>>,
         date: LocalDate,

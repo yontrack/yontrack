@@ -626,7 +626,10 @@ In the UI:
 
 * the page of a **validation run** lists the findings of this scan.
 * the **search** finds a finding by its external ID: searching `CVE-2021-44228` lists the projects and
-  branches where it is exposed or accepted, and leads to the finding page.
+  branches where it is exposed or accepted, and leads to the finding page, or to the
+  [finding across projects](#finding-across-projects).
+* the [**Finding across projects**](#finding-across-projects) page follows an external ID across all
+  the projects.
 * the **findings fan-out** of an [estate](../../scorecard/estate-view.md#findings-fan-out) lists the
   projects of the estate reporting an external ID, with the state of the finding in each and the
   branches exposing it.
@@ -638,6 +641,48 @@ Everywhere a number of findings is given by severity, it is a tag in the colour 
 red for critical, orange for high, gold for medium, blue for low, grey for unknown — which names the
 severity as well: `Critical 3`, or `C 3` where space is short. A severity without any finding is
 shown muted.
+
+### Finding across projects
+
+*Finding across projects*, in the **Information** group of the user menu, follows one external ID —
+a CVE, a rule ID, any other — across all the projects of the instance: which ones report it, on
+which branches, since when. **In all projects →** leads to it from the finding page, beside the
+external ID, and from each finding in the search results. It requires no license.
+
+It opens on a search box and an explanation. Search with a part of the external ID, ignoring case:
+
+* when only one external ID contains the text, its fan-out opens right away;
+* when several do, up to 20 of them are listed, the one open in the most projects first, each with
+  the number of projects where it is open, accepted and resolved. Each opens its fan-out, from which
+  *Findings containing "…"* goes back to the list.
+
+The fan-out has one row per finding — a project has one per scanner and location — grouped by
+project, the projects where it is open first, then the ones where it is accepted, then the ones
+where it is resolved. All of them are listed, without pagination. **Branches** gives the branches of
+each finding:
+
+* the ones exposing it, each since the start of its exposure, and *accepted until* the expiry of its
+  acceptance — or *accepted without expiry*. A branch exposed on any of its stamps stays exposed;
+* then the ones where it is resolved, once all their stamps are, with the latest date of their
+  resolutions.
+
+The page is shared by its address: `/extension/findings/fan-out?finding=CVE-2024-38816` opens the
+fan-out of `CVE-2024-38816`, `?search=cve-2024` the findings whose external ID contains `cve-2024`.
+In the demo, `CVE-2024-38816` is reported in several projects, and is fixed on the `main` branch of
+`petclinic-billing` while it is still exposed on its `release-2.3` branch.
+
+What the page does not list:
+
+* the projects whose findings you are not granted the view of (`ProjectFindingsView`). They are left
+  out silently: no count says that some are hidden;
+* the [disabled branches](#disabled-branches), and the findings exposed only on them;
+* the deleted branches and projects: their exposures are deleted with them. A finding whose branches
+  have all been deleted stays in its project, which reads as resolved, without any branch to list.
+
+The same table is the [findings fan-out of an estate](../../scorecard/estate-view.md#findings-fan-out),
+over the projects of the estate.
+
+The API is the root `searchedFindings(text, size)` query, then `findings(externalId)`.
 
 ### Reading a fix against a build filter
 

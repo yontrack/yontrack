@@ -267,6 +267,7 @@ const DESCRIPTIONS = [
     // No findings in the mobile UI in 6.0 (#1864)
     [/^\/extension\/findings\/project\//, "a project's security findings"],
     [/^\/extension\/findings\/finding\//, 'a security finding'],
+    [/^\/extension\/findings\/fan-out/, 'a security finding across all the projects'],
     // No scorecard in the mobile UI in 6.x (#1904)
     [/^\/extension\/scorecard\/project\//, "a project's scorecard"],
     // No estates in the mobile UI in 6.x: their admin page is desktop-only (#1905)

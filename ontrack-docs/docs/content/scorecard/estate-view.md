@@ -154,16 +154,17 @@ is resolved:
   [Project roll-up](../integrations/findings/findings.md#project-roll-up);
 * its **severity**, the highest it was reported with;
 * its **location**, with the scanner and the kind of scan, which opens the finding page;
-* **Exposed on**: the branches exposing it, each since the start of its exposure, and *accepted
-  until* the expiry of its acceptance — or *accepted without expiry*. A branch where the finding is
-  resolved is not listed; a finding resolved in the project reads *Resolved* and its date;
-  a branch which does not count toward the state of the project — outside the branch model of the
+* **Branches**: the branches exposing it, each since the start of its exposure, and *accepted
+  until* the expiry of its acceptance — or *accepted without expiry*. A branch exposed on any of its
+  stamps stays exposed. Then the branches where it is resolved, once all their stamps are, with the
+  latest date of their resolutions.
+  A branch which does not count toward the state of the project — outside the branch model of the
   project, see [Project roll-up](../integrations/findings/findings.md#project-roll-up)
   — is still listed, greyed with a dashed border, after the branches which count, and says why on
   hover and on keyboard focus: *Outside the branch model: does not count toward the project's
   state*. The state of the project and the summary are the ones of the branches which count, so
-  that a project may read *Resolved* while it lists such a branch. A project without SCM has no
-  branch model: all its branches count;
+  that a project may read *Resolved* while it lists such a branch still exposed. A project without
+  SCM has no branch model: all its branches count;
 * when it was **first seen**.
 
 A [disabled branch](../integrations/findings/findings.md#disabled-branches) is not listed, and a
@@ -175,6 +176,9 @@ Above, the demo's `CVE-2024-38816`, opened from its link
 `?tab=fanout&finding=CVE-2024-38816`: still exposed on the `release-2.3` branch of
 `petclinic-billing` — it was fixed on `main` — in `petclinic-visits`, accepted on `spring-webflux`
 and resolved on `spring-webmvc`, and resolved in `petclinic` as a whole.
+
+The [Finding across projects](../integrations/findings/findings.md#finding-across-projects) page
+gives the same table over all the projects.
 
 ## License
 

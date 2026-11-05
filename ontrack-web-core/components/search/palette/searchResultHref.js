@@ -1,4 +1,4 @@
-import {branchUri, buildUri, findingUri, projectUri} from "@components/common/Links";
+import {branchUri, buildUri, findingFanOutUri, findingUri, projectUri} from "@components/common/Links";
 
 const withId = (entity, uri) => entity?.id !== undefined && entity?.id !== null ? uri(entity) : null
 
@@ -34,4 +34,14 @@ const hrefs = {
 export function searchResultHref(result) {
     const href = hrefs[result?.type?.id]
     return href && result.data ? href(result.data) ?? null : null
+}
+
+/**
+ * The page following a search result across all the projects, or `null` when it does not apply: a
+ * finding, by its external ID. On the results page only, where a result can carry a second link: the
+ * palette opens one page per result.
+ */
+export function searchResultAcrossProjectsHref(result) {
+    const externalId = result?.type?.id === 'finding' ? result.data?.finding?.externalId : null
+    return externalId ? findingFanOutUri(externalId) : null
 }
