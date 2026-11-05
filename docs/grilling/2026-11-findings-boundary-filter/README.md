@@ -54,6 +54,8 @@ is the mockup that was chosen.
    reopened before any matching build, so it needs a new fix.
 10. **A filter which cannot apply falls back to the raw scan fix, and says so.** Showing a branch with
     no GOLD level as "None yet" would have it waiting for a build which can never exist.
+    Its lane ends on the hollow dot of a scan fix, with no hatching: while a filter is active, a solid
+    dot only ever means the fix is in a matching build.
 11. **Saved filters are listed, and choosing one copies its criteria** into the page filter. This gives
     the customer the filters they know, while keeping one rule for the whole page. A filter using
     `since*` is listed but cannot be selected, and says why.
