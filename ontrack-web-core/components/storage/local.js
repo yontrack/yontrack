@@ -4,6 +4,7 @@
 import {useEffect, useState} from "react";
 
 const selectedBuildFilter = (branchId) => `selected_build_filter_${branchId}`
+const selectedBoundaryFilter = (projectId) => `selected_boundary_filter_${projectId}`
 const selectedValidationStampFilter = (branchId) => `selected_validation_stamp_filter_${branchId}`
 const dependencyLinksMode = 'dependency_links_mode'
 
@@ -45,6 +46,28 @@ export function setLocallySelectedBuildFilter(branchId, buildFilterResource) {
     } else {
         localStorage.removeItem(
             selectedBuildFilter((branchId))
+        )
+    }
+}
+
+export function getLocallySelectedBoundaryFilter(projectId) {
+    const json = localStorage.getItem(selectedBoundaryFilter(projectId))
+    if (json) {
+        return JSON.parse(json)
+    } else {
+        return undefined
+    }
+}
+
+export function setLocallySelectedBoundaryFilter(projectId, boundaryFilter) {
+    if (boundaryFilter) {
+        localStorage.setItem(
+            selectedBoundaryFilter(projectId),
+            JSON.stringify(boundaryFilter)
+        )
+    } else {
+        localStorage.removeItem(
+            selectedBoundaryFilter(projectId)
         )
     }
 }

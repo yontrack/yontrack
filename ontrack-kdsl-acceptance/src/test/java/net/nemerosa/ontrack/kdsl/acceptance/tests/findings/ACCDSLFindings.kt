@@ -9,6 +9,7 @@ import net.nemerosa.ontrack.kdsl.connector.graphql.GraphQLClientException
 import net.nemerosa.ontrack.kdsl.connector.graphql.schema.type.FindingExposureState
 import net.nemerosa.ontrack.kdsl.connector.graphql.schema.type.FindingHistoryEntryType
 import net.nemerosa.ontrack.kdsl.connector.graphql.schema.type.FindingKind
+import net.nemerosa.ontrack.kdsl.connector.graphql.schema.type.FindingPeriodBoundaryStatus
 import net.nemerosa.ontrack.kdsl.connector.graphql.schema.type.FindingSeverity
 import net.nemerosa.ontrack.kdsl.connector.graphql.schema.type.FindingState
 import net.nemerosa.ontrack.kdsl.spec.Branch
@@ -17,6 +18,7 @@ import net.nemerosa.ontrack.kdsl.spec.extension.findings.FindingsReportFormat
 import net.nemerosa.ontrack.kdsl.spec.extension.findings.createFindingsValidationStamp
 import net.nemerosa.ontrack.kdsl.spec.extension.findings.exposurePeriods
 import net.nemerosa.ontrack.kdsl.spec.extension.findings.history
+import net.nemerosa.ontrack.kdsl.spec.extension.findings.periodBoundaries
 import net.nemerosa.ontrack.kdsl.spec.extension.findings.findings
 import net.nemerosa.ontrack.kdsl.spec.extension.findings.validateWithFindings
 import net.nemerosa.ontrack.kdsl.spec.extension.license.devLicense
@@ -274,6 +276,42 @@ class ACCDSLFindings : AbstractACCDSLTestSupport() {
                 listOf("CVE-2023-5363"),
                 findings(state = FindingState.OPEN).items.map { it.externalId }
             )
+        }
+    }
+
+    @Test
+    fun `A fix counts once a later build is promoted, and the state of the finding does not change`() {
+        project {
+            branch {
+                createFindingsValidationStamp(name = STAMP)
+                promotion("GOLD")
+                scan(entry("CVE-2021-44228", "CRITICAL"))
+                scan()
+
+                val finding = findings().items.single()
+                val waiting = project.periodBoundaries(finding, "GOLD").single()
+                assertEquals(FindingPeriodBoundaryStatus.NONE_YET, waiting?.status)
+                assertNull(waiting?.build)
+                assertNotNull(waiting?.durationSeconds)
+
+                val promoted = createBuild(uid("bd-"))
+                promoted.promote("GOLD")
+
+                val matched = project.periodBoundaries(finding, "GOLD").single()
+                assertEquals(FindingPeriodBoundaryStatus.MATCHED, matched?.status)
+                assertEquals(promoted.name, matched?.build)
+                assertNotNull(matched?.durationSeconds)
+
+                val notThere = project.periodBoundaries(finding, "PLATINUM").single()
+                assertEquals(FindingPeriodBoundaryStatus.NOT_APPLICABLE, notThere?.status)
+                assertNotNull(notThere?.reason)
+
+                // A lens: the finding stays resolved on the scan facts
+                assertEquals(FindingState.RESOLVED, findings().items.single().state)
+                val (period) = project.exposurePeriods(finding)
+                assertNotNull(period.endedInBuild)
+                assertFalse(period.endedInBuild == promoted.name)
+            }
         }
     }
 

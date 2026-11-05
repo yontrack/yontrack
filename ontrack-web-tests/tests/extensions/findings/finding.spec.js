@@ -4,6 +4,7 @@ import {login} from "../../core/login";
 import {HomePage} from "../../core/home/home";
 import {ProjectFindingsPage} from "./ProjectFindingsPage";
 import {FindingPage, ValidationRunFindingsPage} from "./FindingPage";
+import {BranchPage} from "../../core/branches/branch";
 import {generate} from "@ontrack/utils";
 import {
     createFindingsValidationStamp,
@@ -143,6 +144,112 @@ test('finding page shows a finding discovered, fixed and reopened, with its buil
     await expect(findingPage.historyEntry('REOPENED')).toContainText(`Reopened on main in build ${reopened.name}`)
     await expect(findingPage.historyEntry('RESOLVED')).toContainText(`Fixed on main in build ${fixed.name}`)
     await expect(findingPage.historyEntry('DISCOVERED')).toContainText(`Discovered on main in build ${discovered.name}`)
+})
+
+/**
+ * Two findings of one project, fixed by a build which is not promoted, with a promoted build after it.
+ */
+const provisionFixNotPromoted = async (ontrack, externalId, otherExternalId) => {
+    const project = await ontrack.createProject()
+    const main = await project.createBranch("main")
+    const bronze = await main.createPromotionLevel("BRONZE")
+    const image = await createFindingsValidationStamp(main, "SECURITY.IMAGE")
+    await scanWithFindings(main, image, [
+        finding({externalId, severity: "MEDIUM"}),
+        finding({externalId: otherExternalId, severity: "LOW"}),
+    ])
+    await scanWithFindings(main, image, [])
+    const promoted = await main.createBuild()
+    await promoted.promote(bronze)
+    return {project, main, promoted}
+}
+
+test('a build filter reads the end of the exposure, and is a lens on these sections only', async ({page, ontrack}) => {
+    const externalId = "CVE-2024-12798"
+    const otherExternalId = "CVE-2024-47535"
+    const {project, main, promoted} = await provisionFixNotPromoted(ontrack, externalId, otherExternalId)
+    await login(page, ontrack)
+
+    const findingsPage = new ProjectFindingsPage(page, project)
+    await findingsPage.goTo()
+    await findingsPage.table().getByRole('link', {name: externalId, exact: true}).click()
+    const findingPage = new FindingPage(page, ontrack)
+    await findingPage.expectOnPage(externalId)
+    const findingUrl = page.url()
+    const lane = findingPage.timelineLane('main', 'SECURITY.IMAGE')
+
+    // With no filter, the page is as it was
+    await expect(findingPage.boundaryFilter()).toContainText('No filter (all builds)')
+    await expect(page.getByRole('columnheader', {name: 'In a matching build'})).toHaveCount(0)
+    await expect(lane.getByTestId('finding-exposure-fix')).toHaveCount(1)
+    await expect(lane.getByTestId('finding-exposure-scan-fix')).toHaveCount(0)
+    await expect(lane.getByTestId('finding-exposure-wait')).toHaveCount(0)
+
+    // Choosing a filter shows the hatched stretch, the column and the second line
+    await findingPage.chooseBoundaryFilterOnPromotion('BRONZE')
+    await expect(lane.getByTestId('finding-exposure-wait')).toHaveCount(1)
+    await expect(lane.getByTestId('finding-exposure-scan-fix')).toHaveCount(1)
+    await expect(lane.getByTestId('finding-exposure-fix')).toHaveCount(1)
+    await expect(lane).toContainText(`BRONZE in ${promoted.name}`)
+    await expect(page.getByRole('columnheader', {name: 'In a matching build'})).toBeVisible()
+    await expect(page.getByTestId('finding-exposure-matching-build')).toContainText(promoted.name)
+    await expect(page.getByTestId('finding-exposure-duration-filtered')).toContainText('until BRONZE')
+
+    // A lens: the state of the finding stays on the scans
+    await expect(findingPage.exposure('main', 'SECURITY.IMAGE')).toContainText('Resolved')
+    await expect(findingPage.historyEntry('RESOLVED')).toBeVisible()
+
+    // Still set after a reload...
+    await page.reload()
+    await findingPage.expectOnPage(externalId)
+    await expect(findingPage.boundaryFilter()).toContainText('With promotion BRONZE')
+    await expect(lane.getByTestId('finding-exposure-wait')).toHaveCount(1)
+
+    // ... and on another finding of the project
+    await findingsPage.goTo()
+    await findingsPage.table().getByRole('link', {name: otherExternalId, exact: true}).click()
+    await findingPage.expectOnPage(otherExternalId)
+    await expect(findingPage.boundaryFilter()).toContainText('With promotion BRONZE')
+    await expect(lane.getByTestId('finding-exposure-wait')).toHaveCount(1)
+
+    // Choosing it here says nothing to the Classic view
+    expect(await page.evaluate(id => localStorage.getItem(`selected_build_filter_${id}`), main.id)).toBeNull()
+
+    // Back to no filter
+    await findingPage.boundaryFilter().click()
+    await page.getByRole('menuitem', {name: 'No filter (all builds)'}).click()
+    await expect(lane.getByTestId('finding-exposure-wait')).toHaveCount(0)
+    await expect(page.getByRole('columnheader', {name: 'In a matching build'})).toHaveCount(0)
+
+    // A filter chosen in the Classic view does not apply here
+    const branchPage = new BranchPage(page, main)
+    await branchPage.goTo()
+    const classicFilter = await branchPage.newStandardBuildFilter()
+    await classicFilter.selectTab('Promotion')
+    await classicFilter.selectPromotionLevel('BRONZE')
+    await classicFilter.ok()
+    await page.goto(findingUrl)
+    await findingPage.expectOnPage(externalId)
+    await expect(findingPage.boundaryFilter()).toContainText('No filter (all builds)')
+    await expect(lane.getByTestId('finding-exposure-wait')).toHaveCount(0)
+})
+
+test('a permalink gives the build filter of the finding page, and is cleared on load', async ({page, ontrack}) => {
+    const externalId = "CVE-2024-12798"
+    const {project} = await provisionFixNotPromoted(ontrack, externalId, "CVE-2024-47535")
+    await login(page, ontrack)
+
+    const findingsPage = new ProjectFindingsPage(page, project)
+    await findingsPage.goTo()
+    await findingsPage.table().getByRole('link', {name: externalId, exact: true}).click()
+    const findingPage = new FindingPage(page, ontrack)
+    await findingPage.expectOnPage(externalId)
+
+    const filter = {name: 'Released', data: {withPromotionLevel: 'BRONZE'}}
+    await page.goto(`${page.url()}?boundaryFilter=${encodeURIComponent(JSON.stringify(filter))}`)
+    await expect(findingPage.boundaryFilter()).toContainText('Released')
+    await expect(findingPage.timelineLane('main', 'SECURITY.IMAGE').getByTestId('finding-exposure-wait')).toHaveCount(1)
+    await expect(page).not.toHaveURL(/boundaryFilter/)
 })
 
 test('a search result lands on the finding page', async ({page, ontrack}) => {

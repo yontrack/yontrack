@@ -9,6 +9,7 @@ dependencies {
     api(project(":ontrack-extension-general"))
 
     implementation(project(":ontrack-extension-license"))
+    implementation(project(":ontrack-repository"))
     implementation(project(":ontrack-repository-support"))
     implementation(project(":ontrack-ui-graphql"))
     implementation("io.micrometer:micrometer-core")

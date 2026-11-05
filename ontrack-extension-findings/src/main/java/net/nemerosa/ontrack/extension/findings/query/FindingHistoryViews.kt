@@ -18,6 +18,9 @@ import java.time.LocalDateTime
  * @property endedInBuild Display name of the build of this run, as for [startedInBuild]
  * @property durationSeconds Duration of the period, until now while it is open
  * @property acceptedSpans Stretches of the period under an acceptance, the oldest first
+ * @property branch Branch of the period
+ * @property nextPeriod Next period of the same exposure, `null` for the last one
+ * @property nextStartedBy Run which started the next period, `null` once purged
  */
 data class FindingExposurePeriodView(
     val period: FindingExposurePeriod,
@@ -27,6 +30,9 @@ data class FindingExposurePeriodView(
     val endedInBuild: String?,
     val durationSeconds: Long,
     val acceptedSpans: List<FindingAcceptedSpanView>,
+    val branch: Branch,
+    val nextPeriod: FindingExposurePeriod?,
+    val nextStartedBy: ValidationRun?,
 )
 
 /**

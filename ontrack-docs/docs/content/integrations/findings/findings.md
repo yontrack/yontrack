@@ -580,7 +580,8 @@ In the UI:
 * the **finding page** shows a finding, where and when it was first seen — branch and build — its
   acceptance with statement and expiry, and the link to its description, then:
     * its **exposure timeline**: one lane per branch and stamp, a bar per period, red while exposed,
-      amber while accepted, ending on a green dot when fixed, with the builds at its ends;
+      amber while accepted, ending on a green dot when fixed, with the builds at its ends. A
+      [build filter](#reading-a-fix-against-a-build-filter) can say when a fix counts;
     * its **exposure per branch**: for the current period of each branch and stamp, the build it
       was discovered in, the build it was fixed in, and how long it has been exposed, with the
       earlier periods of a reopened finding. Its header links to the remediation time of the project
@@ -614,6 +615,49 @@ Everywhere a number of findings is given by severity, it is a tag in the colour 
 red for critical, orange for high, gold for medium, blue for low, grey for unknown — which names the
 severity as well: `Critical 3`, or `C 3` where space is short. A severity without any finding is
 shown muted.
+
+### Reading a fix against a build filter
+
+The finding page says which build fixed a finding on each branch, but this build may never have been
+promoted anywhere. *A fix counts once a build matches*, above the exposure timeline, reads the end of
+each period against the builds which count for you, using the
+[build filters](../../concepts/branch-views/index.md) you know from the branch page. Pick *New filter*, or copy
+the criteria of a filter saved on one of the branches of the finding.
+
+The **boundary** of a period is the first build, in build order, at or after the build which ended the
+period, which matches the filter and comes before the next period starts. Dates do not decide this: an
+older build promoted after the fix still contains the finding, and does not count. A matching build
+which was never scanned does count. Its time is when the build started to match: its first promotion
+to the level, its first run of the stamp with the status, or its creation for any other criterion, the
+latest when there are several, and never before the end of the period.
+
+Only the criteria which test a single build can be used. The number of builds is ignored, as a limit
+would lose the matching build. The *since* criteria cannot be used, as their result moves with the head
+of the branch: a saved filter using them is listed, but cannot be selected.
+
+A period which ended has one of four outcomes, each said in words as well as on the bar:
+
+| Outcome | When | Timeline | *In a matching build* |
+|---|---|---|---|
+| Matched | A build matches | Red to the scan fix (hollow dot), hatched to the matching build (solid dot) | The build, and when it started to match |
+| None yet | No build matches, and the finding has not come back | Hatched to now, with no solid dot | *None yet* |
+| Not reached | The finding came back before any build matched | Hatched to the reopening | *Not reached*, and where it was reopened |
+| Doesn't apply | The promotion level or the stamp does not exist on this branch, or the regular expression is not valid | Red to the scan fix, with no hatching | *Doesn't apply*, and why |
+
+When the matching build is the fixing build itself, there is no hatched stretch: one solid dot at the
+fix. While a filter is active, a solid dot only ever means a fix in a matching build.
+
+*Exposed for* keeps the duration given by the scans, and adds the filtered one as a second line.
+
+One filter applies to all the lanes, by name. It is a personal view setting: it is kept in your browser
+for all the findings of the project, apart from the filters of the branch page, and *Permalink* gives a
+link to it. Nothing is stored on the server.
+
+!!! note
+
+    The filter is a way of reading the page. It changes the *Exposure timeline* and *Exposure per branch*
+    sections only. The state of the finding and its resolution, its history, the findings of the project,
+    the remediation time and the scorecard stay on what the scans say, whatever the filter.
 
 ### Dashboard widgets
 
@@ -649,6 +693,9 @@ Through the [GraphQL API](../../api/graphql.md):
   resolved in its project: branch, stamp, run and build
 * `FindingExposure.periods` lists the periods of an exposure, with their builds, their duration and
   their accepted stretches
+* `FindingExposurePeriod.boundary(filter)` reads a period which ended against a build filter: its
+  `status`, and its `build`, `time`, `durationSeconds` or `reason`. See
+  [Reading a fix against a build filter](#reading-a-fix-against-a-build-filter)
 * `Finding.history` lists the history of a finding, paginated, and `Finding.observations` takes a
   branch, a stamp and a time range to expand a group of it
 * `findings(externalId)` lists the findings with this external ID, across all the projects you can

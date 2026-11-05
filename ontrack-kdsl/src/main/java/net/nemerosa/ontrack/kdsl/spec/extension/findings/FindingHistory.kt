@@ -1,7 +1,11 @@
 package net.nemerosa.ontrack.kdsl.spec.extension.findings
 
+import com.apollographql.apollo.api.Optional
 import net.nemerosa.ontrack.kdsl.connector.graphql.schema.FindingHistoryQuery
+import net.nemerosa.ontrack.kdsl.connector.graphql.schema.FindingPeriodBoundariesQuery
 import net.nemerosa.ontrack.kdsl.connector.graphql.schema.type.FindingHistoryEntryType
+import net.nemerosa.ontrack.kdsl.connector.graphql.schema.type.FindingPeriodBoundaryStatus
+import net.nemerosa.ontrack.kdsl.connector.graphql.schema.type.StandardBuildFilter
 import net.nemerosa.ontrack.kdsl.connector.graphqlConnector
 import net.nemerosa.ontrack.kdsl.spec.Project
 import java.time.LocalDateTime
@@ -27,6 +31,22 @@ data class FindingExposurePeriod(
     val endedInBuild: String?,
     val ongoing: Boolean,
     val durationSeconds: Long,
+)
+
+/**
+ * A period of an exposure read against a build filter.
+ *
+ * @property status Outcome for this period
+ * @property build Name of the matching build, for a match only
+ * @property durationSeconds From the start of the period to the boundary, or to now while no build
+ * matches yet
+ * @property reason Why the filter cannot apply, if so
+ */
+data class FindingPeriodBoundary(
+    val status: FindingPeriodBoundaryStatus,
+    val build: String?,
+    val durationSeconds: Long?,
+    val reason: String?,
 )
 
 /**
@@ -69,6 +89,32 @@ fun Project.exposurePeriods(finding: Finding): List<FindingExposurePeriod> =
             }
         }
         ?: emptyList()
+
+/**
+ * Boundaries of the periods of the exposure of a finding of this project, on all branches, the oldest
+ * period first for each branch and stamp: `null` for a period which is still open.
+ *
+ * @param finding Finding
+ * @param withPromotionLevel Promotion level the builds must have
+ */
+fun Project.periodBoundaries(finding: Finding, withPromotionLevel: String): List<FindingPeriodBoundary?> =
+    graphqlConnector.query(
+        FindingPeriodBoundariesQuery(
+            id = finding.id,
+            filter = StandardBuildFilter(withPromotionLevel = Optional.Present(withPromotionLevel)),
+        )
+    )?.finding?.exposures?.flatMap { exposure ->
+        exposure.periods.map { period ->
+            period.boundary?.let { boundary ->
+                FindingPeriodBoundary(
+                    status = boundary.status,
+                    build = boundary.build?.name,
+                    durationSeconds = boundary.durationSeconds,
+                    reason = boundary.reason,
+                )
+            }
+        }
+    } ?: emptyList()
 
 /**
  * History of a finding of this project, the most recent first: the start and the end of each

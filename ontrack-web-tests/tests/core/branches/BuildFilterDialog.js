@@ -55,6 +55,15 @@ class BuildFilterDialog {
     }
 
     /**
+     * The promotion level of the builds, in the Promotion tab. The text of its option starts with the
+     * image of the level, and the [role=option] elements are a hidden list, for accessibility only.
+     */
+    async selectPromotionLevel(promotion) {
+        await this.dialog.getByLabel("With promotion level", {exact: true}).click()
+        await this.page.getByText(promotion, {exact: true}).filter({visible: true}).click()
+    }
+
+    /**
      * Whether the build was assisted, in the Agents tab: "Assisted", "Not assisted" or "Unknown".
      */
     async selectAssisted(label) {

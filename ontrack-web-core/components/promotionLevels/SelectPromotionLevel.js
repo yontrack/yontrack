@@ -1,11 +1,15 @@
 import {Select, Space, Typography} from "antd";
-import {gql} from "graphql-request";
 import {PromotionLevelImage} from "@components/promotionLevels/PromotionLevelImage";
 import InlineError from "@components/common/InlineError";
-import {useQuery} from "@components/services/GraphQL";
+import useItemsOfBranches from "@components/branches/useItemsOfBranches";
 
+/**
+ * @param branch Branch to select a promotion level of
+ * @param branches Several branches, in place of `branch`: their levels are listed once per name
+ */
 export default function SelectPromotionLevel({
                                                  branch,
+                                                 branches,
                                                  value,
                                                  onChange,
                                                  useName = false,
@@ -16,29 +20,15 @@ export default function SelectPromotionLevel({
                                                  id,
                                              }) {
 
-    const {data: promotionLevels, error} = useQuery(
-        gql`
-            query GetPromotionLevels($branchId: Int!) {
-                branches(id: $branchId) {
-                    promotionLevels {
-                        id
-                        name
-                        image
-                        description
-                        annotatedDescription
-                    }
-                }
-            }
-        `,
-        {
-            variables: {branchId: branch ? Number(branch.id) : undefined},
-            deps: [branch?.id],
-            condition: !!branch,
-            dataFn: data => data.branches[0].promotionLevels,
-        }
-    )
+    const {items: promotionLevels, error} = useItemsOfBranches({
+        name: "GetPromotionLevels",
+        field: "promotionLevels",
+        selection: "id name image description annotatedDescription",
+        branch,
+        branches,
+    })
 
-    const options = (promotionLevels ?? []).map(pl => ({
+    const options = promotionLevels.map(pl => ({
         value: useName ? pl.name : pl.id,
         label: <Space>
             <PromotionLevelImage promotionLevel={pl}/>
@@ -48,7 +38,7 @@ export default function SelectPromotionLevel({
 
     // Without this, a failed lookup was indistinguishable from a branch with no promotion levels.
     // With no branch, there is nothing to load from: an error left over from a previous branch is dropped.
-    if (branch && error) {
+    if ((branch || branches) && error) {
         return <InlineError message={error}/>
     }
 

@@ -1,12 +1,15 @@
 import {Select, Space, Typography} from "antd";
-import {gql} from "graphql-request";
 import ValidationStampImage from "@components/validationStamps/ValidationStampImage";
-import {useQuery} from "@components/services/GraphQL";
+import useItemsOfBranches from "@components/branches/useItemsOfBranches";
 import InlineError from "@components/common/InlineError";
 
+/**
+ * @param branch Branch to select a validation stamp of
+ * @param branches Several branches, in place of `branch`: their stamps are listed once per name
+ */
 export default function SelectValidationStamp({
                                                   disabled,
-                                                  branch, value, onChange, onValidationStampSelected,
+                                                  branch, branches, value, onChange, onValidationStampSelected,
                                                   useName = false,
                                                   allowClear = false,
                                                   multiple = false,
@@ -14,35 +17,16 @@ export default function SelectValidationStamp({
                                                   id,
                                               }) {
 
-    const {data: validationStamps = [], error} = useQuery(
-        gql`
-            query GetValidationStamps($branchId: Int!) {
-                branches(id: $branchId) {
-                    validationStamps {
-                        id
-                        name
-                        image
-                        description
-                        annotatedDescription
-                        dataType {
-                            descriptor {
-                                id
-                            }
-                            config
-                        }
-                    }
-                }
-            }
-        `,
-        {
-            variables: {branchId: branch ? Number(branch.id) : undefined},
-            deps: [branch?.id],
-            condition: !!branch,
-            dataFn: (data) => [...data.branches[0].validationStamps].sort((a, b) => a.name.localeCompare(b.name)),
-        }
-    )
+    const {items, error} = useItemsOfBranches({
+        name: "GetValidationStamps",
+        field: "validationStamps",
+        selection: "id name image description annotatedDescription dataType { descriptor { id } config }",
+        branch,
+        branches,
+    })
+    const validationStamps = [...items].sort((a, b) => a.name.localeCompare(b.name))
 
-    const options = (validationStamps ?? []).map(vs => ({
+    const options = validationStamps.map(vs => ({
         value: useName ? vs.name : vs.id,
         label: <Space>
             <ValidationStampImage validationStamp={vs}/>
@@ -53,7 +37,7 @@ export default function SelectValidationStamp({
     const onLocalChange = (value) => {
         if (onChange) onChange(value)
         if (onValidationStampSelected) {
-            const vs = (validationStamps ?? []).find(it => {
+            const vs = validationStamps.find(it => {
                 if (useName) {
                     return it.name === value
                 } else {

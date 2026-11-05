@@ -17,6 +17,9 @@ import FindingExposureTable from "@components/extension/findings/finding/Finding
 import FindingExposureTimeline from "@components/extension/findings/finding/FindingExposureTimeline";
 import FindingHistory from "@components/extension/findings/finding/FindingHistory";
 import ScorecardRemediationLink from "@components/extension/findings/finding/ScorecardRemediationLink";
+import FindingBoundaryFilter from "@components/extension/findings/finding/FindingBoundaryFilter";
+import useBoundaryFilterSelection from "@components/extension/findings/finding/useBoundaryFilterSelection";
+import {withBoundaries} from "@components/extension/findings/findingsModel";
 
 const gqlFinding = gql`
     query Finding($id: Int!) {
@@ -116,6 +119,104 @@ const gqlFinding = gql`
     }
 `
 
+const gqlFindingBoundaries = gql`
+    query FindingBoundaries($id: Int!, $filter: StandardBuildFilter!) {
+        finding(id: $id) {
+            exposures {
+                branch {
+                    id
+                }
+                validationStamp {
+                    id
+                }
+                periods {
+                    startedAt
+                    boundary(filter: $filter) {
+                        status
+                        build {
+                            id
+                            name
+                            displayName
+                        }
+                        time
+                        durationSeconds
+                        reason
+                    }
+                }
+            }
+        }
+    }
+`
+
+/**
+ * The exposure of a finding, on a time axis and per branch, read against the build filter of the
+ * reader if any. These two sections only: a filter is a lens, and everything else on the page stays on
+ * the raw scan facts. The boundaries are read apart, so that changing the filter reloads nothing else.
+ */
+function FindingExposureSections({finding}) {
+
+    const {project} = finding
+    const {boundaryFilter, onBoundaryFilter, onBoundaryFilterPermalink} = useBoundaryFilterSelection({project})
+    const filterKey = boundaryFilter ? JSON.stringify(boundaryFilter.data) : null
+
+    const {data: boundaries, error} = useQuery(
+        gqlFindingBoundaries,
+        {
+            variables: {id: finding.id, filter: boundaryFilter?.data},
+            deps: [finding.id, filterKey],
+            condition: !!boundaryFilter,
+            // Says which filter they are for: until the ones of the current filter are there, the page
+            // shows none rather than the ones of the previous filter
+            dataFn: data => ({filterKey, exposures: data.finding?.exposures ?? []}),
+        }
+    )
+
+    const ready = !!boundaryFilter && boundaries?.filterKey === filterKey
+    const failed = !!boundaryFilter && !ready && !!error
+    const loading = !!boundaryFilter && !ready && !failed
+    const exposures = ready ? withBoundaries(finding.exposures, boundaries.exposures) : finding.exposures
+    const filter = ready ? boundaryFilter : undefined
+
+    return (
+        <>
+            {
+                finding.exposures?.some(exposure => exposure.periods?.length > 0) &&
+                <Col span={24}>
+                    <PageSection
+                        id="finding-exposure-timeline-section"
+                        title="Exposure timeline"
+                        padding={true}
+                        height="auto"
+                        loading={loading}
+                        extra={
+                            <FindingBoundaryFilter
+                                findingId={finding.id}
+                                exposures={finding.exposures}
+                                filter={boundaryFilter}
+                                onFilter={onBoundaryFilter}
+                                onPermalink={onBoundaryFilterPermalink}
+                            />
+                        }
+                    >
+                        {
+                            failed &&
+                            <Alert type="error" showIcon style={{marginBottom: 8}}
+                                   title={`This filter could not be applied: ${error}`}/>
+                        }
+                        <FindingExposureTimeline exposures={exposures} filter={filter}/>
+                    </PageSection>
+                </Col>
+            }
+            <Col span={24}>
+                <PageSection id="finding-exposure-section" title="Exposure per branch" height="auto" loading={loading}
+                             extra={<ScorecardRemediationLink project={project}/>}>
+                    <FindingExposureTable exposures={exposures} filter={filter}/>
+                </PageSection>
+            </Col>
+        </>
+    )
+}
+
 /**
  * The page of one security finding, `/extension/findings/finding/{id}`: what it is, where it was
  * first seen and fixed, its acceptance with its statement and expiry, its exposure on a time axis
@@ -187,21 +288,7 @@ export default function FindingView({id}) {
                                     <FindingAcceptance acceptance={finding.acceptance}/>
                                 </PageSection>
                             </Col>
-                            {
-                                finding.exposures?.some(exposure => exposure.periods?.length > 0) &&
-                                <Col span={24}>
-                                    <PageSection id="finding-exposure-timeline-section" title="Exposure timeline"
-                                                 padding={true} height="auto">
-                                        <FindingExposureTimeline exposures={finding.exposures}/>
-                                    </PageSection>
-                                </Col>
-                            }
-                            <Col span={24}>
-                                <PageSection id="finding-exposure-section" title="Exposure per branch" height="auto"
-                                             extra={<ScorecardRemediationLink project={project}/>}>
-                                    <FindingExposureTable exposures={finding.exposures}/>
-                                </PageSection>
-                            </Col>
+                            <FindingExposureSections finding={finding}/>
                             <Col span={24}>
                                 <PageSection id="finding-history-section" title="History" padding={true}
                                              height="auto">

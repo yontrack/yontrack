@@ -1,4 +1,5 @@
 import {expect} from "@playwright/test";
+import {BuildFilterDialog} from "../../core/branches/BuildFilterDialog";
 
 /**
  * The page of one security finding, `/extension/findings/finding/{id}`.
@@ -42,6 +43,24 @@ export class FindingPage {
 
     timelineLane(branch, validationStamp) {
         return this.page.getByTestId(`finding-exposure-lane-${branch}-${validationStamp}`)
+    }
+
+    boundaryFilter() {
+        return this.page.getByTestId('finding-boundary-filter')
+    }
+
+    /**
+     * Opens the picker of the build filter, and asks for a new filter on a promotion level.
+     */
+    async chooseBoundaryFilterOnPromotion(promotion) {
+        await this.boundaryFilter().click()
+        await this.page.getByRole('menuitem', {name: 'New filter'}).click()
+        const dialog = new BuildFilterDialog(this.page)
+        await dialog.waitFor()
+        await dialog.selectTab('Promotion')
+        await dialog.selectPromotionLevel(promotion)
+        await dialog.ok()
+        await expect(this.boundaryFilter()).toContainText(`With promotion ${promotion}`)
     }
 
     /**

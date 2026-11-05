@@ -53,6 +53,35 @@ class DemoFindingsSeedTest {
     }
 
     @Test
+    fun `the fix of the reopened finding is in a build which is not promoted, and the next one is clean and promoted`() {
+        val (_, fix, next) = branch(DemoContent.MAIN).builds
+        assertEquals(false, fix.reports(DemoContent.SECURITY_DEPENDENCIES, DemoContent.CVE_REOPENED))
+        assertTrue(fix.promotionLevels.isEmpty(), "The build fixing it is not promoted")
+        assertEquals(false, next.reports(DemoContent.SECURITY_DEPENDENCIES, DemoContent.CVE_REOPENED))
+        assertTrue(next.promotionLevels.isNotEmpty(), "The next one is promoted, still without the finding")
+    }
+
+    @Test
+    fun `the demo shows a MEDIUM fixed by the last build of the release branch, with no promoted build after it`() {
+        val builds = branch(DemoContent.SECURITY_RELEASE).builds
+        assertEquals(
+            listOf(true, true, false),
+            builds.map { it.reports(DemoContent.SECURITY_DEPENDENCIES, DemoContent.CVE_FIX_NOT_PROMOTED) },
+        )
+        assertTrue(builds.last().promotionLevels.isEmpty(), "Nothing promoted has the fix")
+        val finding = builds.first().scans.flatMap { it.findings }.single { it.externalId == DemoContent.CVE_FIX_NOT_PROMOTED }
+        // A MEDIUM, invisible to the gating, the remediation time and the overdue findings
+        assertEquals(FindingSeverity.MEDIUM, finding.severity)
+        assertEquals(null, finding.acceptance)
+        assertTrue(
+            project.branches.filter { it.name != DemoContent.SECURITY_RELEASE }.none { branch ->
+                branch.builds.any { it.reports(DemoContent.SECURITY_DEPENDENCIES, DemoContent.CVE_FIX_NOT_PROMOTED) }
+            },
+            "Reported on the release branch only",
+        )
+    }
+
+    @Test
     fun `the demo shows a HIGH reported by a few builds of main then fixed there, and still exposed on the release branch`() {
         val main = branch(DemoContent.MAIN).builds
         val reporting = main.takeWhile { it.reports(DemoContent.SECURITY_DEPENDENCIES, DemoContent.CVE_FIXED_ON_MAIN) }

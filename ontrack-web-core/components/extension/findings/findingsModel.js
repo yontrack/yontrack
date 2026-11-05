@@ -265,17 +265,26 @@ export function earlierPeriodsSummary(periods = []) {
  * period and, over a bar, its stretches under an acceptance. Positions and widths are percentages
  * of the axis.
  *
+ * While a filter is active, a period which ended reads against its `boundary`:
+ *
+ * - `fixDot` is the dot at the end of the red bar: `HOLLOW` for a scan fix, `SOLID` when this build is
+ *   the matching one (and always without a filter), `null` while the period is open;
+ * - `wait` is the hatched stretch, from the scan fix to the matching build, to now, or to the reopening;
+ * - `matchDot` is where the matching build is reached, when it is not the fixing one.
+ *
  * @param {Array} exposures The `exposures` of a finding, with their `periods`
  * @param {Date} now End of the axis
+ * @param {boolean} filtered Whether a filter is active
  * @returns {object|null} `{start, end, lanes, ticks}`, `null` when there is no period
  */
-export function exposureTimeline(exposures = [], now = new Date()) {
+export function exposureTimeline(exposures = [], now = new Date(), {filtered = false} = {}) {
     const time = (value) => dayjs.utc(value).valueOf()
     const periods = exposures.flatMap(exposure => exposure.periods ?? [])
     if (periods.length === 0) return null
 
     const start = Math.min(...periods.map(p => time(p.startedAt)))
-    const end = Math.max(now.getTime(), ...periods.filter(p => p.endedAt).map(p => time(p.endedAt)))
+    const boundaryTimes = filtered ? periods.filter(p => p.boundary?.time).map(p => time(p.boundary.time)) : []
+    const end = Math.max(now.getTime(), ...periods.filter(p => p.endedAt).map(p => time(p.endedAt)), ...boundaryTimes)
     const span = Math.max(end - start, 1)
     const at = (t) => ((t - start) / span) * 100
 
@@ -287,14 +296,28 @@ export function exposureTimeline(exposures = [], now = new Date()) {
         branch: row.branch,
         validationStamp: row.validationStamp,
         showStamp: stamps.get(row.branch.id) > 1,
-        bars: (row.periods ?? []).map(period => {
+        bars: (row.periods ?? []).map((period, index) => {
             const from = time(period.startedAt)
             const to = period.endedAt ? time(period.endedAt) : end
+            const nextPeriod = row.periods[index + 1] ?? null
+            const boundary = filtered && period.endedAt ? period.boundary ?? null : null
+            const onFixingBuild = isBoundaryOnFixingBuild(period, boundary)
+            const waitUntil = boundaryWaitUntil(boundary, onFixingBuild, nextPeriod, end, time)
+            let fixDot = null
+            if (period.endedAt) {
+                fixDot = !boundary || onFixingBuild ? 'SOLID' : 'HOLLOW'
+            }
             return {
                 period,
+                nextPeriod,
+                boundary,
+                onFixingBuild,
                 left: at(from),
                 width: at(to) - at(from),
                 fixed: !!period.endedAt,
+                fixDot,
+                wait: waitUntil !== null ? {left: at(to), width: Math.max(at(waitUntil) - at(to), 0)} : null,
+                matchDot: boundary?.status === 'MATCHED' && !onFixingBuild ? at(waitUntil) : null,
                 accepted: (period.acceptedSpans ?? []).map(acceptedSpan => {
                     const spanFrom = time(acceptedSpan.from)
                     const spanTo = acceptedSpan.to ? time(acceptedSpan.to) : to
@@ -311,6 +334,263 @@ export function exposureTimeline(exposures = [], now = new Date()) {
     })
 
     return {start: new Date(start), end: new Date(end), lanes, ticks}
+}
+
+/**
+ * Whether the matching build of a boundary is the build which ended the period. Once this one has been
+ * purged, it cannot be.
+ */
+function isBoundaryOnFixingBuild(period, boundary) {
+    const fixingBuild = period.endedBy?.build?.id
+    return boundary?.status === 'MATCHED' && fixingBuild !== undefined && String(boundary.build?.id) === String(fixingBuild)
+}
+
+/**
+ * Where the hatched stretch of a period stops, `null` when it has none.
+ */
+function boundaryWaitUntil(boundary, onFixingBuild, nextPeriod, end, time) {
+    switch (boundary?.status) {
+        case 'MATCHED':
+            return onFixingBuild ? null : time(boundary.time)
+        case 'NONE_YET':
+            return end
+        case 'NOT_REACHED':
+            return nextPeriod ? time(nextPeriod.startedAt) : null
+        default:
+            return null
+    }
+}
+
+/** Type of the build filters which can set a boundary. */
+export const STANDARD_BUILD_FILTER_TYPE = 'net.nemerosa.ontrack.service.StandardBuildFilterProvider'
+
+/** The short name of a boundary filter which is not about one promotion level. */
+const MATCHING_BUILD = 'a matching build'
+
+/** The criteria whose result moves with the head of the branch: they cannot set a boundary. */
+const SINCE_CRITERIA = [
+    'sincePromotionLevel',
+    'sinceValidationStamp',
+    'sinceValidationStampStatus',
+    'sinceProperty',
+    'sincePropertyValue',
+]
+
+const BOUNDARY_DATE_CRITERIA = ['afterDate', 'beforeDate']
+
+/** The criteria testing a single build, the only ones which can set a boundary. */
+const BOUNDARY_FILTER_CRITERIA = [
+    'withPromotionLevel',
+    'withValidationStamp',
+    'withValidationStampStatus',
+    'withProperty',
+    'withPropertyValue',
+    'linkedFrom',
+    'linkedFromPromotion',
+    'linkedTo',
+    'linkedToPromotion',
+    'withDisplayName',
+    ...BOUNDARY_DATE_CRITERIA,
+    'assisted',
+    'actor',
+]
+
+const usesSinceCriterion = (data) => SINCE_CRITERIA.some(field => !!data?.[field])
+
+/**
+ * The usable criteria of the data of a build filter, always in the same order: no `count`, no `since*`,
+ * no name, nothing empty, and the dates as days.
+ */
+export function boundaryFilterCriteria(data) {
+    const criteria = {}
+    BOUNDARY_FILTER_CRITERIA.forEach(field => {
+        const value = data?.[field]
+        if (value !== undefined && value !== null && value !== '') {
+            criteria[field] = BOUNDARY_DATE_CRITERIA.includes(field) ? dayjs(value).format('YYYY-MM-DD') : value
+        }
+    })
+    return criteria
+}
+
+/**
+ * A boundary filter, `{name, data}`, from a value coming from outside (a permalink, the local storage).
+ *
+ * @returns {object|undefined} The filter, `undefined` when it has no usable criterion, or uses a
+ * `since*` one, which cannot set a boundary
+ */
+export function sanitizeBoundaryFilter(value) {
+    if (!value || typeof value !== 'object' || usesSinceCriterion(value.data)) return undefined
+    const data = boundaryFilterCriteria(value.data)
+    if (Object.keys(data).length === 0) return undefined
+    return typeof value.name === 'string' && value.name ? {name: value.name, data} : {data}
+}
+
+/** A boundary filter from the JSON of a permalink, `undefined` when it is not one. */
+export function parseBoundaryFilter(json) {
+    if (!json) return undefined
+    try {
+        return sanitizeBoundaryFilter(JSON.parse(json))
+    } catch (ignored) {
+        return undefined
+    }
+}
+
+/**
+ * The short name of a boundary filter in the texts: the promotion level when the filter has only this
+ * criterion, else "a matching build".
+ */
+export function boundaryFilterShortName(filter) {
+    const criteria = Object.keys(filter?.data ?? {})
+    return criteria.length === 1 && criteria[0] === 'withPromotionLevel' ? filter.data.withPromotionLevel : MATCHING_BUILD
+}
+
+/** What the picker shows for a boundary filter. */
+export function boundaryFilterLabel(filter) {
+    if (!filter) return 'No filter (all builds)'
+    if (filter.name) return filter.name
+    const shortName = boundaryFilterShortName(filter)
+    return shortName === MATCHING_BUILD ? 'Custom filter' : `With promotion ${shortName}`
+}
+
+/** Why a saved filter cannot set a boundary, `undefined` when it can. */
+function savedFilterDisabledReason(data, criteria) {
+    if (usesSinceCriterion(data)) return `uses "since", can't set a boundary`
+    if (Object.keys(criteria).length === 0) return `tests no build, can't set a boundary`
+    return undefined
+}
+
+/**
+ * The saved filters a boundary filter can be copied from: the standard ones of the given branches. A
+ * filter with the same name and the same criteria on several branches is listed once.
+ *
+ * @param {Array} branches `{name, buildFilterResources}` per branch
+ * @returns {Array} `{key, name, branches, filter}`, or `{key, name, branches, disabledReason}` for a
+ * filter which cannot be selected
+ */
+export function savedBoundaryFilters(branches = []) {
+    const saved = new Map()
+    branches.forEach(branch => {
+        (branch.buildFilterResources ?? [])
+            .filter(resource => resource.type === STANDARD_BUILD_FILTER_TYPE && !resource.error)
+            .forEach(resource => {
+                const data = boundaryFilterCriteria(resource.data)
+                const disabledReason = savedFilterDisabledReason(resource.data, data)
+                const key = JSON.stringify({name: resource.name, disabledReason, data})
+                if (saved.has(key)) {
+                    saved.get(key).branches.push(branch.name)
+                } else if (disabledReason) {
+                    saved.set(key, {key, name: resource.name, branches: [branch.name], disabledReason})
+                } else {
+                    saved.set(key, {key, name: resource.name, branches: [branch.name], filter: {name: resource.name, data}})
+                }
+            })
+    })
+    return [...saved.values()]
+}
+
+const inABuild = (shortName) => {
+    if (shortName === MATCHING_BUILD) return MATCHING_BUILD
+    return `${/^[aeiou]/i.test(shortName) ? 'an' : 'a'} ${shortName} build`
+}
+
+const noBuildYet = (shortName) =>
+    shortName === MATCHING_BUILD ? 'no matching build yet' : `no ${shortName} build yet`
+
+const capitalized = (text) => text.charAt(0).toUpperCase() + text.slice(1)
+
+const boundaryDay = (boundary) => dayjs.utc(boundary.time).local().format('D MMM')
+
+/** The name of the matching build of a boundary. */
+export const boundaryBuildName = (boundary) => boundary?.build?.displayName ?? boundary?.build?.name ?? UNKNOWN_BUILD
+
+/** How the step to the matching build reads: "→ GOLD in 3.4.4", "→ matching in 3.4.4". */
+export const boundaryStepName = (shortName) => shortName === MATCHING_BUILD ? 'matching' : shortName
+
+/** The filtered duration of a period: "12 days until GOLD", empty when it has none. */
+export function boundaryDurationText(boundary, shortName) {
+    switch (boundary?.status) {
+        case 'MATCHED':
+            return `${formatExposureDuration(boundary.durationSeconds)} until ${shortName}`
+        case 'NONE_YET':
+            return `${formatExposureDuration(boundary.durationSeconds)} so far until ${shortName}`
+        default:
+            return ''
+    }
+}
+
+/** When a build started to match: "GOLD on 14 Oct". */
+export const boundaryMatchedText = (boundary, shortName) =>
+    `${boundaryStepName(shortName)} on ${boundaryDay(boundary)}`
+
+/**
+ * How the label of a bar ends, after its builds: "4 days, 12 until GOLD". The unit is said once when
+ * both durations are in days.
+ */
+export function boundaryBarText(period, boundary, shortName) {
+    const raw = formatExposureDuration(period.durationSeconds)
+    const filtered = formatExposureDuration(boundary.durationSeconds)
+    const days = ' days'
+    const short = raw.endsWith(days) && filtered.endsWith(days) ? filtered.slice(0, -days.length) : filtered
+    switch (boundary.status) {
+        case 'MATCHED':
+            return `${raw}, ${short} until ${shortName}`
+        case 'NONE_YET':
+            return `${noBuildYet(shortName)} · ${raw}, ${short} so far`
+        case 'NOT_REACHED':
+            return `${raw} · not reached`
+        default:
+            return `${raw} · doesn't apply`
+    }
+}
+
+/**
+ * A boundary in one sentence, for the label and the tooltip of a bar: colour is never the only signal.
+ *
+ * @param {object} boundary The boundary of the period
+ * @param {string} shortName Short name of the filter
+ * @param {object} nextPeriod Next period of the exposure, if any
+ */
+export function boundaryLabel(boundary, shortName, nextPeriod) {
+    const duration = formatExposureDuration(boundary?.durationSeconds)
+    switch (boundary?.status) {
+        case 'MATCHED':
+            return `In ${inABuild(shortName)}, ${boundaryBuildName(boundary)}, on ${boundaryDay(boundary)}, ${duration}.`
+        case 'NONE_YET':
+            return `${capitalized(noBuildYet(shortName))}, ${duration} so far.`
+        case 'NOT_REACHED':
+            return `Reopened in ${nextPeriod?.startedInBuild ?? UNKNOWN_BUILD} before reaching ${inABuild(shortName)}.`
+        case 'NOT_APPLICABLE':
+            return `The filter does not apply: ${boundary.reason}`
+        default:
+            return ''
+    }
+}
+
+/** The last period of an exposure which ended, `null` when none did. */
+export function lastEndedPeriod(periods) {
+    return [...(periods ?? [])].reverse().find(period => period.endedAt) ?? null
+}
+
+/**
+ * The exposures of a finding with the boundaries of their periods, read apart from them so that the
+ * page does not reload when the filter changes.
+ *
+ * @param {Array} exposures The `exposures` of a finding
+ * @param {Array} boundaries The same exposures, whose periods have a `startedAt` and a `boundary`
+ */
+export function withBoundaries(exposures = [], boundaries = []) {
+    const key = (exposure) => `${exposure.branch.id}-${exposure.validationStamp.id}`
+    const byExposure = new Map(boundaries.map(exposure => [key(exposure), exposure.periods ?? []]))
+    return exposures.map(exposure => {
+        const periods = byExposure.get(key(exposure)) ?? []
+        return {
+            ...exposure,
+            periods: exposure.periods?.map(period => {
+                const read = periods.find(it => it.startedAt === period.startedAt)
+                return read ? {...period, boundary: read.boundary} : period
+            }),
+        }
+    })
 }
 
 /** The default order of the findings of a project: the most severe first, then the most recently seen. */

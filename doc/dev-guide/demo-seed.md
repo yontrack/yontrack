@@ -251,6 +251,15 @@ are not changed by it. Its two stamps are `security-findings` ones, and a build 
 reached: it declares **scans** (`BuildSpec.scans`), each a list of findings, and the server computes
 the status from them, as it does for any CI posting through `validateBuildWithFindings`.
 
+Two MEDIUM findings show the build filter on the end of an exposure period (#2137), on the finding
+page, with the filter *With promotion BRONZE*:
+
+- **`CVE_REOPENED` is a matching build after a hatched stretch.** Its fix is in `2.4.1`, not promoted
+  because its dependency scan fails, and the promoted `2.4.2` is still clean.
+- **`CVE_FIX_NOT_PROMOTED` is "None yet".** It is reported by `2.3.4` and `2.3.5` on `release-2.3`, and
+  fixed by `2.3.6`, the last build of the branch, which is not promoted. This build exists for it: it
+  reports everything else its predecessor does, so the readings are left alone.
+
 A scan declares its findings, not its report. `FindingsReports` renders the report in the format
 the scan names - the neutral format, or SARIF - so that one finding cannot drift apart between two
 hand-written reports. Two consequences are checked before the reset:

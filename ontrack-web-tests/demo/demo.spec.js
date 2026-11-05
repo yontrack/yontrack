@@ -8,7 +8,8 @@
  * test the deployment, not the code, and a fat smoke suite becomes the flaky thing that blocks
  * releases. What is left is what only a real deployment can break: the Keycloak realm the chart
  * provisions, and the UI pod talking to the backend pod - and, in a second test, the four views
- * the seeded security findings are there to show (#1867), read the way a visitor reaches them.
+ * the seeded security findings are there to show (#1867), read the way a visitor reaches them, and in
+ * a third one the build filter on the end of their exposure (#2137).
  *
  * It lives outside `tests/` on purpose - `playwright.config.js` points `testDir` at that
  * directory, so the regular PLAYWRIGHT suite would otherwise pick this spec up and run it
@@ -21,6 +22,7 @@ const {Ontrack} = require("@ontrack/ontrack")
 const {login} = require("../tests/core/login")
 const {ProjectPage} = require("../tests/core/projects/project")
 const {CommandPalette} = require("../tests/core/search/CommandPalette")
+const {FindingPage} = require("../tests/extensions/findings/FindingPage")
 
 /**
  * Nothing is defaulted. The workflow sets all four, and a default `DEMO_URL` would point a
@@ -43,6 +45,13 @@ const projectName = required('DEMO_SEEDED_PROJECT')
 const findingsProject = process.env.DEMO_FINDINGS_PROJECT || 'petclinic-billing'
 const findingsRelease = process.env.DEMO_FINDINGS_RELEASE || 'release-2.3'
 const findingsCve = process.env.DEMO_FINDINGS_CVE || 'CVE-2024-38816'
+
+/**
+ * The CVEs read against a build filter on their finding page - `DemoContent.CVE_REOPENED`, whose fix is
+ * in a build which is not promoted, and `CVE_FIX_NOT_PROMOTED`, with no promoted build after its fix.
+ */
+const findingsReopenedCve = process.env.DEMO_FINDINGS_REOPENED_CVE || 'CVE-2024-12798'
+const findingsNotPromotedCve = process.env.DEMO_FINDINGS_NOT_PROMOTED_CVE || 'CVE-2024-47535'
 
 /**
  * The demo has no management port exposed, so the usual `connection` fixture - which fetches
@@ -108,4 +117,37 @@ test('the demo shows the security findings, from the project to the finding and 
     await palette.openWithEnter(option)
     await expect(page).toHaveURL(/\/extension\/findings\/finding\/\d+$/)
     await expect(page.getByTestId('finding-summary').getByText(findingsCve, {exact: true})).toBeVisible()
+})
+
+test('the demo reads the end of an exposure against a build filter', async ({page}) => {
+    const ontrack = demoOntrack()
+    await login(page, ontrack)
+    const finding = new FindingPage(page, ontrack)
+
+    const open = async (cve) => {
+        await page.goto(`${ui}/display/project/${findingsProject}`)
+        await page.getByTestId('project-security').getByRole('link', {name: 'All findings'}).click()
+        await page.getByTestId('project-findings').getByRole('link', {name: cve, exact: true}).click()
+        await finding.expectOnPage(cve)
+    }
+
+    // With no filter, the page is as it was
+    await open(findingsReopenedCve)
+    const main = finding.timelineLane('main', 'SECURITY.DEPENDENCIES')
+    await expect(finding.boundaryFilter()).toContainText('No filter (all builds)')
+    await expect(main.getByTestId('finding-exposure-wait')).toHaveCount(0)
+    await expect(page.getByRole('columnheader', {name: 'In a matching build'})).toHaveCount(0)
+
+    // Fixed in a build which is not promoted, then a promoted one: the hatched stretch
+    await finding.chooseBoundaryFilterOnPromotion('BRONZE')
+    await expect(main.getByTestId('finding-exposure-wait')).toHaveCount(1)
+    await expect(main).toContainText('BRONZE in 2.4.2')
+    await expect(page.getByTestId('finding-exposure-matching-build')).toContainText('2.4.2')
+    await expect(page.getByTestId('finding-exposure-duration-filtered')).toContainText('until BRONZE')
+
+    // Set for the other findings of the project: no promoted build after this fix
+    await open(findingsNotPromotedCve)
+    await expect(finding.boundaryFilter()).toContainText('With promotion BRONZE')
+    await expect(page.getByTestId('finding-exposure-matching-build')).toContainText('None yet')
+    await expect(page.getByTestId('finding-exposure-duration-filtered')).toContainText('so far until BRONZE')
 })

@@ -4,21 +4,31 @@ import dayjs from "dayjs";
 import {branchUri} from "@components/common/Links";
 import TimestampText from "@components/common/TimestampText";
 import PeriodBuild, {UNKNOWN_BUILD} from "@components/extension/findings/finding/PeriodBuild";
-import {exposureTimeline, formatExposureDuration} from "@components/extension/findings/findingsModel";
+import {
+    boundaryBarText,
+    boundaryBuildName,
+    boundaryFilterShortName,
+    boundaryLabel,
+    boundaryStepName,
+    exposureTimeline,
+    formatExposureDuration,
+} from "@components/extension/findings/findingsModel";
 
 const LANE_HEIGHT = 44
 const BAR_TOP = 24
 const BAR_HEIGHT = 10
 const LABEL_WIDTH = 160
 
-function periodLabel(period) {
+function periodLabel(bar, shortName) {
+    const {period} = bar
     const from = period.startedInBuild ?? UNKNOWN_BUILD
     const duration = formatExposureDuration(period.durationSeconds, period.ongoing)
     const accepted = period.acceptedSpans?.length > 0 ? ', accepted' : ''
     if (period.ongoing) {
         return `Exposed since ${from}${accepted}, ${duration}`
     } else {
-        return `Exposed from ${from}, fixed in ${period.endedInBuild ?? UNKNOWN_BUILD}${accepted}, ${duration}`
+        const raw = `Exposed from ${from}, fixed in ${period.endedInBuild ?? UNKNOWN_BUILD}${accepted}, ${duration}`
+        return bar.boundary ? `${raw}. ${boundaryLabel(bar.boundary, shortName, bar.nextPeriod)}` : raw
     }
 }
 
@@ -26,7 +36,8 @@ function RunText({run}) {
     return run ? <> (run #{run.runOrder})</> : null
 }
 
-function PeriodTooltip({period}) {
+function PeriodTooltip({bar, shortName}) {
+    const {period} = bar
     return (
         <Space orientation="vertical" size={0}>
             <span>From <b>{period.startedInBuild ?? UNKNOWN_BUILD}</b><RunText run={period.startedBy}/>, <TimestampText
@@ -46,20 +57,65 @@ function PeriodTooltip({period}) {
                 )
             }
             <span>{formatExposureDuration(period.durationSeconds, period.ongoing)}</span>
+            {
+                bar.boundary &&
+                <span>{boundaryLabel(bar.boundary, shortName, bar.nextPeriod)}</span>
+            }
         </Space>
     )
 }
+
+/** A green dot: solid for a fix which counts, hollow for a fix which only the scan has seen. */
+const fixDotStyle = (token, solid) => solid ? {
+    background: token.colorSuccess,
+    border: `2px solid ${token.colorBgContainer}`,
+} : {
+    background: token.colorBgContainer,
+    border: `3px solid ${token.colorSuccess}`,
+}
+
+/** The hatched stretch: the finding is fixed, in a build which does not count yet. */
+const hatching = (token) => ({
+    boxSizing: 'border-box',
+    borderTop: `1px solid ${token.colorError}`,
+    borderBottom: `1px solid ${token.colorError}`,
+    background: `repeating-linear-gradient(135deg, ${token.colorError} 0 3px, transparent 3px 6px)`,
+})
 
 /**
  * The exposure of a finding on a time axis, one lane per branch and stamp: a bar per period, red
  * while exposed, amber while accepted — still counting as exposed — and ending on a green dot when
  * fixed, with the builds at its ends. The table below carries the same data, as text.
+ *
+ * Read against a filter, a period which ended is red until its scan fix, on a hollow dot, then hatched
+ * until a matching build, on a solid dot: a solid dot then only ever means a fix in a matching build.
+ *
+ * @param exposures The exposures of the finding, with the boundaries of their periods under a filter
+ * @param filter The filter they have been read against, if any
+ * @param now End of the axis
  */
-export default function FindingExposureTimeline({exposures, now = new Date()}) {
+export default function FindingExposureTimeline({exposures, filter, now = new Date()}) {
 
     const {token} = theme.useToken()
-    const timeline = exposureTimeline(exposures, now)
+    const timeline = exposureTimeline(exposures, now, {filtered: !!filter})
     if (!timeline) return null
+    const shortName = boundaryFilterShortName(filter)
+
+    const dot = (left, solid, testId) =>
+        <div
+            aria-hidden="true"
+            data-testid={testId}
+            style={{
+                position: 'absolute',
+                top: BAR_TOP - 3,
+                left: `calc(${left}% - 8px)`,
+                width: 16,
+                height: 16,
+                borderRadius: '50%',
+                boxSizing: 'border-box',
+                ...fixDotStyle(token, solid),
+            }}
+        />
 
     return (
         <div data-testid="finding-exposure-timeline" style={{overflowX: 'auto'}}>
@@ -86,10 +142,10 @@ export default function FindingExposureTimeline({exposures, now = new Date()}) {
                                 {
                                     lane.bars.map((bar, index) =>
                                         <div key={index}>
-                                            <Tooltip title={<PeriodTooltip period={bar.period}/>}>
+                                            <Tooltip title={<PeriodTooltip bar={bar} shortName={shortName}/>}>
                                                 <div
                                                     role="img"
-                                                    aria-label={periodLabel(bar.period)}
+                                                    aria-label={periodLabel(bar, shortName)}
                                                     data-testid="finding-exposure-bar"
                                                     style={{
                                                         position: 'absolute',
@@ -122,21 +178,33 @@ export default function FindingExposureTimeline({exposures, now = new Date()}) {
                                                 </div>
                                             </Tooltip>
                                             {
-                                                bar.fixed &&
-                                                <div
-                                                    aria-hidden="true"
-                                                    data-testid="finding-exposure-fix"
-                                                    style={{
-                                                        position: 'absolute',
-                                                        top: BAR_TOP - 3,
-                                                        left: `calc(${bar.left + bar.width}% - 8px)`,
-                                                        width: 16,
-                                                        height: 16,
-                                                        borderRadius: '50%',
-                                                        background: token.colorSuccess,
-                                                        border: `2px solid ${token.colorBgContainer}`,
-                                                    }}
-                                                />
+                                                bar.wait &&
+                                                <Tooltip title={<PeriodTooltip bar={bar} shortName={shortName}/>}>
+                                                    <div
+                                                        aria-hidden="true"
+                                                        data-testid="finding-exposure-wait"
+                                                        style={{
+                                                            position: 'absolute',
+                                                            top: BAR_TOP,
+                                                            left: `${bar.wait.left}%`,
+                                                            width: `${bar.wait.width}%`,
+                                                            height: BAR_HEIGHT,
+                                                            ...hatching(token),
+                                                        }}
+                                                    />
+                                                </Tooltip>
+                                            }
+                                            {
+                                                bar.fixDot === 'SOLID' &&
+                                                dot(bar.left + bar.width, true, 'finding-exposure-fix')
+                                            }
+                                            {
+                                                bar.fixDot === 'HOLLOW' &&
+                                                dot(bar.left + bar.width, false, 'finding-exposure-scan-fix')
+                                            }
+                                            {
+                                                bar.matchDot !== null &&
+                                                dot(bar.matchDot, true, 'finding-exposure-fix')
                                             }
                                             <Typography.Text
                                                 type="secondary"
@@ -155,9 +223,20 @@ export default function FindingExposureTimeline({exposures, now = new Date()}) {
                                                                       name={bar.period.endedInBuild}/></>
                                                 }
                                                 {
+                                                    bar.boundary?.status === 'MATCHED' && !bar.onFixingBuild &&
+                                                    <> → {boundaryStepName(shortName)} in <PeriodBuild
+                                                        run={{build: bar.boundary.build}}
+                                                        name={boundaryBuildName(bar.boundary)}/></>
+                                                }
+                                                {
                                                     bar.accepted.length > 0 && <> · accepted</>
                                                 }
-                                                {' · '}{formatExposureDuration(bar.period.durationSeconds, bar.period.ongoing)}
+                                                {' · '}
+                                                {
+                                                    bar.boundary ?
+                                                        boundaryBarText(bar.period, bar.boundary, shortName) :
+                                                        formatExposureDuration(bar.period.durationSeconds, bar.period.ongoing)
+                                                }
                                             </Typography.Text>
                                         </div>
                                     )
@@ -203,10 +282,27 @@ export default function FindingExposureTimeline({exposures, now = new Date()}) {
                         <span aria-hidden="true" style={{display: 'inline-block', width: 12, height: 8, borderRadius: 2, background: token.colorWarning}}/>
                         <Typography.Text type="secondary">Accepted (still counts as exposed)</Typography.Text>
                     </Space>
-                    <Space size={4}>
-                        <span aria-hidden="true" style={{display: 'inline-block', width: 10, height: 10, borderRadius: '50%', background: token.colorSuccess}}/>
-                        <Typography.Text type="secondary">Fixed</Typography.Text>
-                    </Space>
+                    {
+                        filter ?
+                            <>
+                                <Space size={4}>
+                                    <span aria-hidden="true" style={{display: 'inline-block', width: 16, height: 8, ...hatching(token)}}/>
+                                    <Typography.Text type="secondary">Fixed, not in a matching build</Typography.Text>
+                                </Space>
+                                <Space size={4}>
+                                    <span aria-hidden="true" style={{display: 'inline-block', width: 10, height: 10, borderRadius: '50%', boxSizing: 'border-box', ...fixDotStyle(token, false), borderWidth: 2}}/>
+                                    <Typography.Text type="secondary">Scan fix</Typography.Text>
+                                </Space>
+                                <Space size={4}>
+                                    <span aria-hidden="true" style={{display: 'inline-block', width: 10, height: 10, borderRadius: '50%', background: token.colorSuccess}}/>
+                                    <Typography.Text type="secondary">Fix in a matching build</Typography.Text>
+                                </Space>
+                            </> :
+                            <Space size={4}>
+                                <span aria-hidden="true" style={{display: 'inline-block', width: 10, height: 10, borderRadius: '50%', background: token.colorSuccess}}/>
+                                <Typography.Text type="secondary">Fixed</Typography.Text>
+                            </Space>
+                    }
                 </Space>
             </div>
         </div>

@@ -363,9 +363,10 @@ class FindingQueryServiceImpl(
         val sightings = findingRepository.findObservationSightingsByFinding(findingId)
         val now = Time.now
         val runs = RunCache()
-        return periods.map { period ->
+        return periods.mapIndexed { index, period ->
             val startedBy = runs[period.startedByValidationRunId]
             val endedBy = runs[period.endedByValidationRunId]
+            val nextPeriod = periods.getOrNull(index + 1)
             FindingExposurePeriodView(
                 period = period,
                 startedBy = startedBy,
@@ -381,6 +382,9 @@ class FindingQueryServiceImpl(
                         fromBuild = buildName(run, null),
                     )
                 },
+                branch = exposure.branch,
+                nextPeriod = nextPeriod,
+                nextStartedBy = runs[nextPeriod?.startedByValidationRunId],
             )
         }
     }

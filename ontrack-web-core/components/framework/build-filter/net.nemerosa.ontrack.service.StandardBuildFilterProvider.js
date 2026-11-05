@@ -9,7 +9,16 @@ import {buildAssistedOptions} from "@components/framework/build-filter/buildFilt
 
 const NO_PROPERTIES = []
 
-export default function StandardBuildFilterProvider({branch, buildFilterForm}) {
+/**
+ * The criteria of a standard build filter.
+ *
+ * @param branch Branch of the filter
+ * @param branches Several branches, in place of `branch`, whose promotion levels and validation stamps
+ * are offered by name
+ * @param singleBuild Offers only the criteria which test a single build: no `since*`, whose result
+ * moves with the head of the branch
+ */
+export function StandardBuildFilterFields({branch, branches, singleBuild = false}) {
 
     const {data} = useQuery(
         gql`
@@ -26,6 +35,7 @@ export default function StandardBuildFilterProvider({branch, buildFilterForm}) {
         }
     )
     const properties = data ?? NO_PROPERTIES
+    const target = branches ? {branches} : {branch}
 
     const tabs = [
         {
@@ -65,22 +75,25 @@ export default function StandardBuildFilterProvider({branch, buildFilterForm}) {
                     label="With promotion level"
                 >
                     <SelectPromotionLevel
-                        branch={branch}
+                        {...target}
                         useName={true}
                         allowClear={true}
                     />
                 </Form.Item>
                 {/* Since promotion level */}
-                <Form.Item
-                    name={['data', 'sincePromotionLevel']}
-                    label="Since promotion level"
-                >
-                    <SelectPromotionLevel
-                        branch={branch}
-                        useName={true}
-                        allowClear={true}
-                    />
-                </Form.Item>
+                {
+                    !singleBuild &&
+                    <Form.Item
+                        name={['data', 'sincePromotionLevel']}
+                        label="Since promotion level"
+                    >
+                        <SelectPromotionLevel
+                            {...target}
+                            useName={true}
+                            allowClear={true}
+                        />
+                    </Form.Item>
+                }
             </>
         },
         {
@@ -95,7 +108,7 @@ export default function StandardBuildFilterProvider({branch, buildFilterForm}) {
                             label="With validation stamp"
                         >
                             <SelectValidationStamp
-                                branch={branch}
+                                {...target}
                                 useName={true}
                                 allowClear={true}
                             />
@@ -111,30 +124,33 @@ export default function StandardBuildFilterProvider({branch, buildFilterForm}) {
                         </Form.Item>
                     </Col>
                 </Row>
-                <Row gutter={16}>
-                    <Col span={12}>
-                        {/* Since validation stamp */}
-                        <Form.Item
-                            name={['data', 'sinceValidationStamp']}
-                            label="Since validation stamp"
-                        >
-                            <SelectValidationStamp
-                                branch={branch}
-                                useName={true}
-                                allowClear={true}
-                            />
-                        </Form.Item>
-                    </Col>
-                    <Col span={12}>
-                        {/* Since validation stamp with status */}
-                        <Form.Item
-                            name={['data', 'sinceValidationStampStatus']}
-                            label="... with status"
-                        >
-                            <SelectValidationRunStatus all={true}/>
-                        </Form.Item>
-                    </Col>
-                </Row>
+                {
+                    !singleBuild &&
+                    <Row gutter={16}>
+                        <Col span={12}>
+                            {/* Since validation stamp */}
+                            <Form.Item
+                                name={['data', 'sinceValidationStamp']}
+                                label="Since validation stamp"
+                            >
+                                <SelectValidationStamp
+                                    {...target}
+                                    useName={true}
+                                    allowClear={true}
+                                />
+                            </Form.Item>
+                        </Col>
+                        <Col span={12}>
+                            {/* Since validation stamp with status */}
+                            <Form.Item
+                                name={['data', 'sinceValidationStampStatus']}
+                                label="... with status"
+                            >
+                                <SelectValidationRunStatus all={true}/>
+                            </Form.Item>
+                        </Col>
+                    </Row>
+                }
             </>
         },
         {
@@ -161,26 +177,29 @@ export default function StandardBuildFilterProvider({branch, buildFilterForm}) {
                         </Form.Item>
                     </Col>
                 </Row>
-                <Row gutter={16}>
-                    {/* Since property */}
-                    <Col span={12}>
-                        <Form.Item
-                            name={['data', 'sinceProperty']}
-                            label="Since property"
-                        >
-                            <Select options={properties} allowClear={true}/>
-                        </Form.Item>
-                    </Col>
-                    {/* Since property with value */}
-                    <Col span={12}>
-                        <Form.Item
-                            name={['data', 'sincePropertyValue']}
-                            label="... with value"
-                        >
-                            <Input/>
-                        </Form.Item>
-                    </Col>
-                </Row>
+                {
+                    !singleBuild &&
+                    <Row gutter={16}>
+                        {/* Since property */}
+                        <Col span={12}>
+                            <Form.Item
+                                name={['data', 'sinceProperty']}
+                                label="Since property"
+                            >
+                                <Select options={properties} allowClear={true}/>
+                            </Form.Item>
+                        </Col>
+                        {/* Since property with value */}
+                        <Col span={12}>
+                            <Form.Item
+                                name={['data', 'sincePropertyValue']}
+                                label="... with value"
+                            >
+                                <Input/>
+                            </Form.Item>
+                        </Col>
+                    </Row>
+                }
             </>
         },
         {
@@ -205,11 +224,15 @@ export default function StandardBuildFilterProvider({branch, buildFilterForm}) {
                             label="... with promotion"
                             extra="The build must be linked FROM a build having this promotion"
                         >
-                            <SelectValidationStamp
-                                branch={branch}
-                                useName={true}
-                                allowClear={true}
-                            />
+                            {
+                                singleBuild ?
+                                    <Input/> :
+                                    <SelectValidationStamp
+                                        {...target}
+                                        useName={true}
+                                        allowClear={true}
+                                    />
+                            }
                         </Form.Item>
                     </Col>
                 </Row>
@@ -231,10 +254,14 @@ export default function StandardBuildFilterProvider({branch, buildFilterForm}) {
                             label="... with promotion"
                             extra="The build must be linked TO a build having this promotion"
                         >
-                            <SelectValidationStamp
-                                branch={branch}
-                                useName={true}
-                            />
+                            {
+                                singleBuild ?
+                                    <Input/> :
+                                    <SelectValidationStamp
+                                        {...target}
+                                        useName={true}
+                                    />
+                            }
                         </Form.Item>
                     </Col>
                 </Row>
@@ -302,6 +329,10 @@ export default function StandardBuildFilterProvider({branch, buildFilterForm}) {
         },
     ]
 
+    return <Tabs items={tabs}/>
+}
+
+export default function StandardBuildFilterProvider({branch, buildFilterForm}) {
     return (
         <>
             {/* Name of the filter type (static) */}
@@ -315,9 +346,7 @@ export default function StandardBuildFilterProvider({branch, buildFilterForm}) {
                 <Input/>
             </Form.Item>
 
-            <Tabs
-                items={tabs}
-            />
+            <StandardBuildFilterFields branch={branch}/>
         </>
     )
 }

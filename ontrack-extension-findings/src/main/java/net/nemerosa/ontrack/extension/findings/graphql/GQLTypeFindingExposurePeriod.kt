@@ -3,18 +3,22 @@ package net.nemerosa.ontrack.extension.findings.graphql
 import graphql.Scalars.GraphQLBoolean
 import graphql.Scalars.GraphQLString
 import graphql.schema.DataFetchingEnvironment
+import graphql.schema.GraphQLArgument
 import graphql.schema.GraphQLNonNull
 import graphql.schema.GraphQLObjectType
 import graphql.schema.GraphQLTypeReference
 import net.nemerosa.ontrack.extension.findings.model.FindingExposurePeriod
 import net.nemerosa.ontrack.extension.findings.model.FindingResolutionReason
 import net.nemerosa.ontrack.extension.findings.query.FindingExposurePeriodView
+import net.nemerosa.ontrack.extension.findings.query.FindingPeriodBoundaryService
+import net.nemerosa.ontrack.graphql.schema.GQLInputBuildStandardFilter
 import net.nemerosa.ontrack.graphql.schema.GQLType
 import net.nemerosa.ontrack.graphql.schema.GQLTypeCache
 import net.nemerosa.ontrack.graphql.schema.GQLTypeValidationRun
 import net.nemerosa.ontrack.graphql.support.GQLScalarLocalDateTime
 import net.nemerosa.ontrack.graphql.support.GQLScalarLong
 import net.nemerosa.ontrack.graphql.support.listType
+import net.nemerosa.ontrack.model.structure.StandardBuildFilterData
 import org.springframework.stereotype.Component
 
 /**
@@ -23,6 +27,9 @@ import org.springframework.stereotype.Component
 @Component
 class GQLTypeFindingExposurePeriod(
     private val gqlTypeFindingAcceptedSpan: GQLTypeFindingAcceptedSpan,
+    private val gqlTypeFindingPeriodBoundary: GQLTypeFindingPeriodBoundary,
+    private val inputBuildStandardFilter: GQLInputBuildStandardFilter,
+    private val findingPeriodBoundaryService: FindingPeriodBoundaryService,
 ) : GQLType {
 
     override fun getTypeName(): String = FindingExposurePeriod::class.java.simpleName
@@ -94,8 +101,30 @@ class GQLTypeFindingExposurePeriod(
                     .type(listType(gqlTypeFindingAcceptedSpan.typeRef))
                     .dataFetcher { env -> env.view.acceptedSpans }
             }
+            .field {
+                it.name("boundary")
+                    .description(
+                        "This period read against a build filter: the first build at or after its end, and before the next period starts, which matches the filter. " +
+                                "Null while the period is open. The `count` of the filter is ignored, and a `since*` criterion makes it NOT_APPLICABLE."
+                    )
+                    .type(gqlTypeFindingPeriodBoundary.typeRef)
+                    .argument(
+                        GraphQLArgument.newArgument()
+                            .name(ARG_FILTER)
+                            .description("Build filter, applied by name on the branch of the period")
+                            .type(GraphQLNonNull(inputBuildStandardFilter.getTypeRef()))
+                    )
+                    .dataFetcher { env ->
+                        val filter = inputBuildStandardFilter.convert(env.getArgument(ARG_FILTER)).data as StandardBuildFilterData
+                        findingPeriodBoundaryService.getBoundary(env.view, filter)
+                    }
+            }
             .build()
 
     private val DataFetchingEnvironment.view: FindingExposurePeriodView
         get() = getSource()!!
+
+    private companion object {
+        const val ARG_FILTER = "filter"
+    }
 }

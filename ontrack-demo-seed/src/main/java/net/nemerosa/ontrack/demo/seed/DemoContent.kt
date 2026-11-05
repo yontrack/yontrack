@@ -143,6 +143,13 @@ object DemoContent {
     const val CVE_REOPENED = "CVE-2024-12798"
 
     /**
+     * A MEDIUM reported by the first builds of [SECURITY_RELEASE] and fixed by the last one, which has
+     * not been promoted (#2137): under the filter "With promotion BRONZE" of the finding page, it is
+     * the lane still waiting on a build. A MEDIUM, for the same reason as [CVE_REOPENED].
+     */
+    const val CVE_FIX_NOT_PROMOTED = "CVE-2024-47535"
+
+    /**
      * What [silverAuto] selects its validation stamps by. A constant because the demo is read
      * against it in more than one place, and because it is the one piece of the dataset's
      * vocabulary that is a pattern rather than a name: it must keep matching [UNIT_TESTS] and
@@ -1204,6 +1211,19 @@ object DemoContent {
         fixedVersion = "1.5.13",
     )
 
+    /**
+     * [CVE_FIX_NOT_PROMOTED]: fixed by the bump of netty-common in 2.3.6, which is not promoted.
+     */
+    private val nettyEnvironmentFile = FindingSpec(
+        externalId = CVE_FIX_NOT_PROMOTED,
+        location = "pkg:maven/io.netty/netty-common",
+        severity = FindingSeverity.MEDIUM,
+        title = "Denial of service through the reading of the environment file in netty-common",
+        url = "https://nvd.nist.gov/vuln/detail/$CVE_FIX_NOT_PROMOTED",
+        installedVersion = "4.1.112.Final",
+        fixedVersion = "4.1.115.Final",
+    )
+
     private val protobufStackOverflow = FindingSpec(
         externalId = CVE_HIGH_FIXED,
         location = "pkg:maven/com.google.protobuf/protobuf-java",
@@ -1304,7 +1324,11 @@ object DemoContent {
      *   (#1912).
      * * [CVE_REOPENED], a MEDIUM, is reported by the first build of [MAIN], fixed by the next one,
      *   and back two builds later, where it stays: the reopened finding, whose exposure has two
-     *   periods (#2040).
+     *   periods (#2040). Its fix is in the unpromoted 2.4.1, and the promoted 2.4.2 is clean: with the
+     *   filter "With promotion BRONZE" of the finding page, it shows a matching build after a hatched
+     *   stretch (#2137).
+     * * [CVE_FIX_NOT_PROMOTED], a MEDIUM, is reported by the first builds of [SECURITY_RELEASE] and
+     *   fixed by the last one, which is not promoted: with this filter, no matching build yet (#2137).
      *
      * What the security readings of the scorecard read here, in "Demo products" (#1912): a maturity
      * of 3 - both expected kinds scanned the day before, and a scan which failed in the window - a
@@ -1331,9 +1355,17 @@ object DemoContent {
                 builds = listOf(
                     securityBuild(
                         "305", "2.3.4", "Invoice numbering fix.", DaysAgo(16),
-                        alsoReports = listOf(protobufStackOverflow),
+                        alsoReports = listOf(protobufStackOverflow, nettyEnvironmentFile),
                     ),
-                    securityBuild("309", "2.3.5", "Rounding of the VAT amounts, and protobuf-java 3.25.5.", DaysAgo(5)),
+                    securityBuild(
+                        "309", "2.3.5", "Rounding of the VAT amounts, and protobuf-java 3.25.5.", DaysAgo(5),
+                        alsoReports = listOf(nettyEnvironmentFile),
+                    ),
+                    // Fixes CVE_FIX_NOT_PROMOTED, and is not promoted: nothing shipped has this fix yet
+                    securityBuild(
+                        "315", "2.3.6", "Bump of netty-common to 4.1.115.Final.", DaysAgo(3),
+                        promoted = false,
+                    ),
                 ),
             ),
             BranchSpec(

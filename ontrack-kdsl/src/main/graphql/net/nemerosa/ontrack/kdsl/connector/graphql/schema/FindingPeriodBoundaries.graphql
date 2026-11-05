@@ -1,0 +1,19 @@
+query FindingPeriodBoundaries($id: Int!, $filter: StandardBuildFilter!) {
+    finding(id: $id) {
+        state
+        exposures {
+            periods {
+                durationSeconds
+                boundary(filter: $filter) {
+                    status
+                    build {
+                        name
+                    }
+                    time
+                    durationSeconds
+                    reason
+                }
+            }
+        }
+    }
+}

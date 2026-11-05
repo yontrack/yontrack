@@ -377,6 +377,12 @@ finding to the first run which no longer did. An exposure has one or more
 periods; a reopening starts a new one.
 _Avoid_: exposure window, incident
 
+**Period boundary**:
+The first build at or after the end of an exposure period, and before the next
+period starts, that matches a build filter chosen by the reader. It is a way of
+reading a period and is never stored.
+_Avoid_: delivery (the scorecard's), effective fix
+
 **Exposure episode**:
 The union of the exposure periods of a finding on a set of branches: periods
 which overlap or touch (one ends at the instant the next starts) merge, with

@@ -12,6 +12,8 @@ import org.apache.commons.lang3.Strings
 import org.apache.commons.lang3.StringUtils.isNotBlank
 import org.springframework.dao.DataAccessException
 import org.springframework.stereotype.Repository
+import org.springframework.transaction.annotation.Propagation
+import org.springframework.transaction.annotation.Transactional
 import java.sql.SQLException
 import java.util.*
 import javax.sql.DataSource
@@ -274,6 +276,63 @@ class CoreBuildFilterJdbcRepository(
             size,
             total,
         )
+    }
+
+    /**
+     * In a nested transaction: a regular expression which the JVM accepts and the database refuses
+     * fails the query, and a caller going on after [CoreBuildFilterInvalidException] needs its own
+     * transaction left usable.
+     */
+    @Transactional(propagation = Propagation.NESTED)
+    override fun firstMatchingBuild(
+        branch: Branch,
+        data: StandardBuildFilterData,
+        from: BuildBound,
+        until: BuildBound?,
+        displayNameProperty: BuildDisplayNameProperty?,
+        propertyTypeAccessor: (String) -> PropertyType<*>,
+    ): Build? {
+        val params = mutableMapOf<String, Any?>()
+        val base = buildStandardFilterQuery(
+            branch,
+            data.copy(
+                sincePromotionLevel = null,
+                sinceValidationStamp = null,
+                sinceValidationStampStatus = null,
+                sinceProperty = null,
+                sincePropertyValue = null,
+            ),
+            params,
+            displayNameProperty,
+            propertyTypeAccessor,
+        )
+        val lower = when (from) {
+            is BuildBound.ById -> {
+                params["fromBuildId"] = from.buildId
+                "B.ID >= :fromBuildId"
+            }
+
+            is BuildBound.ByTime -> {
+                params["fromTime"] = dateTimeForDB(from.time)
+                "B.CREATION >= :fromTime"
+            }
+        }
+        val upper = when (until) {
+            null -> ""
+            is BuildBound.ById -> {
+                params["untilBuildId"] = until.buildId
+                " AND B.ID < :untilBuildId"
+            }
+
+            is BuildBound.ByTime -> {
+                params["untilTime"] = dateTimeForDB(until.time)
+                " AND B.CREATION < :untilTime"
+            }
+        }
+        val sql = "SELECT DISTINCT(B.ID) $base AND $lower$upper ORDER BY B.ID ASC LIMIT 1"
+        return catchingInvalidRegex {
+            loadBuilds(sql, params).firstOrNull()
+        }
     }
 
     /**
