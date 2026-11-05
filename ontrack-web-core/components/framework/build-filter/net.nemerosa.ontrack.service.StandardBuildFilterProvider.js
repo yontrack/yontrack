@@ -222,17 +222,9 @@ export function StandardBuildFilterFields({branch, branches, singleBuild = false
                         <Form.Item
                             name={['data', 'linkedFromPromotion']}
                             label="... with promotion"
-                            extra="The build must be linked FROM a build having this promotion"
+                            extra="The build must be linked FROM a build having this promotion, by its name: it is a promotion of the project of this build"
                         >
-                            {
-                                singleBuild ?
-                                    <Input/> :
-                                    <SelectValidationStamp
-                                        {...target}
-                                        useName={true}
-                                        allowClear={true}
-                                    />
-                            }
+                            <Input/>
                         </Form.Item>
                     </Col>
                 </Row>
@@ -252,16 +244,9 @@ export function StandardBuildFilterFields({branch, branches, singleBuild = false
                         <Form.Item
                             name={['data', 'linkedToPromotion']}
                             label="... with promotion"
-                            extra="The build must be linked TO a build having this promotion"
+                            extra="The build must be linked TO a build having this promotion, by its name: it is a promotion of the project of this build"
                         >
-                            {
-                                singleBuild ?
-                                    <Input/> :
-                                    <SelectValidationStamp
-                                        {...target}
-                                        useName={true}
-                                    />
-                            }
+                            <Input/>
                         </Form.Item>
                     </Col>
                 </Row>
