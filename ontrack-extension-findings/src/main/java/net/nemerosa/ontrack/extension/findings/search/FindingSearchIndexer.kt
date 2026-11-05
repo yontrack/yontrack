@@ -26,9 +26,9 @@ import org.springframework.stereotype.Component
  * not matched by similarity: a CVE similar to the one looked for is another vulnerability. Its
  * title is the text, and its last sighting its recency.
  *
- * The document carries the branches the finding is exposed on, and the state of the finding in
- * its project, which only its enabled branches count. It is written again whenever they may
- * change, in the transaction of the change:
+ * The document carries the enabled branches the finding is exposed on, and the state of the finding
+ * in its project. A finding exposed only on disabled branches has no document. It is written again,
+ * or deleted, whenever they may change, in the transaction of the change:
  *
  * - by the ingestion of a scan, for the findings it reports or resolves;
  * - when a branch is updated — which enabling or disabling it is as well, and so is changing its
@@ -71,6 +71,11 @@ class FindingSearchIndexer(
     override val fuzzyMatching: Boolean = false
 
     /**
+     * 2: the disabled branches and the findings exposed only on them are left out
+     */
+    override val documentVersion: Int = 2
+
+    /**
      * Daily reconciliation, for what changes without an event: the expiry of the acceptances, the
      * branching model of the project
      */
@@ -96,7 +101,13 @@ class FindingSearchIndexer(
         if (findings.isEmpty()) return
         try {
             findings.chunked(CHUNK).forEach { chunk ->
-                searchDocumentService.index(documents(project, chunk, deletedBranchId))
+                val documents = documents(project, chunk, deletedBranchId)
+                searchDocumentService.index(documents)
+                // Exposed only on disabled branches: no longer found
+                val keys = documents.map { it.key }.toSet()
+                chunk.map { it.id.toString() }.filter { it !in keys }.forEach { key ->
+                    searchDocumentService.delete(FINDING_SEARCH_RESULT_TYPE, key)
+                }
             }
         } catch (any: Exception) {
             logger.error("[search][findings] Cannot index ${findings.size} findings of ${project.name}", any)
@@ -130,7 +141,8 @@ class FindingSearchIndexer(
     }
 
     /**
-     * Documents of findings of a project, with their exposure, as of today.
+     * Documents of findings of a project, with their exposure, as of today. A finding exposed only
+     * on disabled branches has none.
      *
      * Built as administrator: the documents are what all the users may see, their access being
      * filtered by the search.
@@ -144,12 +156,13 @@ class FindingSearchIndexer(
     ): List<SearchDocument> = securityService.asAdmin {
         val today = Time.now.toLocalDate()
         val branches = structureService.getBranchesForProject(project.id)
-            .filter { it.id() != deletedBranchId }
+            .filter { it.id() != deletedBranchId && !it.isDisabled }
             .associateBy { it.id() }
         val states = findingStateService.getFindingStates(project, findings, today)
         val exposures = findingRepository.findExposuresByFindings(findings.map { it.id })
             .groupBy { it.findingId }
-        findings.map { finding ->
+        findings.mapNotNull { finding ->
+            val state = states[finding.id] ?: return@mapNotNull null
             val exposed = (exposures[finding.id] ?: emptyList())
                 .groupBy { it.branchId }
                 .mapNotNull { (branchId, branchExposures) ->
@@ -178,7 +191,7 @@ class FindingSearchIndexer(
                         kind = finding.kind.name,
                         title = finding.title,
                         maxSeverity = finding.maxSeverity.name,
-                        state = states[finding.id]?.name,
+                        state = state.name,
                     ),
                     SearchResult.SEARCH_RESULT_PROJECT to project.searchDocumentData(),
                     SEARCH_RESULT_BRANCHES to exposed,

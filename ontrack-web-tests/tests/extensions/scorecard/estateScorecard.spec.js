@@ -218,6 +218,22 @@ test('estate view: the fan-out of one finding over the projects of the estate', 
         finding({externalId, severity: "CRITICAL", title: "Remote code execution", acceptedUntil}),
     ])
 
+    // Exposed on a disabled branch as well, which the fan-out does not list
+    const exposedOld = await exposed.createBranch("old")
+    await scanWithFindings(exposedOld, await createFindingsValidationStamp(exposedOld, "SECURITY.IMAGE"), [
+        finding({externalId, severity: "CRITICAL", title: "Remote code execution"}),
+    ])
+    await exposedOld.disableBranch()
+
+    // Exposed only on a disabled branch: not resolved, and not reported either
+    const retired = await ontrack.createProject(generate('e-retired-'))
+    await ontrack.labels().setProjectLabels(retired.id, [label.id])
+    const retiredOld = await retired.createBranch("old")
+    await scanWithFindings(retiredOld, await createFindingsValidationStamp(retiredOld, "SECURITY.IMAGE"), [
+        finding({externalId, severity: "CRITICAL", title: "Remote code execution"}),
+    ])
+    await retiredOld.disableBranch()
+
     // Reported, then fixed
     const fixed = await ontrack.createProject(generate('a-fixed-'))
     await ontrack.labels().setProjectLabels(fixed.id, [label.id])
@@ -271,6 +287,7 @@ test('estate view: the fan-out of one finding over the projects of the estate', 
         await expect(estatePage.fanOutBranch(exposed.name, 'main')).toHaveAttribute('data-counts', 'true')
         await expect(estatePage.fanOutBranch(exposed.name, 'release')).toHaveAttribute('data-counts', 'true')
         await expect(estatePage.fanOutBranches(exposed.name)).not.toContainText('does not count')
+        await expect(estatePage.fanOutBranches(exposed.name)).not.toContainText('old')
 
         // Fixed: no branch left, resolved
         await expect(estatePage.fanOutState(fixed.name)).toHaveText('Resolved')

@@ -32,8 +32,8 @@ const severityRank = (severity) => {
  * is resolved are left out.
  *
  * Each branch says whether it `counts` toward the state of the finding in the project — matched by
- * the branch model of the project (every branch when it has none) and not disabled. The branches
- * which do not count are still listed, after the ones which count.
+ * the branch model of the project (every branch when it has none). The branches which do not count
+ * are still listed, after the ones which count. The server gives no disabled branch.
  *
  * @param {Array} exposures The `exposures` of a finding: `{branch, since, state, acceptanceExpiresAt,
  * counts}` per branch and stamp

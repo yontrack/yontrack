@@ -532,7 +532,7 @@ class FindingsGraphQLIT : AbstractQLKTITSupport() {
     }
 
     @Test
-    fun `Summary of the findings of a project, telling the branches which count for the project from the others`() {
+    fun `Summary of the findings of a project, leaving out the disabled branches`() {
         asAdmin {
             project {
                 val main = branch("main")
@@ -545,7 +545,7 @@ class FindingsGraphQLIT : AbstractQLKTITSupport() {
 
                 val branches = findingsSummary(this).path("branches").toList()
                     .associate { it.path("branch").path("name").asText() to it.path("counting").asBoolean() }
-                assertEquals(mapOf("main" to true, "old" to false), branches)
+                assertEquals(mapOf("main" to true), branches)
             }
         }
     }

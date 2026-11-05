@@ -66,6 +66,13 @@ describe('Summary of a finding', () => {
         expect(link).toHaveAttribute('rel', 'noopener noreferrer')
     })
 
+    it('shows neither a state nor a resolution for a finding exposed only on disabled branches', () => {
+        render(<FindingSummary finding={{...finding, state: null, resolvedAt: null}}/>)
+        expect(screen.getByText('State in the project')).toBeInTheDocument()
+        expect(screen.queryByText('Open')).not.toBeInTheDocument()
+        expect(screen.queryByText('Resolved')).not.toBeInTheDocument()
+    })
+
     it('says when the finding has no URL nor location', () => {
         render(<FindingSummary finding={{...finding, url: null, location: ''}}/>)
         expect(screen.queryByTestId('finding-url')).not.toBeInTheDocument()

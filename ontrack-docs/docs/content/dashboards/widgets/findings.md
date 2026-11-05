@@ -23,8 +23,9 @@ and, optionally, the branches with open findings among those which count.
 
 **Key:** `extension/findings/BranchFindings`
 
-The findings open on a branch, and the ones accepted and resolved on it. A disabled branch does not
-count for the project, but the widget still shows its own findings, and says it is disabled.
+The findings open on a branch, and the ones accepted and resolved on it. A disabled branch is not
+taken into account for the project, but the widget still shows its own findings, and says it is
+disabled.
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|

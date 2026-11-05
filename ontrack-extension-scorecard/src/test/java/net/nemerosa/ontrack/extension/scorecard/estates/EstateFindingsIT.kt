@@ -391,6 +391,31 @@ class EstateFindingsIT : EstatesTestSupport() {
     }
 
     @Test
+    fun `A finding exposed only on a disabled branch is in neither the fan-out, the ranking nor the search`() {
+        val retired = uid("CVE-")
+        val mixed = uid("CVE-")
+        asAdmin {
+            val label = label()
+            project {
+                labels = listOf(label)
+                val old = scannedBranch("old")
+                old.scanEntries(entry(retired), entry(mixed))
+                scannedBranch("main").scanEntries(entry(mixed))
+                structureService.disableBranch(old)
+            }
+            val estate = estate(label)
+
+            assertEquals(0, estateFindings(estate.name, retired).size())
+            assertEquals(emptyList(), searchedFindings(estate.name, retired))
+            assertEquals(listOf("$mixed: 1/0/0"), rankedFindings(estate.name).counts())
+            assertEquals(listOf("$mixed: 1/0/0"), searchedFindings(estate.name, mixed).counts())
+
+            // The disabled branch is not even greyed
+            assertEquals(mapOf("main" to true), countingByBranch(estate, mixed))
+        }
+    }
+
+    @Test
     fun `The ranked findings are bounded by the size asked for`() {
         val prefix = uid("CVE-")
         asAdmin {

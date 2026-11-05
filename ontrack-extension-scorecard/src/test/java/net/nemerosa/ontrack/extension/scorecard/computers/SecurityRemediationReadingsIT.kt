@@ -326,6 +326,25 @@ class SecurityRemediationReadingsIT : EstatesTestSupport() {
     }
 
     @Test
+    fun `A disabled branch keeps no finding open`() {
+        asAdmin {
+            val label = label()
+            project {
+                labels = listOf(label)
+                val estate = estate(label, security = EstateSecurity(criticalTargetDays = 7))
+                val old = scannedBranch("old")
+                old.scan(30, finding("CVE-OLD", "CRITICAL"))
+                scannedBranch("main").scan(30, finding("CVE-MAIN", "CRITICAL"))
+                structureService.disableBranch(old)
+                overdue(EstateReadingSet(estate)).let { reading ->
+                    assertEquals(1.0, reading.value)
+                    assertEquals(1, reading.details.path("openCritical").asInt())
+                }
+            }
+        }
+    }
+
+    @Test
     fun `Only the branches in scope keep a finding open`() {
         asAdmin {
             val label = label()

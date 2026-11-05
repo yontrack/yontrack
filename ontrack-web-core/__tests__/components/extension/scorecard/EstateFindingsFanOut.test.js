@@ -28,10 +28,9 @@ jest.mock("../../../../components/services/GraphQL", () => ({
     callGraphQL: jest.fn(),
 }))
 
-const main = {id: 10, name: 'main', disabled: false}
-const release = {id: 11, name: 'release', disabled: false}
-const spike = {id: 12, name: 'feature-old-spike', disabled: false}
-const archived = {id: 13, name: 'archived', disabled: true}
+const main = {id: 10, name: 'main'}
+const release = {id: 11, name: 'release'}
+const spike = {id: 12, name: 'feature-old-spike'}
 
 const exposure = (branch, props = {}) => ({
     branch,
@@ -357,14 +356,12 @@ describe('The findings fan-out of an estate', () => {
                 resolvedAt: '2026-09-15T10:00:00Z',
                 // By branch name, as the server gives them
                 exposures: [
-                    exposure(archived, {counts: false}),
                     exposure(spike, {counts: false}),
                     exposure(main, {state: 'RESOLVED', resolvedAt: '2026-09-15T10:00:00Z'}),
                 ],
             }),
             finding(4, {id: 10, name: 'delta'}, {
                 exposures: [
-                    exposure(archived, {counts: false}),
                     exposure(spike, {counts: false}),
                     exposure(release),
                 ],
@@ -383,7 +380,6 @@ describe('The findings fan-out of an estate', () => {
                 .getAllByTestId(/^estate-fanout-branch-delta-/)
             expect(branches.map(it => [it.getAttribute('data-testid'), it.getAttribute('data-counts')])).toEqual([
                 ['estate-fanout-branch-delta-release', 'true'],
-                ['estate-fanout-branch-delta-archived', 'false'],
                 ['estate-fanout-branch-delta-feature-old-spike', 'false'],
             ])
         })
@@ -392,8 +388,6 @@ describe('The findings fan-out of an estate', () => {
             searchOutside()
             const outside = screen.getByTestId('estate-fanout-branch-gamma-feature-old-spike')
             expect(outside).toHaveTextContent("Outside the branch model: does not count toward the project's state")
-            expect(screen.getByTestId('estate-fanout-branch-gamma-archived'))
-                .toHaveTextContent("Disabled branch: does not count toward the project's state")
             expect(screen.getByTestId('estate-fanout-branch-delta-release'))
                 .not.toHaveTextContent('does not count')
 

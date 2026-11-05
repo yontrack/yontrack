@@ -25,7 +25,9 @@ import java.time.LocalDate
 interface FindingQueryService {
 
     /**
-     * Findings of a project, by default the most severe first, then the most recently seen.
+     * Findings of a project, by default the most severe first, then the most recently seen. The
+     * findings exposed only on disabled branches are left out, unless the filter asks for one of
+     * these branches by its name.
      *
      * @param project Project
      * @param filter Filter on the findings
@@ -61,7 +63,7 @@ interface FindingQueryService {
 
     /**
      * Summary of the findings of a project: its open findings by severity, and their exposure
-     * per branch.
+     * per branch. Neither the disabled branches nor the findings exposed only on them are counted.
      *
      * @param project Project
      * @param date Day against which the expiry of the acceptances is evaluated
@@ -86,7 +88,8 @@ interface FindingQueryService {
     ): BranchFindingsSummary?
 
     /**
-     * Findings having a given external ID, across all the projects, by project name.
+     * Findings having a given external ID, across all the projects, by project name. The findings
+     * exposed only on disabled branches are left out.
      *
      * @param externalId External ID of the findings
      * @param projectIds IDs of the projects to look into, `null` for all of them. Whatever they
@@ -116,6 +119,7 @@ interface FindingQueryService {
     /**
      * The external IDs of the findings of the given projects containing a text, ignoring case,
      * whatever their state: open, accepted or resolved. Ranked as [getRankedFindings] ranks them.
+     * The findings exposed only on disabled branches are left out.
      *
      * @param projectIds IDs of the projects to look into. The projects whose findings the user
      * cannot see are left out.
@@ -143,18 +147,19 @@ interface FindingQueryService {
     fun getValidationRunFindings(run: ValidationRun): List<FindingObservationView>
 
     /**
-     * State of a finding in its project.
+     * State of a finding in its project, `null` when it is exposed only on disabled branches.
      */
     fun getFindingState(finding: Finding, date: LocalDate = Time.now.toLocalDate()): FindingState?
 
     /**
-     * Exposure of a finding on the branches of its project, resolved or not, by branch then stamp,
-     * each saying whether its branch counts toward the state of the finding in the project.
+     * Exposure of a finding on the enabled branches of its project, resolved or not, by branch then
+     * stamp, each saying whether its branch counts toward the state of the finding in the project.
      */
     fun getFindingExposures(finding: Finding): List<FindingExposureView>
 
     /**
-     * Observations of a finding, the most recent first.
+     * Observations of a finding, the most recent first. The ones of the disabled branches are left
+     * out, unless the filter asks for one of these branches.
      *
      * @param filter Filter on the observations: their branch, their stamp, their time
      */
@@ -177,8 +182,8 @@ interface FindingQueryService {
     ): List<FindingExposurePeriodView>
 
     /**
-     * Where and when a finding was first seen: the start of the earliest period of its exposures.
-     * `null` when it has none, or when it cannot be seen.
+     * Where and when a finding was first seen: the start of the earliest period of its exposures on
+     * the enabled branches. `null` when it has none, or when it cannot be seen.
      */
     fun getFindingFirstSeenIn(finding: Finding): FindingSighting?
 
@@ -192,8 +197,8 @@ interface FindingQueryService {
     fun getFindingResolvedIn(finding: Finding, date: LocalDate = Time.now.toLocalDate()): FindingSighting?
 
     /**
-     * History of a finding, the most recent first: the periods of its exposures, the changes of
-     * acceptance within them, and its observations, grouped between these.
+     * History of a finding on the enabled branches, the most recent first: the periods of its
+     * exposures, the changes of acceptance within them, and its observations, grouped between these.
      *
      * @param date Day against which the expiry of the acceptances is evaluated
      */
@@ -205,8 +210,8 @@ interface FindingQueryService {
     ): PaginatedList<FindingHistoryEntryView>
 
     /**
-     * Acceptance recorded by the most recent observation of a finding, `null` when this
-     * observation carries none or when all the observations have been purged.
+     * Acceptance recorded by the most recent observation of a finding on an enabled branch, `null`
+     * when this observation carries none or when there is none: purged, or all on disabled branches.
      */
     fun getFindingAcceptance(finding: Finding): FindingAcceptance?
 
@@ -227,7 +232,7 @@ interface FindingQueryService {
  * Exposure of a finding on a branch, for the scans of one stamp, with the branch and the stamp.
  *
  * @property counts Whether the branch counts toward the state of the finding in its project:
- * matched by the branch model of the project (every branch when it has none), and not disabled
+ * matched by the branch model of the project (every branch when it has none)
  */
 data class FindingExposureView(
     val exposure: FindingExposure,

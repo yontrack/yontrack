@@ -72,9 +72,13 @@ class FindingQueryServiceImpl(
                                 FindingState.of(FindingExposureState.of(branchExposures.map { it.stateOn(date) })) == filter.state
                         )
             }
-        } else if (filter.state != null) {
+        } else {
+            // A finding exposed only on disabled branches has no state, and is not listed
             val states = findingStateService.getFindingStates(project, findings, date)
-            findings = findings.filter { states[it.id] == filter.state }
+            findings = findings.filter { finding ->
+                val state = states[finding.id]
+                state != null && (filter.state == null || state == filter.state)
+            }
         }
 
         val exposedFor = when (sort) {
@@ -156,8 +160,10 @@ class FindingQueryServiceImpl(
 
     override fun getProjectFindingsSummary(project: Project, date: LocalDate): FindingsSummary? {
         if (!canSeeFindings(project.id())) return null
-        val findings = findingRepository.findFindingsByProject(project.id())
-        val states = findingStateService.getFindingStates(project, findings, date)
+        val allFindings = findingRepository.findFindingsByProject(project.id())
+        val states = findingStateService.getFindingStates(project, allFindings, date)
+        // A finding exposed only on disabled branches has no state, and is not counted
+        val findings = allFindings.filter { it.id in states }
         val byId = findings.associateBy { it.id }
         // Exposure per branch: open on a branch when exposed there for one of its stamps at least,
         // as the filter on a branch gives it
@@ -167,7 +173,10 @@ class FindingQueryServiceImpl(
             findingRepository.findExposuresByFindings(findings.map { it.id })
         }
         val countingBranches = findingStateService.getCountingBranchIds(project)
-        val branches = exposures.groupBy { it.branchId }
+        val disabledBranches = findingStateService.getDisabledBranchIds(project)
+        val branches = exposures
+            .filter { it.branchId !in disabledBranches }
+            .groupBy { it.branchId }
             .map { (branchId, branchExposures) ->
                 val open = branchExposures.groupBy { it.findingId }
                     .filterValues { findingExposures ->
@@ -216,8 +225,14 @@ class FindingQueryServiceImpl(
         val projects = findings.map { it.projectId }.distinct()
             .mapNotNull { projectId -> visibleProject(projectId) }
             .associateBy { it.id() }
-        return findings
-            .filter { it.projectId in projects }
+        // A finding exposed only on disabled branches has no state, and is not listed
+        val listed = findings.groupBy { it.projectId }.flatMap { (projectId, projectFindings) ->
+            projects[projectId]?.let { project ->
+                val states = findingStateService.getFindingStates(project, projectFindings)
+                projectFindings.filter { it.id in states }
+            } ?: emptyList()
+        }
+        return listed
             .sortedWith(
                 compareBy<Finding> { projects.getValue(it.projectId).name }
                     .thenBy { it.scanner }
@@ -297,11 +312,12 @@ class FindingQueryServiceImpl(
 
     override fun getFindingExposures(finding: Finding): List<FindingExposureView> {
         if (!canSeeFindings(finding.projectId)) return emptyList()
+        val project = structureService.getProject(ID.of(finding.projectId))
+        val disabledBranches = findingStateService.getDisabledBranchIds(project)
         val exposures = findingRepository.findExposuresByFinding(finding.id)
+            .filter { it.branchId !in disabledBranches }
         if (exposures.isEmpty()) return emptyList()
-        val countingBranches = findingStateService.getCountingBranchIds(
-            structureService.getProject(ID.of(finding.projectId))
-        )
+        val countingBranches = findingStateService.getCountingBranchIds(project)
         val branches = mutableMapOf<Int, Branch>()
         val stamps = mutableMapOf<Int, ValidationStamp>()
         return exposures
@@ -330,19 +346,17 @@ class FindingQueryServiceImpl(
         filter: FindingObservationFilter,
     ): PaginatedList<FindingObservationView> {
         if (!canSeeFindings(finding.projectId)) return PaginatedList.empty()
-        val observations = if (filter == FindingObservationFilter()) {
-            findingRepository.findObservationsByFinding(finding.id)
-        } else {
-            findingRepository.findObservationSightingsByFinding(finding.id)
-                .filter { sighting ->
-                    val time = sighting.observation.time
-                    (filter.branchId == null || sighting.branchId == filter.branchId) &&
-                            (filter.validationStampId == null || sighting.validationStampId == filter.validationStampId) &&
-                            (filter.from == null || time >= filter.from) &&
-                            (filter.to == null || time <= filter.to)
-                }
-                .map { it.observation }
-        }
+        val disabledBranches = disabledBranchIds(finding)
+        val observations = findingRepository.findObservationSightingsByFinding(finding.id)
+            .filter { sighting ->
+                val time = sighting.observation.time
+                // Asking for a disabled branch by its ID still gets its observations
+                (if (filter.branchId == null) sighting.branchId !in disabledBranches else sighting.branchId == filter.branchId) &&
+                        (filter.validationStampId == null || sighting.validationStampId == filter.validationStampId) &&
+                        (filter.from == null || time >= filter.from) &&
+                        (filter.to == null || time <= filter.to)
+            }
+            .map { it.observation }
         return page(observations, offset, size)
             .map { observation ->
                 FindingObservationView(
@@ -391,7 +405,9 @@ class FindingQueryServiceImpl(
 
     override fun getFindingFirstSeenIn(finding: Finding): FindingSighting? {
         if (!canSeeFindings(finding.projectId)) return null
+        val disabledBranches = disabledBranchIds(finding)
         val period = findingRepository.findExposurePeriodsByFinding(finding.id)
+            .filter { it.branchId !in disabledBranches }
             .minWithOrNull(FindingHistoryComputation.periodOrder)
             ?: return null
         val run = RunCache()[period.startedByValidationRunId]
@@ -431,9 +447,12 @@ class FindingQueryServiceImpl(
         date: LocalDate,
     ): PaginatedList<FindingHistoryEntryView> {
         if (!canSeeFindings(finding.projectId)) return PaginatedList.empty()
+        val disabledBranches = disabledBranchIds(finding)
         val history = FindingHistoryComputation.history(
-            periods = findingRepository.findExposurePeriodsByFinding(finding.id),
-            sightings = findingRepository.findObservationSightingsByFinding(finding.id),
+            periods = findingRepository.findExposurePeriodsByFinding(finding.id)
+                .filter { it.branchId !in disabledBranches },
+            sightings = findingRepository.findObservationSightingsByFinding(finding.id)
+                .filter { it.branchId !in disabledBranches },
             today = date,
         )
         val branches = mutableMapOf<Int, Branch>()
@@ -478,10 +497,16 @@ class FindingQueryServiceImpl(
 
     override fun getFindingAcceptance(finding: Finding): FindingAcceptance? =
         if (canSeeFindings(finding.projectId)) {
-            findingRepository.findObservationsByFinding(finding.id).firstOrNull()?.acceptance
+            val disabledBranches = disabledBranchIds(finding)
+            findingRepository.findObservationSightingsByFinding(finding.id)
+                .firstOrNull { it.branchId !in disabledBranches }
+                ?.observation?.acceptance
         } else {
             null
         }
+
+    private fun disabledBranchIds(finding: Finding): Set<Int> =
+        findingStateService.getDisabledBranchIds(structureService.getProject(ID.of(finding.projectId)))
 
     /**
      * The findings of a project can be seen by a user who can see the project and who is granted

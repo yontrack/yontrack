@@ -189,6 +189,7 @@ class FindingJdbcRepository(
                     FROM FINDINGS F
                     LEFT JOIN FINDING_EXPOSURES E ON E.FINDING_ID = F.ID AND E.BRANCH_ID IN (:branchIds)
                     WHERE F.PROJECT_ID IN (:projectIds) $searched
+                    AND NOT $EXPOSED_ONLY_ON_DISABLED_BRANCHES
                     GROUP BY F.ID
                 ),
                 PROJECT_STATES AS (
@@ -566,6 +567,19 @@ class FindingJdbcRepository(
          */
         private const val ACCEPTANCE_HOLDS =
             "E.ACCEPTED AND (E.ACCEPTANCE_EXPIRES_AT IS NULL OR E.ACCEPTANCE_EXPIRES_AT >= :date)"
+
+        /**
+         * Whether a finding is exposed on disabled branches only: it has no state, see
+         * [FindingStateService][net.nemerosa.ontrack.extension.findings.state.FindingStateService].
+         */
+        private const val EXPOSED_ONLY_ON_DISABLED_BRANCHES = """(
+            EXISTS (SELECT 1 FROM FINDING_EXPOSURES X WHERE X.FINDING_ID = F.ID)
+            AND NOT EXISTS (
+                SELECT 1 FROM FINDING_EXPOSURES X
+                INNER JOIN BRANCHES B ON B.ID = X.BRANCH_ID
+                WHERE X.FINDING_ID = F.ID AND NOT B.DISABLED
+            )
+        )"""
 
         /**
          * Ranks of the states of a finding, the most exposed first.

@@ -10,7 +10,8 @@ import net.nemerosa.ontrack.model.events.*
  * of all its branches.
  *
  * There is no event per observation, only per change of exposure on a branch, all the stamps of
- * the branch rolled up.
+ * the branch rolled up. A disabled branch sends none, and enabling it sends nothing for what
+ * happened in the meantime.
  */
 object FindingsEvents {
 

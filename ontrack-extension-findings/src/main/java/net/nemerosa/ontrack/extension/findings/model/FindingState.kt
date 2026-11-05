@@ -3,7 +3,7 @@ package net.nemerosa.ontrack.extension.findings.model
 /**
  * State of a finding in its project, rolled up from its exposure on the branches which count:
  * the branches matched by the branch model of the project (all of them when it has none), the
- * disabled branches left out.
+ * disabled branches left out. A finding exposed only on disabled branches has no state at all.
  *
  * Evaluated when it is read, so that an acceptance past its expiry stops counting without any
  * job.

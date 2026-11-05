@@ -48,6 +48,9 @@ class FindingSearchIT : AbstractQLKTITSupport() {
     @Autowired
     private lateinit var searchService: SearchService
 
+    @Autowired
+    private lateinit var findingSearchIndexer: FindingSearchIndexer
+
     @Test
     fun `Searching an external ID lists the projects and the branches the finding is exposed on`() {
         val cve = uid("CVE-")
@@ -265,14 +268,62 @@ class FindingSearchIT : AbstractQLKTITSupport() {
                 assertEquals("OPEN", state(cve))
 
                 structureService.disableBranch(main)
-                assertEquals("RESOLVED", state(cve), "A disabled branch does not count")
+                assertEquals(emptyList(), search(cve), "Exposed only on a disabled branch: not found")
 
                 structureService.enableBranch(structureService.getBranch(main.id))
                 assertEquals("OPEN", state(cve))
 
                 // The update form of a branch changes its state as well
                 structureService.saveBranch(structureService.getBranch(main.id).withDisabled(true))
-                assertEquals("RESOLVED", state(cve))
+                assertEquals(emptyList(), search(cve))
+            }
+        }
+    }
+
+    @Test
+    fun `A disabled branch is not listed in the branches a finding is exposed on, until it is enabled`() {
+        val cve = uid("CVE-")
+        asAdmin {
+            project {
+                branch("main") {
+                    scan(findingsStamp(), entry(cve))
+                }
+                val old = branch("old") {
+                    scan(findingsStamp(), entry(cve))
+                }
+                assertEquals(listOf("main", "old"), branches(cve))
+
+                structureService.disableBranch(old)
+                assertEquals(listOf("main"), branches(cve))
+
+                structureService.enableBranch(structureService.getBranch(old.id))
+                assertEquals(listOf("main", "old"), branches(cve))
+            }
+        }
+    }
+
+    @Test
+    fun `A scan of a disabled branch is not found, and the rebuild of the documents does not bring it back`() {
+        val cve = uid("CVE-")
+        asAdmin {
+            project {
+                val old = branch("old")
+                val vs = old.findingsStamp()
+                // A new build would enable the branch: a scan of a build it already has
+                val build = old.build()
+                structureService.disableBranch(old)
+                findingsIngestionService.ingest(
+                    build = build,
+                    request = FindingsIngestionRequest(
+                        validation = vs.name,
+                        format = "findings",
+                        report = """{"scanner": "trivy", "kind": "IMAGE", "findings": [${entry(cve)}]}""".parseAsJson(),
+                    )
+                )
+                assertEquals(emptyList(), search(cve))
+
+                searchDocumentService.rebuild(findingSearchIndexer)
+                assertEquals(emptyList(), search(cve))
             }
         }
     }

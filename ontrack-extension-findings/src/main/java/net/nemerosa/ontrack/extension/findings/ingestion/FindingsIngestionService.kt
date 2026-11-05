@@ -23,7 +23,8 @@ interface FindingsIngestionService {
      * exposure on the branch of the build for the stamp of the run. Each transition of a finding
      * on the branch is posted as an event — see
      * [FindingsEvents][net.nemerosa.ontrack.extension.findings.events.FindingsEvents] — in the same
-     * transaction, in the order of the transitions.
+     * transaction, in the order of the transitions. A scan of a disabled branch is stored, but posts
+     * no such event, and enabling the branch posts nothing for it.
      *
      * A report which cannot be read creates nothing, and neither does a report in a native format
      * posted without the licensed feature for it — see

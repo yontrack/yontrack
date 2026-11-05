@@ -76,7 +76,7 @@ interface FindingRepository {
      *
      * The state of a finding in its project is rolled up from its exposure on the branches which
      * count only, as [FindingState] says; a project is counted once per external ID, by its most
-     * exposed finding.
+     * exposed finding. A finding exposed only on disabled branches has no state, and is left out.
      *
      * @param countingBranchIds IDs of the branches which count, for each project to look into, by
      * project ID
@@ -93,7 +93,8 @@ interface FindingRepository {
      * The external IDs of the findings of the given projects containing a text, ignoring case,
      * whatever their state, ranked as [findRankedFindings] ranks them: by the number of these
      * projects in which they are open, then by severity, the highest first, then by external ID —
-     * aggregated by the database.
+     * aggregated by the database. A finding exposed only on disabled branches has no state, and is
+     * left out.
      *
      * @param countingBranchIds IDs of the branches which count, for each project to look into, by
      * project ID

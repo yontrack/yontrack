@@ -80,7 +80,6 @@ export const gqlEstateFindingsFanOut = gql`
                     branch {
                         id
                         name
-                        disabled
                     }
                     validationStamp {
                         id
@@ -100,11 +99,9 @@ const DAY_FORMAT = "YYYY MMM DD"
 
 /**
  * Why a branch exposing the finding does not count toward the state of the finding in its project.
+ * The server gives no disabled branch.
  */
-const notCountingReason = (branch) =>
-    branch.disabled ?
-        "Disabled branch: does not count toward the project's state" :
-        "Outside the branch model: does not count toward the project's state"
+const NOT_COUNTING_REASON = "Outside the branch model: does not count toward the project's state"
 
 /**
  * One branch a finding is exposed on, since the start of its exposure.
@@ -133,12 +130,12 @@ function FanOutBranch({project, branch, state, since, acceptanceExpiresAt, count
                 </>
             }
             {
-                !counts && <span className="ot-visually-hidden">{` (${notCountingReason(branch)})`}</span>
+                !counts && <span className="ot-visually-hidden">{` (${NOT_COUNTING_REASON})`}</span>
             }
         </Tag>
     return counts ?
         tag :
-        <Tooltip title={notCountingReason(branch)} trigger={['hover', 'focus']}>{tag}</Tooltip>
+        <Tooltip title={NOT_COUNTING_REASON} trigger={['hover', 'focus']}>{tag}</Tooltip>
 }
 
 /**

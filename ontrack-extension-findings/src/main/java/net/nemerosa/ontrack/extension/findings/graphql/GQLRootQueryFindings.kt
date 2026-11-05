@@ -21,7 +21,8 @@ class GQLRootQueryFindings(
             .name("findings")
             .description(
                 "Security findings having the given external ID (a CVE, a rule ID) across all the projects, " +
-                        "by project name. Only the projects whose findings the user is granted the view of are searched."
+                        "by project name. Only the projects whose findings the user is granted the view of are searched. " +
+                        "The findings exposed only on disabled branches are left out."
             )
             .argument(stringArgument(ARG_EXTERNAL_ID, "External ID of the findings", nullable = false))
             .type(listType(gqlTypeFinding.typeRef))

@@ -2786,22 +2786,22 @@ type FavouriteProjectPayload implements Payload {
 
 "One known weakness (a vulnerability, a code issue, a secret, a DAST alert) at one location of one project, identified by its scanner, its external ID and its location."
 type Finding {
-  "Acceptance recorded by the most recent observation of the finding. Null when this observation carries none, or when all the observations have been purged."
+  "Acceptance recorded by the most recent observation of the finding on an enabled branch. Null when this observation carries none, or when there is none: all purged, or all on disabled branches."
   acceptance: FindingAcceptance
   "How long the finding has been exposed: its longest ongoing period on one branch for one stamp, and the length of its last exposure episode. Over the branches which count toward its state in its project, or over one branch only."
   exposedFor(
     "Name of the branch whose periods count, instead of the branches which count in the project"
     branch: String
   ): FindingExposedFor
-  "Exposure of the finding on the branches of its project, resolved or not, one entry per branch and validation stamp, by branch name then stamp name"
+  "Exposure of the finding on the enabled branches of its project, resolved or not, one entry per branch and validation stamp, by branch name then stamp name"
   exposures: [FindingExposure!]!
   "Identifier given by the scanner, like a CVE or a rule ID"
   externalId: String!
   "Time of the first observation"
   firstSeen: LocalDateTime!
-  "Where and when the finding was first seen: the start of the earliest period of its exposures, with its branch, its stamp, its run and its build. Null when it has no exposure."
+  "Where and when the finding was first seen: the start of the earliest period of its exposures on the enabled branches, with its branch, its stamp, its run and its build. Null when it has no exposure."
   firstSeenIn: FindingSighting
-  "History of the finding, the most recent first: the start and the end of each period of its exposures, the changes of acceptance within them, and its observations, grouped between these."
+  "History of the finding on the enabled branches, the most recent first: the start and the end of each period of its exposures, the changes of acceptance within them, and its observations, grouped between these."
   history(
     "Offset for the page"
     offset: Int = 0,
@@ -2818,7 +2818,7 @@ type Finding {
   location: String!
   "Maximum severity across the observations of the finding"
   maxSeverity: FindingSeverity!
-  "Observations of the finding, the most recent first, optionally restricted to a branch, a validation stamp and a time range (both ends included)"
+  "Observations of the finding, the most recent first, optionally restricted to a branch, a validation stamp and a time range (both ends included). The ones of the disabled branches are left out, unless their branch is asked for."
   observations(
     "ID of the branch of the observations"
     branchId: Int,
@@ -2835,13 +2835,13 @@ type Finding {
   ): FindingObservationPaginated
   "Project the finding belongs to"
   project: Project!
-  "Time the finding was resolved in its project, if it is"
+  "Time the finding was resolved in its project, if it is. Null when the finding is exposed only on disabled branches."
   resolvedAt: LocalDateTime
   "Where and when the finding resolved in its project: the latest end of a period of its exposures on the branches which count, with its branch, its stamp, its run and its build. Null unless the finding is resolved in its project."
   resolvedIn: FindingSighting
   "Name of the scanner which reported the finding"
   scanner: String!
-  "State of the finding in its project, rolled up from its exposure on the branches which count: the branches matched by the branch model of the project (all of them when it has none), the disabled branches left out. Evaluated when it is read, so that an acceptance past its expiry stops counting."
+  "State of the finding in its project, rolled up from its exposure on the branches which count: the branches matched by the branch model of the project (all of them when it has none), the disabled branches left out. Evaluated when it is read, so that an acceptance past its expiry stops counting. Null when the finding is exposed only on disabled branches."
   state: FindingState
   "Short description of the finding"
   title: String!
@@ -2903,7 +2903,7 @@ type FindingExposure {
   accepted: Boolean!
   "Branch the finding is exposed on"
   branch: Branch!
-  "Whether the branch counts toward the state of the finding in its project: matched by the branch model of the project (every branch when it has none, without SCM), and not disabled. A branch which does not count still exposes the finding."
+  "Whether the branch counts toward the state of the finding in its project: matched by the branch model of the project (every branch when it has none, without SCM). A branch which does not count still exposes the finding."
   counts: Boolean!
   "Periods of the exposure, the oldest first: one per stretch from the first run which reported the finding to the first run which no longer did. A reopening starts a new period."
   periods: [FindingExposurePeriod!]!
@@ -3063,7 +3063,7 @@ type FindingSighting {
 type FindingsBranchSummary {
   "Branch"
   branch: Branch!
-  "Whether this branch counts for the state of the findings of the project: matched by the branch model of the project, and not disabled"
+  "Whether this branch counts for the state of the findings of the project: matched by the branch model of the project"
   counting: Boolean!
   "Findings open on this branch ? exposed there for one of its validation stamps at least ? by maximum severity, every severity present, the most severe first"
   open: [FindingSeverityCount!]!
@@ -3075,7 +3075,7 @@ type FindingsBranchSummary {
 type FindingsSummary {
   "Number of accepted findings of the project"
   acceptedCount: Int!
-  "Branches a finding has been exposed on, resolved or not, the most exposed first: by number of open critical findings, then of high ones, and so on, then by name"
+  "Enabled branches a finding has been exposed on, resolved or not, the most exposed first: by number of open critical findings, then of high ones, and so on, then by name"
   branches: [FindingsBranchSummary!]!
   "Open findings of the project by maximum severity, every severity present, the most severe first"
   open: [FindingSeverityCount!]!
@@ -6011,7 +6011,7 @@ type Project implements Authorizable & ProjectEntity {
   disabled: Boolean!
   "Is this project a favourite of the current user?"
   favourite: Boolean
-  "Security findings of the project, by default the most severe first, then the most recently seen. Empty for a user who is not granted the view of the findings of the project."
+  "Security findings of the project, by default the most severe first, then the most recently seen. The findings exposed only on disabled branches are left out, unless the filter asks for one of these branches. Empty for a user who is not granted the view of the findings of the project."
   findings(
     "Filter on the findings"
     filter: FindingFilter,
@@ -6613,7 +6613,7 @@ type Query {
     "ID of the finding"
     id: Int!
   ): Finding
-  "Security findings having the given external ID (a CVE, a rule ID) across all the projects, by project name. Only the projects whose findings the user is granted the view of are searched."
+  "Security findings having the given external ID (a CVE, a rule ID) across all the projects, by project name. Only the projects whose findings the user is granted the view of are searched. The findings exposed only on disabled branches are left out."
   findings(
     "External ID of the findings"
     externalId: String!

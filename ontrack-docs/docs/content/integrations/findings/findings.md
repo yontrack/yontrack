@@ -106,11 +106,34 @@ At the level of the project, a finding is:
 
 Only some branches count for this roll-up:
 
-* a **disabled branch** keeps its exposure, visible on the finding page, but is left out of the
-  state of the project. Enabling it again brings it back.
-* when the project has a branching model, only the branches matching it count.
+* when the project has a branching model, only the branches matching it count. A finding exposed
+  only outside of it is still listed, and reads as `RESOLVED`.
+* a [disabled branch](#disabled-branches) is not taken into account at all.
 * a **deleted branch** takes its exposure with it. Nothing was fixed, so no
   [resolution event](#events) is sent.
+
+### Disabled branches
+
+A disabled branch is retired: wherever the findings are read — the findings pages, the estates, the
+scorecards, the widgets, the search — it is not taken into account.
+
+* The branch is not listed among the ones exposing a finding, in the branches of a project nor in
+  the branches to filter its findings on.
+* A finding exposed only on disabled branches disappears from the lists, the search, the estates and
+  the counts, rather than counting as resolved: nothing was fixed. Its page still opens from a direct
+  link, with no state and no branches.
+* No [event](#events) is sent for a disabled branch.
+
+The maximum severity of a finding and when it was first and last seen are kept across all its
+observations, whatever their branch: a scan of a branch since disabled still counts for them.
+
+The scans of a build of a disabled branch are still stored, and enabling the branch again brings
+everything back, without any event for what happened in the meantime. A new build enables its
+disabled branch by itself.
+
+The views which ask about a disabled branch by its name keep working: its
+[widget](#dashboard-widgets) and its hint, the findings of its project filtered on its name, and the command
+leading to its findings.
 
 ### Versions and locations
 
@@ -714,6 +737,9 @@ Two [events](../../generated/events/index.md) follow the exposure of findings on
 
 The events speak for the branch, all its validation stamps together: a finding reported by two
 stamps of a branch is new when the first one reports it, and resolved when neither does any more.
+
+A [disabled branch](#disabled-branches) sends none of them, and enabling it sends nothing for what
+happened in the meantime.
 
 Their entity is the branch. A [subscription](../notifications/index.md) on the `main` branch
 answers "tell me of any new finding on `main`", and one on the project sees all its branches.

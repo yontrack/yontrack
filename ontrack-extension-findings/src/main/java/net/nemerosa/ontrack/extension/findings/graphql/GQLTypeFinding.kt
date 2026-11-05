@@ -95,8 +95,12 @@ class GQLTypeFinding(
             }
             .field {
                 it.name(Finding::resolvedAt.name)
-                    .description("Time the finding was resolved in its project, if it is")
+                    .description("Time the finding was resolved in its project, if it is. Null when the finding is exposed only on disabled branches.")
                     .type(GQLScalarLocalDateTime.INSTANCE)
+                    .dataFetcher { env ->
+                        val finding: Finding = env.getSource()!!
+                        finding.resolvedAt?.takeIf { findingQueryService.getFindingState(finding) != null }
+                    }
             }
             .field {
                 it.name(Finding::maxSeverity.name)
@@ -108,7 +112,8 @@ class GQLTypeFinding(
                     .description(
                         "State of the finding in its project, rolled up from its exposure on the branches which count: " +
                                 "the branches matched by the branch model of the project (all of them when it has none), " +
-                                "the disabled branches left out. Evaluated when it is read, so that an acceptance past its expiry stops counting."
+                                "the disabled branches left out. Evaluated when it is read, so that an acceptance past its expiry stops counting. " +
+                                "Null when the finding is exposed only on disabled branches."
                     )
                     .type(GraphQLTypeReference(FindingState::class.java.simpleName))
                     .dataFetcher { env ->
@@ -119,8 +124,8 @@ class GQLTypeFinding(
             .field {
                 it.name("acceptance")
                     .description(
-                        "Acceptance recorded by the most recent observation of the finding. " +
-                                "Null when this observation carries none, or when all the observations have been purged."
+                        "Acceptance recorded by the most recent observation of the finding on an enabled branch. " +
+                                "Null when this observation carries none, or when there is none: all purged, or all on disabled branches."
                     )
                     .type(gqlTypeFindingAcceptance.typeRef)
                     .dataFetcher { env ->
@@ -131,7 +136,7 @@ class GQLTypeFinding(
             .field {
                 it.name("exposures")
                     .description(
-                        "Exposure of the finding on the branches of its project, resolved or not, " +
+                        "Exposure of the finding on the enabled branches of its project, resolved or not, " +
                                 "one entry per branch and validation stamp, by branch name then stamp name"
                     )
                     .type(listType(gqlTypeFindingExposure.typeRef))
@@ -143,7 +148,7 @@ class GQLTypeFinding(
             .field {
                 it.name("firstSeenIn")
                     .description(
-                        "Where and when the finding was first seen: the start of the earliest period of its exposures, " +
+                        "Where and when the finding was first seen: the start of the earliest period of its exposures on the enabled branches, " +
                                 "with its branch, its stamp, its run and its build. Null when it has no exposure."
                     )
                     .type(gqlTypeFindingSighting.typeRef)
@@ -191,7 +196,8 @@ class GQLTypeFinding(
                     cache = cache,
                     fieldName = "observations",
                     fieldDescription = "Observations of the finding, the most recent first, optionally restricted to a branch, " +
-                            "a validation stamp and a time range (both ends included)",
+                            "a validation stamp and a time range (both ends included). " +
+                            "The ones of the disabled branches are left out, unless their branch is asked for.",
                     itemType = FindingObservation::class.java.simpleName,
                     arguments = listOf(
                         GraphQLArgument.newArgument()
@@ -234,7 +240,7 @@ class GQLTypeFinding(
                 paginatedListFactory.createPaginatedField<Finding, FindingHistoryEntryView>(
                     cache = cache,
                     fieldName = "history",
-                    fieldDescription = "History of the finding, the most recent first: the start and the end of each period of its exposures, " +
+                    fieldDescription = "History of the finding on the enabled branches, the most recent first: the start and the end of each period of its exposures, " +
                             "the changes of acceptance within them, and its observations, grouped between these.",
                     itemType = FindingHistoryEntry::class.java.simpleName,
                     itemPaginatedListProvider = { _, finding, offset, size ->

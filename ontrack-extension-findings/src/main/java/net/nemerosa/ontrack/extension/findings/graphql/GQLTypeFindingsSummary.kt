@@ -55,7 +55,7 @@ class GQLTypeFindingsSummary : GQLType {
             .field {
                 it.name(FindingsSummary::branches.name)
                     .description(
-                        "Branches a finding has been exposed on, resolved or not, the most exposed first: " +
+                        "Enabled branches a finding has been exposed on, resolved or not, the most exposed first: " +
                                 "by number of open critical findings, then of high ones, and so on, then by name"
                     )
                     .type(GraphQLNonNull(GraphQLList(GraphQLNonNull(GraphQLTypeReference(BRANCH_SUMMARY)))))
@@ -118,7 +118,7 @@ class GQLTypeFindingsBranchSummary : GQLType {
                 it.name(FindingsBranchSummary::counting.name)
                     .description(
                         "Whether this branch counts for the state of the findings of the project: " +
-                                "matched by the branch model of the project, and not disabled"
+                                "matched by the branch model of the project"
                     )
                     .type(GraphQLNonNull(GraphQLBoolean))
             }

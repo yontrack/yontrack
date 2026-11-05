@@ -35,6 +35,7 @@ class GQLProjectFindingsFieldContributor(
                 cache = GQLTypeCache(),
                 fieldName = "findings",
                 fieldDescription = "Security findings of the project, by default the most severe first, then the most recently seen. " +
+                        "The findings exposed only on disabled branches are left out, unless the filter asks for one of these branches. " +
                         "Empty for a user who is not granted the view of the findings of the project.",
                 itemType = GQLTypeFinding.FINDING,
                 arguments = listOf(

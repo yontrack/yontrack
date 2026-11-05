@@ -7,12 +7,14 @@ import net.nemerosa.ontrack.model.structure.Branch
  * Summary of the findings of a project, for its Security section.
  *
  * Every count is by maximum severity, as the filter of the findings is, so that a count and the
- * list it leads to agree.
+ * list it leads to agree. Neither the disabled branches nor the findings exposed only on them are
+ * counted.
  *
  * @property open Open findings of the project, by maximum severity, every severity present
  * @property acceptedCount Number of accepted findings of the project
  * @property resolvedCount Number of resolved findings of the project
- * @property branches Branches a finding has been exposed on, resolved or not, the most exposed first
+ * @property branches Enabled branches a finding has been exposed on, resolved or not, the most
+ * exposed first
  * @property scanners Names of the scanners which reported the findings of the project, sorted
  */
 data class FindingsSummary(
@@ -34,7 +36,7 @@ data class FindingsSummary(
  * @property branch Branch
  * @property open Findings open on this branch, by maximum severity, every severity present
  * @property counting Whether this branch counts for the state of the findings of the project:
- * matched by its branch model, and not disabled
+ * matched by its branch model
  */
 data class FindingsBranchSummary(
     val branch: Branch,

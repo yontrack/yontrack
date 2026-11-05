@@ -63,8 +63,8 @@ class GQLTypeFindingExposure(
                 it.name(FindingExposureView::counts.name)
                     .description(
                         "Whether the branch counts toward the state of the finding in its project: " +
-                                "matched by the branch model of the project (every branch when it has none, without SCM), " +
-                                "and not disabled. A branch which does not count still exposes the finding."
+                                "matched by the branch model of the project (every branch when it has none, without SCM). " +
+                                "A branch which does not count still exposes the finding."
                     )
                     .type(GraphQLNonNull(GraphQLBoolean))
                     .dataFetcher { env -> env.view.counts }

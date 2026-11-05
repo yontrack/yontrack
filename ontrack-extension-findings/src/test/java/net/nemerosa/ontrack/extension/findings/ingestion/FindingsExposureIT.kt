@@ -249,7 +249,7 @@ class FindingsExposureIT : AbstractDSLTestSupport() {
     }
 
     @Test
-    fun `A disabled branch keeps its exposure and is left out of the state in the project`() {
+    fun `A disabled branch keeps its exposure, and a finding exposed only on it has no state`() {
         project {
             val main = branch("main")
             val release = branch("release-x")
@@ -263,7 +263,7 @@ class FindingsExposureIT : AbstractDSLTestSupport() {
             // Still exposed on the release branch
             assertEquals(FindingState.OPEN, state(finding("CVE-1")))
             // Only exposed on the disabled branch
-            assertEquals(FindingState.RESOLVED, state(finding("CVE-2")))
+            assertNull(state(finding("CVE-2")))
             // The rows are kept
             assertEquals(2, findingRepository.findExposuresByBranch(main.id()).size)
 
@@ -338,7 +338,7 @@ class FindingsExposureIT : AbstractDSLTestSupport() {
 
     private fun Branch.finding(externalId: String): Finding = project.finding(externalId)
 
-    private fun state(finding: Finding): FindingState = findingStateService.getFindingState(finding)
+    private fun state(finding: Finding): FindingState? = findingStateService.getFindingState(finding)
 
     private fun FindingsIngestionResult.summary() =
         transitions.map { Triple(it.type, it.finding.externalId, it.reopened) }

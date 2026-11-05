@@ -79,9 +79,13 @@ class FindingsIngestionServiceImpl(
         val written = writeFindings(build.project, report, findings, run)
         // Exposure of the findings on the branch, for the stamp
         val transitions = writeExposure(build.project, run, written)
-        // Events of the transitions, in the same transaction, after the one of the run
-        transitions.forEach { transition ->
-            eventPostService.post(FindingsEvents.event(transition))
+        // Events of the transitions, in the same transaction, after the one of the run. None for a
+        // disabled branch, whether or not it is enabled again later. Read again: a new build enables
+        // its branch, which the branch of this build may not say.
+        if (!structureService.getBranch(build.branch.id).isDisabled) {
+            transitions.forEach { transition ->
+                eventPostService.post(FindingsEvents.event(transition))
+            }
         }
         // Measuring an ingested report
         measure(parser.format, sample, findings.size)
@@ -240,9 +244,18 @@ class FindingsIngestionServiceImpl(
         val resolvedIds = change.saved.map { it.findingId }.filter { it !in reported }
         val touched = reported.values + findingRepository.findFindingsByIds(resolvedIds)
         val states = findingStateService.getFindingStates(project, touched, time.toLocalDate())
+        val withoutState = findingRepository.findExposuresByFindings(touched.filter { it.id !in states }.map { it.id })
+            .groupBy { it.findingId }
         val findings = touched.associate { finding ->
-            val resolvedAt = when (states.getValue(finding.id)) {
+            val resolvedAt = when (states[finding.id]) {
                 FindingState.RESOLVED -> finding.resolvedAt ?: time
+                // Exposed only on disabled branches: followed as if they were enabled, for enabling
+                // them to bring it back. It is not read while they are disabled.
+                null -> if (withoutState[finding.id].orEmpty().all { it.resolvedAt != null }) {
+                    finding.resolvedAt ?: time
+                } else {
+                    null
+                }
                 else -> null
             }
             finding.id to if (resolvedAt != finding.resolvedAt) {

@@ -18,6 +18,7 @@ import net.nemerosa.ontrack.it.AsAdminTest
 import net.nemerosa.ontrack.json.parseAsJson
 import net.nemerosa.ontrack.model.events.EventType
 import net.nemerosa.ontrack.model.structure.Branch
+import net.nemerosa.ontrack.model.structure.Build
 import net.nemerosa.ontrack.model.structure.ProjectEntity
 import net.nemerosa.ontrack.model.structure.ValidationStamp
 import net.nemerosa.ontrack.model.structure.config
@@ -195,6 +196,47 @@ class FindingsEventsIT : AbstractDSLTestSupport() {
     }
 
     @Test
+    fun `No event for a disabled branch, and enabling it sends nothing for what happened in the meantime`() {
+        project {
+            val main = branch("main")
+            val old = branch("old")
+            val vsMain = main.findingsStamp()
+            val vsOld = old.findingsStamp()
+            val onProject = subscribe(FindingsEvents.SECURITY_FINDING_NEW, FindingsEvents.SECURITY_FINDING_RESOLVED)
+
+            old.scan(vsOld, entry("CVE-1"))
+            waitForMessages(onProject, 1)
+
+            // A new build would enable the branch: a scan of a build it already has
+            val build = old.build()
+            structureService.disableBranch(old)
+            // One resolved, one new
+            build.scan(vsOld, entry("CVE-2"))
+
+            structureService.enableBranch(structureService.getBranch(old.id))
+            // A later event, to be sure nothing was queued in between
+            main.scan(vsMain, entry("CVE-3"))
+
+            waitForMessages(onProject, 2)
+            assertEquals(
+                listOf(
+                    "new|CVE-1|HIGH|pkg:maven/org.x/y|trivy|IMAGE|old|false",
+                    "new|CVE-3|HIGH|pkg:maven/org.x/y|trivy|IMAGE|main|false",
+                ),
+                messages(onProject)
+            )
+
+            // The next scan of the enabled branch only says what it changes
+            structureService.getBranch(old.id).scan(vsOld)
+            waitForMessages(onProject, 3)
+            assertEquals(
+                "resolved|CVE-2|HIGH|pkg:maven/org.x/y|trivy|IMAGE|old|false",
+                messages(onProject).last()
+            )
+        }
+    }
+
+    @Test
     fun `Default templates of the events`() {
         project {
             branch {
@@ -292,8 +334,11 @@ class FindingsEventsIT : AbstractDSLTestSupport() {
         )
 
     private fun Branch.scan(vs: ValidationStamp, vararg entries: String): FindingsIngestionResult =
+        build().scan(vs, *entries)
+
+    private fun Build.scan(vs: ValidationStamp, vararg entries: String): FindingsIngestionResult =
         findingsIngestionService.ingest(
-            build = build(),
+            build = this,
             request = FindingsIngestionRequest(
                 validation = vs.name,
                 format = "findings",

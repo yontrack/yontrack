@@ -371,6 +371,13 @@ A finding is exposed on a branch while the latest scan of the same stamp on that
 branch reports it.
 _Avoid_: open (the project-level roll-up), affected
 
+A disabled branch is retired: wherever findings data is read — the findings
+extension, estates, scorecards, widgets, search — its exposure is not taken into
+account. A finding exposed only on disabled branches has no state, and is listed
+nowhere rather than reading as resolved, though its page opens from a direct link.
+Scans on such a branch are still stored, and enabling it brings everything back.
+Only a view asking about that branch by its name still reads it.
+
 **Exposure period**:
 One continuous stretch of an exposure, from the first run which reported the
 finding to the first run which no longer did. An exposure has one or more

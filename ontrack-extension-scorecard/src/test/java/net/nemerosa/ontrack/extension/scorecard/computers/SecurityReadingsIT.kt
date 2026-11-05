@@ -162,6 +162,19 @@ class SecurityReadingsIT : EstatesTestSupport() {
     }
 
     @Test
+    fun `The scans of a disabled branch are not read`() {
+        asAdmin {
+            project {
+                val old = branch("old")
+                old.scan(old.scanStamp(), FindingKind.IMAGE, daysAgo = 1)
+                assertEquals(2.0, maturity().value)
+                structureService.disableBranch(old)
+                assertEquals(0.0, maturity().value)
+            }
+        }
+    }
+
+    @Test
     fun `A scan which failed its thresholds in the window is gating`() {
         asAdmin {
             project {

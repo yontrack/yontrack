@@ -10,8 +10,8 @@ import {createFindingsValidationStamp, finding, scanWithFindings} from "@ontrack
  *
  * - `main`: CVE-A (CRITICAL) open
  * - `release`: CVE-B (HIGH) open, CVE-C (MEDIUM) resolved
- * - `old`: CVE-D (LOW) open, but the branch is disabled and does not count for the project, which
- *   reads it as resolved
+ * - `old`: CVE-D (LOW) open, but the branch is disabled: the project ignores it, and CVE-D, exposed
+ *   only there, with it
  */
 const provisionFindings = async (ontrack) => {
     const project = await ontrack.createProject()
@@ -70,12 +70,12 @@ test('findings widgets show the findings of a project and of a branch by severit
     await page.getByRole('button', {name: 'Dashboard', exact: true}).click()
     await page.getByText(dashboardName).click()
 
-    // Project: the disabled branch does not count
+    // Project: the disabled branch is not taken into account
     await expect(page.getByTestId('project-findings-open-CRITICAL')).toHaveText('Critical 1')
     await expect(page.getByTestId('project-findings-open-HIGH')).toHaveText('High 1')
     await expect(page.getByTestId('project-findings-open-LOW')).toHaveText('Low 0')
-    // CVE-C, and CVE-D which is exposed on no branch that counts
-    await expect(page.getByTestId('project-findings-resolved')).toHaveText('2')
+    // CVE-C. Not CVE-D, which nothing fixed
+    await expect(page.getByTestId('project-findings-resolved')).toHaveText('1')
     const rows = page.getByTestId('project-findings-branches').locator('tbody tr.ant-table-row')
     await expect(rows).toHaveCount(2)
     await expect(page.getByTestId('project-findings-branches')).not.toContainText('old')
