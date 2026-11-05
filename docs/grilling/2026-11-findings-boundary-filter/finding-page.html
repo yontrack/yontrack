@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Period boundary mockup</title>
+<!--
+  Static mockup chosen in the grilling session of 2026-11-02 (option A), read on 20 Oct with the
+  filter "With promotion GOLD". Not product code: the implementation uses antd 6 components and the
+  app's tokens.
+-->
+<style>
+  :root { color-scheme:light dark; --text:#1f1f1f; --muted:#6e6e6e; --secondary:#595959; --border:#e8e8e8; --bg:#fff; --card:#fafafa;
+          --exposed:#cf1322; --resolved:#389e0d; --link:#1677ff; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --text:#e6e6e6; --muted:#a6a6a6; --secondary:#bfbfbf;
+          --border:#303030; --bg:#141414; --card:#1f1f1f; --exposed:#ff7875; --resolved:#95de64; --link:#4096ff; } }
+  body { margin:0; padding:24px 16px; background:var(--bg); color:var(--text); font:14px/1.6 system-ui, sans-serif; }
+  main { max-width:1000px; margin:0 auto; }
+  section { border:1px solid var(--border); border-radius:8px; margin:0 0 20px; }
+  header { display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap; padding:10px 16px; border-bottom:1px solid var(--border); background:var(--card); }
+  h2 { font-size:15px; font-weight:600; margin:0; }
+  .pick { font-size:13px; color:var(--secondary); }
+  .sel { border:1px solid var(--border); border-radius:6px; padding:2px 8px; margin-left:6px; color:var(--text); background:var(--bg); }
+  .body { padding:12px 16px; overflow-x:auto; }
+  .gantt { min-width:640px; }
+  .lane { display:grid; grid-template-columns:110px minmax(0,1fr); align-items:center; gap:12px; min-height:44px; }
+  a { color:var(--link); text-decoration:none; }
+  .track { position:relative; height:42px; }
+  .bar { position:absolute; top:24px; height:10px; border-radius:2px; background:var(--exposed); }
+  .wait { position:absolute; top:24px; height:10px; box-sizing:border-box; border-top:1px solid var(--exposed); border-bottom:1px solid var(--exposed);
+          background:repeating-linear-gradient(135deg, var(--exposed) 0 3px, transparent 3px 6px); }
+  .fix, .scan { position:absolute; top:21px; width:16px; height:16px; margin-left:-8px; border-radius:50%; box-sizing:border-box; }
+  .fix { background:var(--resolved); border:2px solid var(--bg); }
+  .scan { background:var(--bg); border:3px solid var(--resolved); }
+  .lab { position:absolute; top:2px; font-size:12px; white-space:nowrap; color:var(--secondary); }
+  .axis { display:flex; justify-content:space-between; margin-left:122px; border-top:1px solid var(--border); font-size:11px; color:var(--muted); padding-top:2px; }
+  .legend { display:flex; gap:16px; flex-wrap:wrap; align-items:center; font-size:12px; color:var(--secondary); margin-top:8px; }
+  .legend span { display:inline-flex; align-items:center; gap:4px; }
+  .legend i { position:static; display:inline-block; margin:0; }
+  table { width:100%; border-collapse:collapse; min-width:640px; }
+  th, td { text-align:left; padding:8px; border-bottom:1px solid var(--border); vertical-align:top; }
+  th { color:var(--secondary); font-weight:500; background:var(--card); }
+  .sub { display:block; font-size:12px; color:var(--muted); }
+  code { font-family:ui-monospace, Menlo, monospace; font-size:12.5px; }
+  .menu { max-width:420px; padding:4px 0; }
+  .menu div { padding:5px 16px; }
+  .menu .group { font-size:12px; color:var(--muted); border-top:1px solid var(--border); margin-top:4px; padding-top:8px; }
+  .menu .off { color:var(--muted); }
+</style>
+</head>
+<body>
+<main>
+  <section>
+    <header>
+      <h2>Exposure timeline</h2>
+      <span class="pick">A fix counts once a build matches<span class="sel">With promotion GOLD ▾</span></span>
+    </header>
+    <div class="body"><div class="gantt">
+      <div class="lane"><a href="#">main</a><div class="track">
+        <span class="lab" style="left:0"><code>3.4.0</code> → <code>3.4.2</code> → GOLD in <code>3.4.4</code> · 4 days, 12 until GOLD</span>
+        <div class="bar" style="left:0;width:22.2%" role="img" aria-label="Exposed from 3.4.0, fixed in 3.4.2, 4 days. In a GOLD build, 3.4.4, on 14 Oct, 12 days."></div>
+        <div class="wait" style="left:22.2%;width:44.5%"></div><div class="scan" style="left:22.2%"></div><div class="fix" style="left:66.7%"></div>
+      </div></div>
+      <div class="lane"><a href="#">release-2.5</a><div class="track">
+        <span class="lab" style="left:5.6%"><code>2.5.0</code> → <code>2.5.1</code></span>
+        <span class="lab" style="left:33.3%"><code>2.5.3</code> · reopened · 12 days, ongoing</span>
+        <div class="bar" style="left:5.6%;width:11.1%" role="img" aria-label="Exposed from 2.5.0, fixed in 2.5.1, 2 days. Reopened in 2.5.3 before reaching a GOLD build."></div>
+        <div class="wait" style="left:16.7%;width:16.6%"></div><div class="scan" style="left:16.7%"></div>
+        <div class="bar" style="left:33.3%;width:66.7%" role="img" aria-label="Exposed since 2.5.3, 12 days, ongoing"></div>
+      </div></div>
+      <div class="lane"><a href="#">release-2.4</a><div class="track">
+        <span class="lab" style="left:5.6%"><code>2.4.1</code> → <code>2.4.3</code> · no GOLD build yet · 7 days, 17 so far</span>
+        <div class="bar" style="left:5.6%;width:38.8%" role="img" aria-label="Exposed from 2.4.1, fixed in 2.4.3, 7 days. No GOLD build yet, 17 days so far."></div>
+        <div class="wait" style="left:44.4%;width:55.6%"></div><div class="scan" style="left:44.4%"></div>
+      </div></div>
+      <div class="lane"><a href="#">release-2.3</a><div class="track">
+        <span class="lab" style="left:5.6%"><code>2.3.8</code> → <code>2.3.9</code> · 2 days · no GOLD on this branch</span>
+        <div class="bar" style="left:5.6%;width:11.1%" role="img" aria-label="Exposed from 2.3.8, fixed in 2.3.9, 2 days. The filter does not apply: no GOLD on this branch."></div>
+        <div class="fix" style="left:16.7%"></div>
+      </div></div>
+      <div class="axis"><span>2 Oct</span><span>8 Oct</span><span>14 Oct</span><span>20 Oct</span></div>
+      <div class="legend">
+        <span><i style="width:12px;height:8px;background:var(--exposed)"></i>Exposed</span>
+        <span><i class="wait" style="width:16px;height:8px"></i>Fixed, not in a matching build</span>
+        <span><i class="scan" style="width:12px;height:12px;border-width:2px"></i>Scan fix</span>
+        <span><i class="fix" style="width:12px;height:12px;border:0"></i>Fix in a matching build</span>
+      </div>
+    </div></div>
+  </section>
+
+  <section>
+    <header><h2>Exposure per branch</h2></header>
+    <div class="body">
+      <table>
+        <tr><th>Branch</th><th>State</th><th>Discovered in</th><th>Fixed in</th><th>In a matching build</th><th>Exposed for</th></tr>
+        <tr><td><a href="#">main</a></td><td>Resolved</td><td><code>3.4.0</code><span class="sub">2 Oct</span></td><td><code>3.4.2</code><span class="sub">6 Oct</span></td><td><code>3.4.4</code><span class="sub">GOLD on 14 Oct</span></td><td>4 days<span class="sub">12 days until GOLD</span></td></tr>
+        <tr><td><a href="#">release-2.5</a></td><td>Exposed<span class="sub">reopened</span></td><td><code>2.5.3</code><span class="sub">8 Oct</span></td><td><code>2.5.1</code>, reopened<span class="sub">5 Oct</span></td><td>Not reached<span class="sub">reopened in <code>2.5.3</code> first</span></td><td>12 days, ongoing<span class="sub">earlier: 2 days</span></td></tr>
+        <tr><td><a href="#">release-2.4</a></td><td>Resolved</td><td><code>2.4.1</code><span class="sub">3 Oct</span></td><td><code>2.4.3</code><span class="sub">10 Oct</span></td><td>None yet</td><td>7 days<span class="sub">17 days so far until GOLD</span></td></tr>
+        <tr><td><a href="#">release-2.3</a></td><td>Resolved</td><td><code>2.3.8</code><span class="sub">3 Oct</span></td><td><code>2.3.9</code><span class="sub">5 Oct</span></td><td>Doesn't apply<span class="sub">no GOLD on this branch</span></td><td>2 days</td></tr>
+      </table>
+    </div>
+  </section>
+
+  <section style="max-width:420px">
+    <header><h2>The picker, open</h2></header>
+    <div class="menu">
+      <div>✓ No filter (all builds)</div>
+      <div>New filter</div>
+      <div class="group">Saved on these branches</div>
+      <div>GOLD builds <span class="sub" style="display:inline">· main, release-2.4</span></div>
+      <div>Passed DAST <span class="sub" style="display:inline">· main</span></div>
+      <div class="off">Since last RC <span class="sub" style="display:inline">· uses "since", can't set a boundary</span></div>
+    </div>
+  </section>
+</main>
+</body>
+</html>
