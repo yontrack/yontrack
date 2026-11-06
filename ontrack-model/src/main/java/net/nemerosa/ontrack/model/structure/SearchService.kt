@@ -23,7 +23,7 @@ interface SearchService {
     /**
      * Paginated search on one type of results.
      */
-    @Deprecated("Use search(SearchQueryRequest). Will be removed in 7.0.")
+    @Deprecated("Removed in V7. Use search(SearchQueryRequest) instead. See #2140")
     fun paginatedSearch(request: SearchRequest): SearchResults =
         search(
             SearchQueryRequest(

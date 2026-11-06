@@ -13,10 +13,3 @@
 # issue expected to remove them; the grouping is a guide, the test does not read it.
 # Cutover gate (doc/dev-guide/major-branch.md): this file has no entry left when 6.0.0 is released.
 
-# Search on Postgres - the deprecated search(...) form, re-marked Removed in V7 by its own initiative
-graphql ontrack-ui-graphql/src/main/java/net/nemerosa/ontrack/graphql/schema/GQLRootQuerySearch.kt#token
-graphql ontrack-ui-graphql/src/main/java/net/nemerosa/ontrack/graphql/schema/GQLRootQuerySearch.kt#type
-graphql ontrack-ui-graphql/src/main/java/net/nemerosa/ontrack/graphql/schema/GQLTypeSearchResults.kt#pageInfo
-graphql ontrack-ui-graphql/src/main/java/net/nemerosa/ontrack/graphql/schema/GQLTypeSearchResults.kt#pageItems
-kotlin ontrack-model/src/main/java/net/nemerosa/ontrack/model/structure/SearchRequest.kt#SearchRequest
-kotlin ontrack-model/src/main/java/net/nemerosa/ontrack/model/structure/SearchService.kt#paginatedSearch

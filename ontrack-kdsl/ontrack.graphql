@@ -6963,9 +6963,9 @@ type Query {
     "Maximum number of results to return"
     size: Int = 20,
     "Query string"
-    token: String @deprecated(reason : "Use query. Will be removed in 7.0."),
+    token: String @deprecated(reason : "Removed in V7. Use query instead. See #2140"),
     "Result type"
-    type: String @deprecated(reason : "Use types. Will be removed in 7.0."),
+    type: String @deprecated(reason : "Removed in V7. Use types instead. See #2140"),
     "IDs of the types of results to look into. All of them by default."
     types: [String!]
   ): SearchResults!
@@ -7703,9 +7703,9 @@ type SearchResults {
   "Message about the search, for example when the search index is being built"
   message: String
   "Information about the current page"
-  pageInfo: PageInfo @deprecated(reason : "Use total, and the offset and size arguments. Will be removed in 7.0.")
+  pageInfo: PageInfo @deprecated(reason : "Removed in V7. Use total, with the offset and size arguments, instead. See #2140")
   "Items in the current page"
-  pageItems: [SearchResult!]! @deprecated(reason : "Use items. Will be removed in 7.0.")
+  pageItems: [SearchResult!]! @deprecated(reason : "Removed in V7. Use items instead. See #2140")
   "Total number of results, for what the user can see: the sum of the counts of the facets"
   total: Int!
 }

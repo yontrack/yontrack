@@ -92,7 +92,7 @@ class GQLTypeSearchResults(
                 GraphQLFieldDefinition.newFieldDefinition()
                     .name("pageInfo")
                     .description("Information about the current page")
-                    .deprecate("Use total, and the offset and size arguments. Will be removed in 7.0.")
+                    .deprecate("Removed in V7. Use total, with the offset and size arguments, instead. See #2140")
                     .type(pageInfo.typeRef)
                     .dataFetcher { env -> env.getSource<GQLSearchResults>()!!.paginatedList.pageInfo }
                     .build()
@@ -101,7 +101,7 @@ class GQLTypeSearchResults(
                 GraphQLFieldDefinition.newFieldDefinition()
                     .name("pageItems")
                     .description("Items in the current page")
-                    .deprecate("Use items. Will be removed in 7.0.")
+                    .deprecate("Removed in V7. Use items instead. See #2140")
                     .type(listType(searchResult.typeRef))
                     .dataFetcher { env -> env.getSource<GQLSearchResults>()!!.results.items }
                     .build()

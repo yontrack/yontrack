@@ -72,14 +72,14 @@ class GQLRootQuerySearch(
                     .name(ARG_TOKEN)
                     .description("Query string")
                     .type(GraphQLString)
-                    .deprecate("Use query. Will be removed in 7.0.")
+                    .deprecate("Removed in V7. Use query instead. See #2140")
             )
             .argument(
                 GraphQLArgument.newArgument()
                     .name(ARG_TYPE)
                     .description("Result type")
                     .type(GraphQLString)
-                    .deprecate("Use types. Will be removed in 7.0.")
+                    .deprecate("Removed in V7. Use types instead. See #2140")
             )
             .type(GraphQLNonNull(searchResults.typeRef))
             .dataFetcher { env ->
