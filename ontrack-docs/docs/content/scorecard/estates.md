@@ -234,30 +234,21 @@ On a project, each estate's readings are a set of
 [`Project.scorecard`](scorecard.md#api), with its `estate`, and each reading gives its `target` and
 `targetMet`.
 
-In the KDSL:
+`recomputeEstate(input: {id: …})` queues the recompute of the readings of every project of an
+estate. It computes the estate's readings only; `recomputeProjectScorecard` computes every set of a
+project — see [Scorecard](scorecard.md#api).
 
-```kotlin
-val estate = ontrack.estates.create(
-    name = "Products",
-    labels = listOf("portfolio:product"),
-    marker = EstateMarker.Promotion("GOLD"),
-    readings = listOf(
-        EstateReadingConfig(key = ReadingKeys.DELIVERY_LEAD_TIME, target = 86400.0),
-        EstateReadingConfig(key = ReadingKeys.SECURITY_OVERDUE, target = 0.0),
-    ),
-    security = EstateSecurity(
-        expectedKinds = listOf(FindingKind.DEPENDENCIES, FindingKind.CODE),
-        criticalTargetDays = 7,
-        highTargetDays = 14,
-    ),
-)
-// Recomputes the readings of the estate's projects and waits for them, by project name
-val scorecards = estate.recomputeAndWait()
-val leadTime = scorecards["my-project"]?.estate("Products")?.reading(ReadingKeys.DELIVERY_LEAD_TIME)
+From a script, the [Yontrack CLI](https://github.com/yontrack/yontrack-cli) runs these through
+`yontrack graphql`. For example, to recompute an estate, given by its name:
+
+```bash
+ESTATE_ID=$(yontrack graphql --query '{ estate(name: "Products") { id } }' | jq -r .estate.id)
+yontrack graphql --fail-on-user-errors \
+  --query 'mutation($id: Int!) { recomputeEstate(input: {id: $id}) { errors { message } } }' \
+  --vars-json "{\"id\": $ESTATE_ID}"
 ```
 
-An estate recompute computes the estate's readings only; `project.recomputeScorecardAndWait()`
-computes every set of the project.
+The recompute is queued: its readings are there once it has run.
 
 ## License
 

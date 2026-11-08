@@ -372,13 +372,26 @@ In GraphQL, `Project.scorecard` gives the sets of the project — the no-estate 
 
 `recomputeProjectScorecard(input: {projectId: 1})` queues the recompute of a project.
 
-In the KDSL:
+From a script, the [Yontrack CLI](https://github.com/yontrack/yontrack-cli) runs these through
+`yontrack graphql`. For example, to read the lead time of a project in its no-estate set:
 
-```kotlin
-val scorecard = project.scorecard()
-val leadTime = scorecard.noEstate.reading(ReadingKeys.DELIVERY_LEAD_TIME)?.value
-// Recomputes and waits for the readings of the day
-project.recomputeScorecardAndWait()
+```bash
+yontrack graphql --query '
+  query($name: String!) {
+    projects(name: $name) { scorecard { sets { name estate { name } readings { key value basis } } } }
+  }' --var name=my-project \
+  | jq '.projects[0].scorecard.sets[]
+        | select(.estate == null)
+        | .readings[] | select(.key == "delivery.leadTime")'
+```
+
+and to queue the recompute of its readings:
+
+```bash
+PROJECT_ID=$(yontrack graphql --query '{ projects(name: "my-project") { id } }' | jq -r '.projects[0].id')
+yontrack graphql --fail-on-user-errors \
+  --query 'mutation($id: Int!) { recomputeProjectScorecard(input: {projectId: $id}) { errors { message } } }' \
+  --vars-json "{\"id\": $PROJECT_ID}"
 ```
 
 ## Metrics export

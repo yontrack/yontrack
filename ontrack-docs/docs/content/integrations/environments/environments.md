@@ -210,7 +210,20 @@ mutation {
 }
 ```
 
-or with the KDSL, `pipeline.fail(message = "Helm upgrade timed out")`.
+or with the [Yontrack CLI](https://github.com/yontrack/yontrack-cli), from version 6.0.0, given
+the ID of the pipeline which `yontrack slot pipeline start` printed:
+
+```bash
+yontrack slot pipeline fail --pipeline 2957ff78-... --message "Helm upgrade timed out"
+```
+
+Without `--pipeline`, the CLI takes the ID from `YONTRACK_PIPELINE_ID`, which
+`yontrack slot pipeline start --output env` exports:
+
+```bash
+eval "$(yontrack slot pipeline start --project my-project --environment production --build 42 --output env)"
+helm upgrade ... || yontrack slot pipeline fail --message "Helm upgrade timed out"
+```
 
 ## Backdating deployments
 
@@ -243,13 +256,30 @@ and the current time is used, as before.
 Backdating needs no other right than the action's own. The events are sent, and the slot workflows
 run, as for any other deployment — at the time they are recorded, not at the backdated one.
 
-In the KDSL:
+With the CLI, `--date` backdates the start and the failure of a deployment — given as
+`2026-09-15T14:30:00+02:00`, or without offset in UTC:
 
-```kotlin
-build.startPipeline(slot, dateTime = start)
-    .startDeploying(dateTime = start.plusMinutes(1))
-    .finishDeployment(dateTime = start.plusMinutes(10))
-// or .fail(message = "...", dateTime = ...), or .cancel(reason = "...", dateTime = ...)
+```bash
+yontrack slot pipeline start --project my-project --environment production --build 42 \
+    --date 2026-09-15T14:30:00Z
+yontrack slot pipeline fail --pipeline 2957ff78-... --message "Smoke tests failed" \
+    --date 2026-09-15T14:45:00Z
+```
+
+The other steps go through the mutations, which `yontrack graphql` runs — for example, a
+deployment which ran from 14:31 to 14:40:
+
+```bash
+yontrack graphql --fail-on-user-errors \
+  --query 'mutation($id: String!, $at: LocalDateTime) {
+    startSlotPipelineDeployment(input: {pipelineId: $id, dateTime: $at}) { errors { message } }
+  }' \
+  --vars-json '{"id": "2957ff78-...", "at": "2026-09-15T14:31:00Z"}'
+yontrack graphql --fail-on-user-errors \
+  --query 'mutation($id: String!, $at: LocalDateTime) {
+    finishSlotPipelineDeployment(input: {pipelineId: $id, forcing: false, dateTime: $at}) { errors { message } }
+  }' \
+  --vars-json '{"id": "2957ff78-...", "at": "2026-09-15T14:40:00Z"}'
 ```
 
 ## Setup

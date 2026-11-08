@@ -282,7 +282,13 @@ build's branch) and `slotId`:
 }
 ```
 
-The KDSL offers `build.readiness(promotionLevel = "GOLD")` and `build.readiness(slot = slot)`.
+The [Yontrack CLI](https://github.com/yontrack/yontrack-cli), from version 6.0.0, reads it with
+`build readiness`, as text, or as the GraphQL result with `--output json`:
+
+```bash
+yontrack build readiness --project my-project --branch main --build 42 --promotion GOLD
+yontrack build readiness --project my-project --branch main --build 42 --slot b6b8a2c1-...
+```
 
 ### How agents use it
 
