@@ -28,7 +28,7 @@ history, and it was not rewritten". Concretely:
 * the evidence attached to a validation run is recorded by its SHA-256: a verification which reads
   the evidence back detects an altered or vanished file;
 * a trail can be exported as one JSON document and verified offline, with nothing but its content
-  — see [Verifying a trail offline](#verifying-a-trail-offline);
+  — by `yontrack audit-trail verify`, see [Verifying a trail offline](#verifying-a-trail-offline);
 * the evidence of a build can be downloaded at once, with its trail, as an
   [evidence archive](#evidence-archive), whose files are checked offline against the trail.
 
@@ -168,6 +168,71 @@ When the evidence storage is not configured or cannot be reached, the section sa
 Evidence is attached to an existing validation run. Uploading requires the right to create
 validation runs on its project — what a CI token has — and the license.
 
+#### CLI
+
+The [Yontrack CLI](https://github.com/yontrack/yontrack-cli), from version 6.0.0, validates a build
+and attaches evidence to the new validation run in one step, with `--evidence`, which can be
+repeated:
+
+```bash
+yontrack validate --project payments --branch release-2.4 --build 2.4.7 \
+    --validation security-scan --status PASSED \
+    --evidence trivy-report.pdf \
+    --evidence sbom.json \
+    --evidence-tool trivy \
+    --evidence-tool-version 0.58.1 \
+    --evidence-source-url "$CI_JOB_URL"
+```
+
+| Option                    | Description                                                                          |
+|---------------------------|--------------------------------------------------------------------------------------|
+| `--evidence`              | Path to a file to attach. Repeatable.                                                |
+| `--evidence-tool`         | Tool which produced the evidence, like `trivy` — the `sourceTool`.                   |
+| `--evidence-tool-version` | Version of that tool — the `sourceVersion`.                                          |
+| `--evidence-source-url`   | Where the evidence was produced, like the URL of the CI job — the `sourceUrl`.       |
+| `--evidence-optional`     | Only warn, instead of failing, when an evidence is missing.                          |
+
+The options belong to `validate` and to all its subcommands, so a validation with data carries its
+evidence the same way — here, a [security findings](../integrations/findings/findings.md) report,
+attached as it was sent:
+
+```bash
+yontrack validate --project payments --branch release-2.4 --build 2.4.7 \
+    --validation security-scan \
+    --evidence trivy.json \
+    --evidence-tool trivy \
+    --evidence-tool-version 0.58.1 \
+    findings --format trivy --kind IMAGE --report trivy.json
+```
+
+```bash
+yontrack validate --project payments --branch release-2.4 --build 2.4.7 \
+    --validation unit-tests \
+    --evidence build/test-results/report.html \
+    junit --pattern "build/test-results/**/*.xml"
+```
+
+The tool, its version and the URL apply to every evidence of the command. The files are uploaded
+once the validation run is created, through the [REST end point](#rest), each with its SHA-256 as
+its `externalDigest` — Yontrack refuses a file which is not what the CLI read — and with the media
+type of its extension: `.pdf` is `application/pdf`, `.json` is `application/json`.
+
+A missing evidence is an audit gap, so the command **fails**:
+
+* when an evidence file cannot be read, or is empty — before the validation run is created: nothing
+  is recorded;
+* when Yontrack refuses an evidence, with one of the [codes](#rest) of the REST end point — the
+  validation run is recorded all the same, and every other evidence is still tried.
+
+With `--evidence-optional`, both only print a warning on stderr, and the command succeeds:
+
+```
+Warning: evidence trivy-report.pdf was not attached to validation run 4512: No evidence storage is configured. (audit-trail.evidence.storage-not-configured)
+```
+
+The CLI attaches evidence to the validation runs it creates only: to attach evidence to an existing
+run, use the REST end point.
+
 #### REST
 
 ```
@@ -245,45 +310,12 @@ There is no GraphQL mutation to upload evidence: the content goes through REST o
     does — must also route `/rest/extension/audit-trail` to it, for the uploads, the downloads and
     the exports made by API clients. The web UI does not need it: it goes through its own server.
 
-#### KDSL
+Whether evidence can be attached at all is the state of the [storage](#status-of-the-storage),
+which a pipeline can read before it runs its scans — `OK`, `NOT_CONFIGURED` or `UNREACHABLE`:
 
-The KDSL attaches evidence to a validation run, or validates a build and attaches evidence in one
-call:
-
-```kotlin
-val run = build.validateWithEvidence(
-    validationStamp = "security-scan",
-    status = "PASSED",
-    evidence = listOf(
-        EvidenceFile(
-            fileName = "trivy-report.pdf",
-            content = File("trivy-report.pdf").readBytes(),
-            mediaType = "application/pdf",
-            sourceTool = "trivy",
-            sourceVersion = "0.58.1",
-        )
-    ),
-)
-
-// Or, on an existing run
-run.attachEvidence(EvidenceFile(fileName = "sbom.json", content = sbom, mediaType = "application/vnd.cyclonedx+json"))
+```bash
+yontrack graphql --query '{ auditTrailStorageState }' | jq -r .auditTrailStorageState
 ```
-
-A refused evidence throws an `EvidenceRefusedException`, whose `code` is one of the codes above.
-`validateWithEvidence` creates the run first: when an evidence is refused, the run stays, with the
-evidence attached before the refused one, and the exception is thrown — a missing evidence is an
-audit gap, and the step should fail.
-
-The KDSL also reads a run's evidence (`ValidationRun.evidence`), downloads (`Evidence.download()`)
-and deletes them (`Evidence.delete()`), and reads the trail of a build (`Build.trail`), verifies it
-on the server (`Build.verifyTrail(includeEvidence)`) and exports it (`Build.exportTrail()`).
-`Ontrack.auditTrailStorageState` tells whether evidence can be attached at all.
-
-#### CLI
-
-The `yontrack` CLI does not upload evidence nor verify trails yet: the commands are coming
-([yontrack/yontrack-cli#83](https://github.com/yontrack/yontrack-cli/issues/83)). Until then, use
-the REST API above.
 
 ### Display
 
@@ -739,6 +771,33 @@ query BuildTrail($id: Int!) {
 `auditTrail` is `null` when the build has no trail to read: the license is off and no entry was
 ever written for it.
 
+With the `yontrack` CLI, the same verification is run on the server through its `graphql` command,
+the build being found by its name. For example, to fail a pipeline step when the trail of the
+build, or its evidence, does not verify:
+
+```bash
+yontrack graphql --query '
+  query Verify($project: String!, $branch: String!, $build: String!) {
+    builds(project: $project, branch: $branch, name: $build) {
+      auditTrail {
+        verification(includeEvidence: true) {
+          chainIntact endorsementsValid partial unendorsedFromSeq
+          missingEvidence alteredEvidence
+          problems { seq type message }
+        }
+      }
+    }
+  }' --var project=payments --var branch=release-2.4 --var build=2.4.7 \
+  | jq -e '.builds[0].auditTrail.verification
+           | .chainIntact and .endorsementsValid
+             and (.missingEvidence | length) == 0
+             and (.alteredEvidence | length) == 0'
+```
+
+`jq -e` exits with a non-zero code when the expression is `false` — or `null`, for a build without
+trail. This verification trusts the server which runs it; to verify a trail **without** trusting
+it, export the trail and [verify it offline](#verifying-a-trail-offline).
+
 #### Daily verification
 
 A job verifies, **every day**, the trails of the builds which gained entries since its previous
@@ -758,10 +817,18 @@ endorsements and the public keys of the instance.
 
 * REST: `GET /rest/extension/audit-trail/builds/{buildId}/export`, downloaded as
   `audit-trail-<project>-<branch>-<build>.json`;
-* the *Export JSON* command of the audit trail page;
-* KDSL: `Build.exportTrail()`.
+* the *Export JSON* command of the audit trail page.
 
-It is available whatever the license, as long as the build has a trail.
+It is available whatever the license, as long as the build has a trail. From a script, with an
+[API token](../security/tokens.md), the ID of the build being given by the CLI:
+
+```bash
+BUILD_ID=$(yontrack build search --project payments --branch release-2.4 --name 2.4.7 --display-id)
+curl --fail-with-body \
+  -H "X-Ontrack-Token: $YONTRACK_TOKEN" \
+  -o audit-trail-payments-release-2.4-2.4.7.json \
+  "$YONTRACK_URL/rest/extension/audit-trail/builds/$BUILD_ID/export"
+```
 
 ```json
 {
@@ -887,7 +954,60 @@ The export carries its own keys, so it proves that it was not altered since it w
 by whom it was endorsed. To prove that it was endorsed by **your** instance, compare its keys with
 the ones the instance publishes (`GET /rest/extension/audit-trail/keys`), or with a copy you kept.
 
-To verify an export:
+#### With the CLI
+
+The [Yontrack CLI](https://github.com/yontrack/yontrack-cli), from version 6.0.0, verifies an
+export offline — it calls no Yontrack, so it trusts none:
+
+```bash
+yontrack audit-trail verify audit-trail-payments-release-2.4-2.4.7.json
+```
+
+It runs the [checks](#verification) on every entry — seq, hash of the
+[canonical JSON](#canonical-json) of its envelope, chain, first entry, and the Ed25519
+endorsements against the keys of the export — and prints a report. An intact trail:
+
+```
+Trail of build payments / release-2.4 / 2.4.7 (ID 1042), exported at 2026-10-02T09:00:00.000Z
+Entries:      3
+Keys:         06e3fd8fda29bb60 (Ed25519)
+Start:        complete, opened by build.created
+Chain:        intact
+Endorsements: valid
+The trail is intact.
+```
+
+A trail whose payload of seq 2 was edited after it was written:
+
+```
+Trail of build payments / release-2.4 / 2.4.7 (ID 1042), exported at 2026-10-02T09:00:00.000Z
+Entries:      3
+Keys:         06e3fd8fda29bb60 (Ed25519)
+Start:        complete, opened by build.created
+Chain:        broken at seq 2, verified up to seq 1
+Endorsements: valid
+Problems:
+  seq 2  HASH  The hash of the entry is not the hash of its content.
+Error: the trail is broken: its chain is broken at seq 2
+```
+
+Both are the exports of the [test vectors](#test-vectors). The command exits with a non-zero code
+when the chain is broken or an endorsement is invalid, so
+that a pipeline or an audit script stops on it. A [partial](#license) trail, and entries written in
+[unendorsed mode](#unendorsed-mode) — the `Unendorsed` line gives the first of them — are reported
+without failing.
+
+The CLI checks the keys **of the export**: comparing them with the keys of your instance is up to
+you, for example:
+
+```bash
+diff <(jq -r '.keys[].keyId' audit-trail-payments-release-2.4-2.4.7.json | sort) \
+     <(yontrack graphql --query '{ auditTrailKeys { keyId } }' | jq -r '.auditTrailKeys[].keyId' | sort)
+```
+
+#### By hand
+
+To verify an export with another implementation:
 
 1. parse it with a JSON parser which keeps integers as integers;
 2. keep the `keys` whose `algorithm` is `Ed25519` and whose `keyId` is the ID of their public key;
@@ -904,14 +1024,32 @@ echo -n "$SIGNATURE" | base64 -d > signature.bin
 openssl pkeyutl -verify -pubin -inkey key.pem -rawin -in hash.bin -sigfile signature.bin
 ```
 
+#### The files of an evidence archive
+
 To verify the files of an [evidence archive](#evidence-archive), verify its `audit-trail.json` as
 an export, then, for each `evidence.attached` entry which no `evidence.deleted` entry follows,
 compute the SHA-256 of the file which the manifest gives for its `payload.evidence.id`, and compare
-it with `payload.evidence.sha256`. The
-manifest's own `state` is what the server found: the trail, not the manifest, is what is signed.
+it with `payload.evidence.sha256`. The manifest's own `state` is what the server found: the trail,
+not the manifest, is what is signed.
 
-The offline verification command of the `yontrack` CLI is coming
-([yontrack/yontrack-cli#83](https://github.com/yontrack/yontrack-cli/issues/83)).
+The CLI verifies the trail; the files are checked against it with `jq` and `sha256sum`:
+
+```bash
+unzip -d archive audit-trail-payments-release-2.4-2.4.7.zip
+cd archive
+yontrack audit-trail verify audit-trail.json
+jq -r --slurpfile manifest manifest.json '
+  ($manifest[0].evidence | map({key: (.id | tostring), value: .path}) | from_entries) as $paths
+  | [.entries[] | select(.type == "evidence.deleted") | .payload.evidence.id] as $deleted
+  | .entries[] | select(.type == "evidence.attached") | .payload.evidence
+  | select(.id as $id | $deleted | index($id) | not)
+  | "\(.sha256)  \($paths[.id | tostring] // "missing-\(.id)")"
+' audit-trail.json | sha256sum -c -
+```
+
+`sha256sum` prints `OK` for each file which is what the trail recorded, `FAILED` for an altered
+one, and cannot open the file of a missing evidence; it exits with a non-zero code on either. On
+macOS, use `shasum -a 256 -c -`.
 
 ### Test vectors
 
@@ -931,19 +1069,22 @@ An implementation of the verification should pass all of them:
 
 ### API
 
-| Operation                         | REST                                                                    | GraphQL                                        |
-|-----------------------------------|-------------------------------------------------------------------------|------------------------------------------------|
-| Read the trail of a build         |                                                                         | `Build.auditTrail { entries endorsements }`    |
-| Verify it                         |                                                                         | `Build.auditTrail { verification(includeEvidence) }` |
-| Export it                         | `GET /rest/extension/audit-trail/builds/{buildId}/export`               |                                                |
-| Download its evidence archive     | `GET /rest/extension/audit-trail/builds/{buildId}/evidence-archive`     |                                                |
-| Public keys                       | `GET /rest/extension/audit-trail/keys`                                  | `auditTrailKeys`                               |
-| Evidence of a validation run      |                                                                         | `ValidationRun.evidence`                       |
-| Upload evidence                   | `POST /rest/extension/audit-trail/validation-runs/{validationRunId}/evidence` |                                          |
-| Download evidence                 | `GET /rest/extension/audit-trail/evidence/{evidenceId}/download`        |                                                |
-| Delete evidence                   | `DELETE /rest/extension/audit-trail/evidence/{evidenceId}`              | `deleteEvidence`                               |
-| State of the evidence storage     |                                                                         | `auditTrailStorageState`                       |
-| Status of the audit trail         |                                                                         | `auditTrailStatus` (global settings)           |
+| Operation                         | REST                                                                    | GraphQL                                        | CLI                                    |
+|-----------------------------------|-------------------------------------------------------------------------|------------------------------------------------|----------------------------------------|
+| Read the trail of a build         |                                                                         | `Build.auditTrail { entries endorsements }`    |                                        |
+| Verify it                         |                                                                         | `Build.auditTrail { verification(includeEvidence) }` |                                  |
+| Verify an export, offline         |                                                                         |                                                | `yontrack audit-trail verify <file>`   |
+| Export it                         | `GET /rest/extension/audit-trail/builds/{buildId}/export`               |                                                |                                        |
+| Download its evidence archive     | `GET /rest/extension/audit-trail/builds/{buildId}/evidence-archive`     |                                                |                                        |
+| Public keys                       | `GET /rest/extension/audit-trail/keys`                                  | `auditTrailKeys`                               |                                        |
+| Evidence of a validation run      |                                                                         | `ValidationRun.evidence`                       |                                        |
+| Upload evidence                   | `POST /rest/extension/audit-trail/validation-runs/{validationRunId}/evidence` |                                          | `yontrack validate … --evidence <file>` |
+| Download evidence                 | `GET /rest/extension/audit-trail/evidence/{evidenceId}/download`        |                                                |                                        |
+| Delete evidence                   | `DELETE /rest/extension/audit-trail/evidence/{evidenceId}`              | `deleteEvidence`                               |                                        |
+| State of the evidence storage     |                                                                         | `auditTrailStorageState`                       |                                        |
+| Status of the audit trail         |                                                                         | `auditTrailStatus` (global settings)           |                                        |
+
+The GraphQL queries are run from the CLI by `yontrack graphql`, as in [Verification](#verification).
 
 ### Events and metrics
 
@@ -982,21 +1123,3 @@ so to every user, whatever the license: *This instance allows trail tampering fo
 its trails prove nothing.*
 
 The switch is off by default. While it is off, the endpoint does not exist: it answers `404`.
-
-## Release note for 6.0
-
-Yontrack's release notes are written in its wiki. This is the paragraph they carry for the audit
-trail:
-
-> **Audit trail and evidence** (licensed, `extension.audit-trail`). Yontrack 6.0 records the story
-> of every build — creation, properties, links, validations, promotions, run info, deployments — in
-> an append-only trail, hash-chained and signed with an Ed25519 key of the instance, written in the
-> same transaction as each change, with the actor who made it (account, API token name, JWT issuer
-> and subject, or the system and its reason). Validation runs carry evidence — reports, SBOMs,
-> screenshots — stored in an S3-compatible bucket and recorded by their SHA-256. A trail is
-> verified in the UI, through the API and daily, and exported as JSON to be verified offline; the
-> evidence of a build is downloaded at once, with its trail, as a ZIP archive.
-> What 6.0 gives is **integrity and origin**: this Yontrack produced this history, and it was not
-> rewritten. It does **not** give third-party proof of time (no TSA), sealing, retention
-> independent of the builds (a trail goes with its build), detection of the periods during which
-> the license was off, CI OIDC federation, nor Object Lock on DigitalOcean Spaces.
