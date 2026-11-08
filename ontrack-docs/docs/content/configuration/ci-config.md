@@ -24,7 +24,7 @@ configuration:
           tests: { }
         UI_UNIT:
           tests: { }
-        API.ACCEPTANCE:
+        KDSL.ACCEPTANCE:
           tests: { }
         PLAYWRIGHT:
           tests: { }
@@ -33,7 +33,7 @@ configuration:
           validations:
             - BUILD
             - UI_UNIT
-            - API.ACCEPTANCE
+            - KDSL.ACCEPTANCE
             - PLAYWRIGHT
         RELEASE:
           promotions:
@@ -697,7 +697,7 @@ validations:
     tests: { }
   UI_UNIT:
     tests: { }
-  API.ACCEPTANCE:
+  KDSL.ACCEPTANCE:
     tests: { }
   PLAYWRIGHT:
     tests: { }
@@ -706,7 +706,7 @@ promotions:
     validations:
       - BUILD
       - UI_UNIT
-      - API.ACCEPTANCE
+      - KDSL.ACCEPTANCE
       - PLAYWRIGHT
   RELEASE:
     promotions:
