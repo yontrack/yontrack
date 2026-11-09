@@ -8,7 +8,7 @@ dependencies {
     api("org.springframework.boot:spring-boot-starter-webmvc")
     api("org.springframework.boot:spring-boot-restclient")
 
-    implementation("com.apollographql.apollo:apollo-runtime:4.1.1")
+    implementation("com.apollographql.apollo:apollo-runtime:5.2.0")
     implementation("org.apache.httpcomponents.client5:httpclient5")
     implementation("org.apache.httpcomponents.core5:httpcore5")
 }
