@@ -82,9 +82,21 @@ class AutoVersioningProcessingServiceImpl(
         return outcome
     }
 
+    private fun isSourcePromotionRunDeleted(order: AutoVersioningOrder): Boolean =
+        order.sourcePromotionRunId?.let {
+            structureService.findPromotionRunByID(ID.of(it)) == null
+        } ?: false
+
     private fun processOrder(order: AutoVersioningOrder, automaticRetries: Boolean): AutoVersioningProcessingOutcome {
         logger.debug("Processing auto versioning order: {}", order)
         autoVersioningAuditService.onProcessingStart(order)
+        // The promotion which triggered the order may have been revoked while the order was waiting
+        // (for its schedule, or in the queue): the version must not be propagated any longer
+        if (isSourcePromotionRunDeleted(order)) {
+            logger.debug("Processing auto versioning order source promotion run deleted: {}", order)
+            autoVersioningAuditService.onProcessingAborted(order, SOURCE_PROMOTION_RUN_DELETED)
+            return AutoVersioningProcessingOutcome.SOURCE_REVOKED
+        }
         val branch = order.branch
         // Source build
         val sourceBuild: Build? by lazy {
@@ -599,5 +611,12 @@ class AutoVersioningProcessingServiceImpl(
 
     private val AutoVersioningSourceConfigPath.filePropertyType: FilePropertyType
         get() = autoVersioningTargetFileService.getFilePropertyType(this)
+
+    companion object {
+        /**
+         * Audit message of an order aborted because its source promotion run has been deleted.
+         */
+        const val SOURCE_PROMOTION_RUN_DELETED = "Source promotion run has been deleted"
+    }
 
 }

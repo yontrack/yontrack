@@ -72,7 +72,9 @@ section.
 5. **The order is processed**: an [upgrade branch](#the-upgrade-branch) is created, the
    [target files are updated](#updating-the-target-files), and [post-processing](#post-processing) runs if configured.
    If the version in the target files is already the expected one, the process is aborted at this point without any
-   change.
+   change. So is it when the promotion which triggered the order has been deleted in the meantime — by hand, or
+   [revoked automatically](../../concepts/model/auto-promotion.md#revoking-a-promotion) — while the order was waiting to be
+   processed: the audit entry ends in the `PROCESSING_ABORTED` state, and no upgrade branch is created.
 6. **The change lands** on the target branch, either through a [pull request](#pull-requests) or by a direct
    [push](#push-mode).
 7. **Side effects** are applied: [build link](#build-links) creation,
@@ -950,6 +952,10 @@ one auto-versioning request still active, it is processed.
 
     The cron expression is a Spring 6-field expression (seconds, minutes, hours, day of month, month, day of week) and
     is always evaluated in the UTC time zone.
+
+    If the promotion which triggered a waiting request is deleted or
+    [revoked](../../concepts/model/auto-promotion.md#revoking-a-promotion) before the schedule is reached, the request
+    is aborted when it is picked up: its audit entry ends in the `PROCESSING_ABORTED` state, without any upgrade branch.
 
     A background job picks up the due requests; its own frequency is set by the
     `ontrack.extension.auto-versioning.scheduling.cron` [configuration property](../../generated/configurations/net.nemerosa.ontrack.extension.av.AutoVersioningConfigProperties.md)

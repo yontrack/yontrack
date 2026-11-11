@@ -36,4 +36,10 @@ enum class AutoVersioningProcessingOutcome(
      */
     NO_CONFIG("Auto-versioning process not started because missing configuration"),
 
+    /**
+     * The order was not processed because the promotion run which triggered it has been deleted
+     * in the meantime (typically revoked by the auto promotion's `autoRevoke`).
+     */
+    SOURCE_REVOKED("Auto-versioning process not started because the source promotion run has been deleted"),
+
 }

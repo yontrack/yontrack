@@ -116,6 +116,7 @@ object AutoVersioningTestFixtures {
         cronSchedule: String? = null,
         disabled: Boolean? = null,
         pushMode: AutoVersioningPushMode? = AutoVersioningPushMode.PR,
+        prTitleTemplate: String? = null,
     ) = AutoVersioningSourceConfig(
         sourceProject = sourceProject,
         sourceBranch = sourceBranch,
@@ -136,7 +137,7 @@ object AutoVersioningTestFixtures {
         notifications = notifications,
         qualifier = null,
         reviewers = null,
-        prTitleTemplate = null,
+        prTitleTemplate = prTitleTemplate,
         prBodyTemplate = null,
         prBodyTemplateFormat = null,
         additionalPaths = null,

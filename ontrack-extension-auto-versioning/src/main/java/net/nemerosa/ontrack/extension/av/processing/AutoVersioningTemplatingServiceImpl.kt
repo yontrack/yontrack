@@ -41,9 +41,10 @@ class AutoVersioningTemplatingServiceImpl(
             }
         }
 
+        // The source promotion run may have been deleted (revoked) since the order was created
         val sourcePromotionRun: PromotionRun? by lazy {
             order.sourcePromotionRunId?.let {
-                structureService.getPromotionRun(ID.of(it))
+                structureService.findPromotionRunByID(ID.of(it))
             }
         }
 

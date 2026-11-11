@@ -152,6 +152,7 @@ abstract class AbstractAutoVersioningTestSupport : AbstractQLKTITSupport() {
 
     protected fun withSimpleSetup(
         cronSchedule: String? = null,
+        prTitleTemplate: String? = null,
         code: (
             pl: PromotionLevel,
             target: Branch,
@@ -189,6 +190,7 @@ abstract class AbstractAutoVersioningTestSupport : AbstractQLKTITSupport() {
                                                     targetPath = "target.properties",
                                                     targetProperty = "version",
                                                     cronSchedule = cronSchedule,
+                                                    prTitleTemplate = prTitleTemplate,
                                                 )
                                             )
                                         )
