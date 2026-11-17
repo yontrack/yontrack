@@ -63,7 +63,11 @@ export default function ConfigurationDialog({configurationDialog}) {
 
     const onTestConfig = async () => {
         setConnectionResult(undefined)
-        const connectionResult = await testConfig(configurationDialog.form.getFieldsValue(true), configurationDialog.configurationType)
+        // All the values of the form, the ones of the fields not shown included, but the
+        // extra data of the listed configuration, which is no field of the configuration
+        const data = {...configurationDialog.form.getFieldsValue(true)}
+        delete data.extra
+        const connectionResult = await testConfig(data, configurationDialog.configurationType)
         setConnectionResult(connectionResult)
     }
 

@@ -262,6 +262,8 @@ const DESCRIPTIONS = [
     [/^\/extension\/scm\/[^/]+\/issue-info\//, 'an issue'],
     [/^\/extension\/environments\//, 'an environment'],
     [/^\/extension\/auto-versioning\//, 'auto-versioning'],
+    // No HTTP configurations in the mobile UI: an admin page, desktop-only (#2151)
+    [/^\/extension\/notifications\/http\/configurations$/, 'the HTTP configurations'],
     [/^\/extension\/notifications\//, 'notifications'],
     [/^\/extension\/workflows\//, 'a workflow'],
     // No findings in the mobile UI in 6.0 (#1864)

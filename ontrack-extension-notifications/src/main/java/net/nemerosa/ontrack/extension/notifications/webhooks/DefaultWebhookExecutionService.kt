@@ -136,18 +136,11 @@ class DefaultWebhookExecutionService(
     }
 
     private fun authenticate(webhook: Webhook, builder: HttpRequest.Builder) {
-        val authenticator = webhookAuthenticatorRegistry.findWebhookAuthenticator(webhook.authentication.type)
+        webhookAuthenticatorRegistry.findWebhookAuthenticator(webhook.authentication.type)
             ?: throw WebhookAuthenticatorNotFoundException(webhook.authentication.type)
-        authenticate(webhook, authenticator, builder)
-    }
-
-    private fun <C> authenticate(
-        webhook: Webhook,
-        authenticator: WebhookAuthenticator<C>,
-        builder: HttpRequest.Builder,
-    ) {
-        val config = authenticator.validateConfig(webhook.authentication.config)
-        authenticator.authenticate(config, builder)
+        webhook.authentication.headers().forEach { (name, value) ->
+            builder.header(name, value)
+        }
     }
 
 }

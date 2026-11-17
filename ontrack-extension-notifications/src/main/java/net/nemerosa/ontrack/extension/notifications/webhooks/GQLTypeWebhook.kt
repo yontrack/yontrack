@@ -54,9 +54,9 @@ class GQLTypeWebhook(
                 "authenticationConfig",
                 "Configuration for the webhook authentication"
             ) { webhook, _ ->
-                val authenticator = webhookAuthenticatorRegistry.findWebhookAuthenticator(webhook.authentication.type)
+                webhookAuthenticatorRegistry.findWebhookAuthenticator(webhook.authentication.type)
                     ?: throw WebhookAuthenticatorNotFoundException(webhook.authentication.type)
-                authenticator.obfuscateJson(webhook.authentication.config)
+                webhook.authentication.obfuscate().config
             }
             .field(
                 gqlPaginatedListFactory.createPaginatedField<Webhook, WebhookExchange>(

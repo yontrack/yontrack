@@ -1,16 +1,18 @@
 package net.nemerosa.ontrack.extension.notifications.webhooks
 
+import net.nemerosa.ontrack.extension.notifications.http.auth.HttpAuthenticator
+import net.nemerosa.ontrack.extension.notifications.http.auth.HttpAuthenticators
+import net.nemerosa.ontrack.extension.notifications.http.auth.NoneHttpAuthenticator
 import org.springframework.stereotype.Component
 
 @Component
-class DefaultWebhookAuthenticatorRegistry(
-    webhookAuthenticators: List<WebhookAuthenticator<*>>,
-) : WebhookAuthenticatorRegistry {
+class DefaultWebhookAuthenticatorRegistry : WebhookAuthenticatorRegistry {
 
-    private val index = webhookAuthenticators.associateBy { it.type }
+    override val authenticators: List<HttpAuthenticator<*>> =
+        HttpAuthenticators.authenticators.filter { it.type != NoneHttpAuthenticator.TYPE }
 
-    override val authenticators: List<WebhookAuthenticator<*>> = index.values.sortedBy { it.type }
+    private val index = authenticators.associateBy { it.type }
 
-    override fun findWebhookAuthenticator(type: String): WebhookAuthenticator<*>? = index[type]
+    override fun findWebhookAuthenticator(type: String): HttpAuthenticator<*>? = index[type]
 
 }

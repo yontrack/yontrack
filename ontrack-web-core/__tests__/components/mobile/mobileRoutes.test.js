@@ -113,6 +113,13 @@ describe('mobileEquivalent', () => {
         expect(describeDesktopRoute('/extension/scorecard/project/12')).toEqual("a project's scorecard")
     })
 
+    it('leaves the HTTP configurations admin page desktop-only', () => {
+        // #2151: the mobile UI manages no configuration
+        expect(mobileEquivalent('/extension/notifications/http/configurations')).toBeNull()
+        expect(isRedirectExempt('/extension/notifications/http/configurations')).toBe(false)
+        expect(describeDesktopRoute('/extension/notifications/http/configurations')).toEqual('the HTTP configurations')
+    })
+
     it('leaves the estates admin page desktop-only', () => {
         // #1905: no estates in the mobile UI in 6.x. The admin page reaches the
         // interstitial, under a name a user can read.

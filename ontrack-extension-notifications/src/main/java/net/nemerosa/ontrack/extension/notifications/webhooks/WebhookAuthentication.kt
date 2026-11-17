@@ -1,8 +1,9 @@
 package net.nemerosa.ontrack.extension.notifications.webhooks
 
-import tools.jackson.databind.JsonNode
+import net.nemerosa.ontrack.extension.notifications.http.auth.HttpAuthentication
 
-data class WebhookAuthentication(
-    val type: String,
-    val config: JsonNode,
-)
+/**
+ * A webhook is authenticated the way any HTTP call is, with the types of [HttpAuthentication]
+ * but `none`.
+ */
+typealias WebhookAuthentication = HttpAuthentication

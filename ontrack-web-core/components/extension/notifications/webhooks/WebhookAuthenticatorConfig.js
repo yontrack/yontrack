@@ -4,7 +4,7 @@ export default function WebhookAuthenticatorConfig({authenticationType, prefix, 
     return (
         <>
             <Dynamic
-                path={`framework/webhook-authenticator/${authenticationType}/Form.js`}
+                path={`framework/http-authenticator/${authenticationType}/Form.js`}
                 props={{prefix, creation}}
             />
         </>

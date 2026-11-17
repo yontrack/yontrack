@@ -3460,6 +3460,14 @@ type HookResponse {
   type: HookResponseType!
 }
 
+"Authentication type of an HTTP configuration"
+type HttpAuthenticator {
+  "Authentication display name"
+  displayName: String!
+  "Authentication type"
+  type: String!
+}
+
 "Application information"
 type Info {
   "Version information"
@@ -6686,6 +6694,8 @@ type Query {
     "Size of the page"
     size: Int = 20
   ): HookRecordingPaginated
+  "List of the authentication types of an HTTP configuration"
+  httpAuthenticators: [HttpAuthenticator!]!
   "Gets information about the application"
   info: Info
   "List of issue services"
@@ -9648,9 +9658,9 @@ type Webhook {
 
 "Webhook authenticator"
 type WebhookAuthenticator {
-  "Webhook authentication display name"
+  "Authentication display name"
   displayName: String!
-  "Webhook authentication identifier"
+  "Authentication type"
   type: String!
 }
 

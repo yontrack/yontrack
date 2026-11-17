@@ -4,7 +4,7 @@ export default function WebhookAuthenticatorSummary({authenticationType}) {
     return (
         <>
             <Dynamic
-                path={`framework/webhook-authenticator/${authenticationType}/Summary.js`}
+                path={`framework/http-authenticator/${authenticationType}/Summary.js`}
                 props={{}}
             />
         </>

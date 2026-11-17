@@ -92,6 +92,7 @@ nav:
   - Automation:
       - Notifications:
           - Overview: content/integrations/notifications/index.md
+          - HTTP configurations: content/integrations/notifications/http-configuration.md
           - Jenkins: content/integrations/notifications/jenkins.md
           - GitHub Workflows: content/integrations/notifications/github-workflow.md
           - Bitbucket Pipelines: content/integrations/notifications/bitbucket-pipelines.md

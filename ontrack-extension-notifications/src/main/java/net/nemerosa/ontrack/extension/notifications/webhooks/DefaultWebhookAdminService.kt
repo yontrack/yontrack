@@ -1,7 +1,6 @@
 package net.nemerosa.ontrack.extension.notifications.webhooks
 
 import tools.jackson.databind.node.NullNode
-import net.nemerosa.ontrack.json.asJson
 import net.nemerosa.ontrack.json.format
 import net.nemerosa.ontrack.json.parseAsJson
 import net.nemerosa.ontrack.model.security.EncryptionService
@@ -79,17 +78,7 @@ class DefaultWebhookAdminService(
                 ?: throw WebhookAuthenticatorNotFoundException(authentication.type)
             authenticator.validateConfig(authentication.config)
             // Reusing existing authentication
-            if (authentication.type == existing.authentication.type) {
-                WebhookAuthentication(
-                    type = authentication.type,
-                    config = authenticator.merge(
-                        input = authentication.config,
-                        existing = existing.authentication.config
-                    ).asJson(),
-                )
-            } else {
-                authentication
-            }
+            authentication.merge(existing.authentication)
         } else {
             existing.authentication
         }
