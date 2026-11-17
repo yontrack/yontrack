@@ -77,8 +77,8 @@ of the last response.
 
 In a workflow, the next nodes can use the response through the
 [`workflow`](../../generated/templating/renderables/templating-renderable-workflow.md) templating
-function, for example `${workflow.deploy?path=body.id}` for a node named `deploy`. Only text
-values can be used this way.
+function, under the `result` of the node, for example `${workflow.deploy?path=result.body.id}` for a
+node named `deploy`. Only text values can be used this way.
 
 ## Waiting for a condition
 
@@ -222,6 +222,49 @@ The [`webhook`](../../generated/notifications/notification-backend-webhook.md) c
 events of Yontrack to a listener: it always sends the event, and does not look at the answer. The
 `http` channel calls an API as a step of the delivery: you choose what is sent, and the notification
 fails when the API does.
+
+## Testing with the mock deployment API
+
+To try the channel, or a workflow built on it, without any real deployment tool, Yontrack has a **mock
+deployment API**. It is a testing aid, disabled by default: enable it only on a demonstration or test
+instance, with the `ontrack.config.extension.notifications.http.mock.enabled` property (the
+`ONTRACK_CONFIG_EXTENSION_NOTIFICATIONS_HTTP_MOCK_ENABLED` environment variable). The `dev` profile
+enables it. When it is disabled, its paths answer `404` to an authenticated caller.
+
+It lives under `/extension/notifications/http/mock` on the backend of Yontrack, and is called like any
+other API of Yontrack, with an authentication: a `header` authentication named `X-Ontrack-Token`, whose
+value is an API token, for example. Point an [HTTP configuration](http-configuration.md) at it, with
+the base URL under which the backend reaches **itself**, which may differ from the URL of the UI, for
+example `http://localhost:8080/extension/notifications/http/mock`.
+
+* `POST /deployments` starts a deployment and answers `201`, with its `Location` and the deployment,
+  `{"id": "...", "status": "RUNNING", ...}`. The body is optional. It may give the `outcome` of the
+  deployment, `SUCCEEDED` (the default) or `FAILED`, and its `durationSeconds`, 5 by default, at most
+  3600. Anything else in the body is ignored.
+* `GET /deployments/{id}` returns the deployment: `RUNNING` until its duration has elapsed, then
+  `SUCCEEDED`, or `FAILED` when it was asked for. An unknown id answers `404`.
+
+It keeps nothing: the creation time, the duration and the outcome of a deployment are written in its id,
+so that it works with several replicas, and across restarts.
+
+{% raw %}
+```yaml
+channel: http
+channelConfig:
+  config: mock-deployments
+  method: POST
+  path: /deployments
+  body:
+    version: "${build}"
+    outcome: SUCCEEDED
+    durationSeconds: 10
+  successCondition: "response.body.status == 'SUCCEEDED'"
+  failureCondition: "response.body.status == 'FAILED'"
+  statusUrl: "response.headers['location']"
+  intervalSeconds: 5
+  timeoutSeconds: 60
+```
+{% endraw %}
 
 ## Configuration as Code
 

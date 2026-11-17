@@ -18,6 +18,13 @@ ontrack:
           # demo seed. It is off by default everywhere else and must be switched on explicitly -
           # see JenkinsExtensionConfigProperties.MockJenkinsConfigProperties.
           enabled: true
+      notifications:
+        http:
+          mock:
+            # The mock deployment API, called by the `http` channel in the KDSL acceptance tests
+            # and in the demo seed. It is off by default everywhere else and must be switched on
+            # explicitly - see NotificationsConfigProperties.HttpMockProperties.
+            enabled: true
       workflows:
         mock:
           # The "Simulated gate" node executor, used by the integration and KDSL acceptance
