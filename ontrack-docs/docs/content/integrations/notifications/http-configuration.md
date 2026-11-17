@@ -82,3 +82,29 @@ ontrack:
 
 The list is the complete list of the HTTP configurations: a configuration which is not in it is
 deleted. When the CasC is rendered, the secrets are left blank.
+
+## HTTP notifications settings
+
+Global limits apply to every HTTP call. As an administrator, open the user menu, choose _System_ >
+_Settings_, then select _HTTP notifications_:
+
+| Setting                 | Default | Meaning                                                                       |
+|-------------------------|---------|-------------------------------------------------------------------------------|
+| `maxTimeoutSeconds`     | 3600    | Maximum timeout, in seconds, which a subscription may set on an HTTP call     |
+| `maxResponseBytes`      | 65536   | Maximum size, in bytes, of a response body read: a longer body is truncated   |
+| `requestTimeoutSeconds` | 30      | Timeout, in seconds, of a single request: both its connection and its reading |
+
+All of them must be strictly positive. There is no switch to turn the HTTP calls off: without any
+HTTP configuration, no call can be made.
+
+In Configuration as Code, they are under `ontrack.config.settings.http-notifications`:
+
+```yaml
+ontrack:
+  config:
+    settings:
+      http-notifications:
+        maxTimeoutSeconds: 3600
+        maxResponseBytes: 65536
+        requestTimeoutSeconds: 30
+```
