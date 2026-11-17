@@ -256,7 +256,8 @@ class ACCHttpNotifications : AbstractACCDSLWorkflowsTestSupport() {
 
     /**
      * HTTP configuration on the mock deployment API of the instance, as the backend reaches itself,
-     * authenticated with the token of the tests.
+     * authenticated with the token of the tests. The mock answers without any authentication (#2156) -
+     * the demo's configuration has none - and the header keeps a credentialed configuration exercised.
      */
     private fun mockHttpConfiguration(): HttpConfiguration {
         val config = HttpConfiguration(

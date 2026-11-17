@@ -14,13 +14,23 @@ import kotlin.test.assertTrue
 class MockDeploymentEnablementTest {
 
     private val runner = ApplicationContextRunner()
-        .withUserConfiguration(MockDeploymentController::class.java)
+        .withUserConfiguration(MockDeploymentController::class.java, GQLRootQueryHttpMockDeploymentsUrl::class.java)
 
     @Test
     fun `off by default`() {
         runner.run { context ->
             assertFalse(context.containsBean("mockDeploymentController"))
+            assertTrue(context.getBeansOfType(GQLRootQueryHttpMockDeploymentsUrl::class.java).isEmpty())
         }
+    }
+
+    @Test
+    fun `the query telling where it is comes with it`() {
+        runner
+            .withPropertyValues("ontrack.config.extension.notifications.http.mock.enabled=true")
+            .run { context ->
+                assertTrue(context.getBeansOfType(GQLRootQueryHttpMockDeploymentsUrl::class.java).isNotEmpty())
+            }
     }
 
     @Test

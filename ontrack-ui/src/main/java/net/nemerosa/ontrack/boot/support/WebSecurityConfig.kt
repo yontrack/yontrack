@@ -4,11 +4,13 @@ import net.nemerosa.ontrack.model.support.OntrackConfigProperties
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.boot.security.autoconfigure.actuate.web.servlet.EndpointRequest
 import org.springframework.boot.actuate.endpoint.web.WebServerNamespace
 import org.springframework.boot.web.server.context.WebServerApplicationContext
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
+import org.springframework.core.annotation.Order
 import org.springframework.security.config.annotation.web.builders.HttpSecurity
 import org.springframework.security.config.annotation.web.invoke
 import org.springframework.security.config.http.SessionCreationPolicy
@@ -60,6 +62,33 @@ class WebSecurityConfig(
     }
 
     /**
+     * The mock deployment API answers without any authentication, and only where it is enabled
+     * (`ontrack.config.extension.notifications.http.mock.enabled`, see `MockDeploymentController` in
+     * `ontrack-extension-notifications`): its callers are the `http` channel of this very instance,
+     * under an HTTP configuration whose authentication is `none` - the demo's - and the tests.
+     *
+     * It reads nothing and writes nothing (a deployment is all in its id), so letting anonymous calls
+     * in costs nothing; but only its own paths: the chain matches nothing else. Where the mock is
+     * disabled, the chain does not exist, and its paths are refused like any unknown path of the API.
+     *
+     * Before the API chain, which matches any request.
+     */
+    @Bean
+    @Order(MOCK_DEPLOYMENT_ORDER)
+    @ConditionalOnProperty(name = [HTTP_MOCK_ENABLED], havingValue = "true", matchIfMissing = false)
+    fun mockDeploymentWebSecurity(http: HttpSecurity): SecurityFilterChain {
+        http {
+            securityMatcher("$HTTP_MOCK_PATH/**")
+            authorizeHttpRequests {
+                authorize(anyRequest, permitAll)
+            }
+            csrf { disable() }
+            sessionManagement { sessionCreationPolicy = SessionCreationPolicy.STATELESS }
+        }
+        return http.build()
+    }
+
+    /**
      * API login
      */
     @Bean
@@ -95,6 +124,24 @@ class WebSecurityConfig(
         val typ = ontrackConfigProperties.security.authorization.jwt.typ.trim()
         logger.info("Using a custom JWT `typ`: $typ")
         return JwtTypeValidator(typ)
+    }
+
+    companion object {
+        /**
+         * Same as `NotificationsConfigProperties.HTTP_MOCK_ENABLED`, which this module does not
+         * compile against.
+         */
+        const val HTTP_MOCK_ENABLED = "ontrack.config.extension.notifications.http.mock.enabled"
+
+        /**
+         * Same as `MockDeploymentController.PATH`.
+         */
+        const val HTTP_MOCK_PATH = "/extension/notifications/http/mock"
+
+        /**
+         * Before the API chain, which has no order and matches any request.
+         */
+        const val MOCK_DEPLOYMENT_ORDER = 10
     }
 
 }

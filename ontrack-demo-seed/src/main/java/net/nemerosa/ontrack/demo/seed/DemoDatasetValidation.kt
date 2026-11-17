@@ -88,6 +88,16 @@ fun DemoDataset.validate() {
     // a branch doing that has no stable order to check in the first place.
     val reference = LocalDateTime.of(2000, 1, 1, 0, 0)
 
+    // HTTP configurations before the projects: the `http` subscriptions of their promotion levels name
+    // them, and the server refuses a subscription naming a configuration which does not exist
+    val httpConfigurationNames = mutableSetOf<String>()
+    httpConfigurations.forEach { configuration ->
+        checkName(configuration.name, "HTTP configuration")
+        if (!httpConfigurationNames.add(configuration.name)) {
+            problems += "The dataset declares the HTTP configuration ${configuration.name} twice."
+        }
+    }
+
     projects.forEach { project ->
         checkName(project.name, "Project")
         // A label naming nothing is a typo here for the same reason a promotion dependency is:
@@ -243,6 +253,21 @@ fun DemoDataset.validate() {
                 }
                 workflow.promotions.filter { it !in levelNames }.forEach { promotion ->
                     problems += "$where promotes to $promotion, which the branch does not declare."
+                }
+            }
+            // The checks of the `http` channel as the subscription is saved, after the reset
+            branch.promotionLevels.forEach { promotionLevel ->
+                promotionLevel.httpCalls.groupingBy { it.name }.eachCount().filterValues { it > 1 }.keys.forEach { name ->
+                    problems += "Promotion level ${promotionLevel.name} of ${project.name}/${branch.name} " +
+                            "declares the HTTP call $name twice."
+                }
+                promotionLevel.httpCalls.forEach { call ->
+                    checkHttpCall(
+                        call = call,
+                        where = "The HTTP call ${call.name} of ${promotionLevel.name} of ${project.name}/${branch.name}",
+                        httpConfigurationNames = httpConfigurationNames,
+                        problems = problems,
+                    )
                 }
             }
             branch.builds.forEach { build ->
@@ -720,6 +745,40 @@ fun DemoDataset.validate() {
     require(problems.isEmpty()) {
         "The demo dataset is not valid, and nothing was deleted:\n" +
                 problems.joinToString("\n") { "- $it" }
+    }
+}
+
+/**
+ * What the `http` channel checks of its configuration as a subscription is saved - `HttpNotificationChannel`
+ * on the server side - and what the seed needs of a call to wait for it.
+ */
+private fun checkHttpCall(
+    call: HttpCallSpec,
+    where: String,
+    httpConfigurationNames: Set<String>,
+    problems: MutableList<String>,
+) {
+    if (call.config !in httpConfigurationNames) {
+        problems += "$where names the HTTP configuration ${call.config}, which the dataset does not declare."
+    }
+    if (call.method !in HttpCallSpec.METHODS) {
+        problems += "$where is a ${call.method}; the channel calls with ${HttpCallSpec.METHODS.joinToString(", ")}."
+    }
+    if (call.method == "GET" && call.body != null) {
+        problems += "$where sends a body with a GET."
+    }
+    if (call.method == "GET" && call.statusUrl != null) {
+        problems += "$where has a status URL on a GET, which polls its own URL."
+    }
+    if ((call.statusUrl != null || call.failureCondition != null) && call.successCondition.isNullOrBlank()) {
+        problems += "$where has a status URL or a failure condition, and no success condition to wait for."
+    }
+    if (call.intervalSeconds < HttpCallSpec.MIN_INTERVAL_SECONDS) {
+        problems += "$where polls every ${call.intervalSeconds} s; the channel polls every " +
+                "${HttpCallSpec.MIN_INTERVAL_SECONDS} s at least."
+    }
+    if (call.timeoutSeconds < call.intervalSeconds) {
+        problems += "$where times out after ${call.timeoutSeconds} s, before its first poll."
     }
 }
 

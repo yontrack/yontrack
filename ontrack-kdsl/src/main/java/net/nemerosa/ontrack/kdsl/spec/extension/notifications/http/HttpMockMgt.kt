@@ -3,12 +3,25 @@ package net.nemerosa.ontrack.kdsl.spec.extension.notifications.http
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import net.nemerosa.ontrack.kdsl.connector.Connected
 import net.nemerosa.ontrack.kdsl.connector.Connector
+import net.nemerosa.ontrack.kdsl.connector.graphql.schema.HttpMockDeploymentsUrlQuery
+import net.nemerosa.ontrack.kdsl.connector.graphqlConnector
 import net.nemerosa.ontrack.kdsl.connector.parseOrNull
 
 /**
  * Mock deployment API of an instance, the target of the `http` channel in the tests and in the demo.
  */
 class HttpMockMgt(connector: Connector) : Connected(connector) {
+
+    /**
+     * Base URL under which the backend reaches its own mock deployment API, for an HTTP configuration
+     * calling it from the instance. Asked over GraphQL, which an ingress routes to the backend.
+     *
+     * @throws net.nemerosa.ontrack.kdsl.connector.graphql.GraphQLClientException When the mock
+     * deployment API is not enabled on the instance: the query does not exist there
+     */
+    val url: String
+        get() = graphqlConnector.query(HttpMockDeploymentsUrlQuery())?.httpMockDeploymentsUrl
+            ?: error("The instance did not tell where its mock deployment API is")
 
     /**
      * Starts a deployment.

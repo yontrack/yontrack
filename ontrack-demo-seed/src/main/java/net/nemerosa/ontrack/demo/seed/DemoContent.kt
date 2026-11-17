@@ -94,6 +94,18 @@ object DemoContent {
      */
     const val CANARY_JENKINS = "demo-jenkins"
 
+    /**
+     * The HTTP configuration the [GOLD] promotions of [SERVICE] start their deployments through: the
+     * mock deployment API of the instance itself, without authentication (#2156).
+     */
+    const val DEPLOYMENTS_CONFIG = "demo-deployments"
+
+    /**
+     * How long a deployment the [GOLD] promotions of [SERVICE] start runs on the mock deployment API:
+     * long enough for the call to poll it a few times before it is over, short enough for the reset.
+     */
+    const val DEPLOYMENT_SECONDS = 12
+
     const val BUILD = "BUILD"
     const val UNIT_TESTS = "UNIT.TESTS"
     const val INTEGRATION_TESTS = "INTEGRATION.TESTS"
@@ -360,6 +372,7 @@ object DemoContent {
         dashboard = dashboard(),
         estates = estates(),
         agents = agents(),
+        httpConfigurations = listOf(HttpConfigurationSpec(DEPLOYMENTS_CONFIG)),
     )
 
     /**
@@ -576,6 +589,38 @@ object DemoContent {
     private val goldAfterSilver = gold.copy(dependsOn = listOf(SILVER))
 
     /**
+     * GOLD on the main branch of [SERVICE], where a human approving the build for release starts its
+     * deployment (#2156): an `http` call POSTs a deployment of the build to the mock deployment API of
+     * the instance ([DEPLOYMENTS_CONFIG]), and polls the `Location` it answers with until the deployment
+     * is over. The record of each GOLD promotion shows the call and its attempts - the POST and three
+     * polls, a deployment running [DEPLOYMENT_SECONDS] seconds polled every five.
+     *
+     * On the main branch only: the maintenance branch's GOLD promotions are of builds nobody deploys
+     * any more, and the reset waits for every call the dataset makes.
+     */
+    private val goldDeploys = goldAfterSilver.copy(
+        httpCalls = listOf(
+            HttpCallSpec(
+                name = "deploy",
+                config = DEPLOYMENTS_CONFIG,
+                method = "POST",
+                path = "/deployments",
+                body = mapOf(
+                    "project" to "\${project}",
+                    "build" to "\${build}",
+                    "promotion" to "\${promotionLevel}",
+                    "durationSeconds" to DEPLOYMENT_SECONDS,
+                ).asJson(),
+                statusUrl = "response.headers['location']",
+                successCondition = "response.body.status == 'SUCCEEDED'",
+                failureCondition = "response.body.status == 'FAILED'",
+                intervalSeconds = 5,
+                timeoutSeconds = 120,
+            ),
+        ),
+    )
+
+    /**
      * The map's third source of a *requires*, on [LIBRARY] alone: SILVER cannot be granted before
      * BRONZE, and nothing on SILVER names BRONZE to say so.
      *
@@ -772,7 +817,8 @@ object DemoContent {
                 description = "Main development branch.",
                 scmBranch = SCM_MAIN,
                 favourite = true,
-                promotionLevels = fullPromotions + canaryPass + releasable,
+                // The full ladder, its GOLD starting a deployment
+                promotionLevels = listOf(bronze, silverAuto, goldDeploys, canaryPass, releasable),
                 // The dependency scan on this branch only: the maintenance branch has none, and a branch
                 // which never scanned exposes nothing, so the project is resolved as a whole (#1982)
                 validationStamps = fullValidationStamps + dependencyScan,

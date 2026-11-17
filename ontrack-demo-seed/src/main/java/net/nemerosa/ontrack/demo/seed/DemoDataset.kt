@@ -45,6 +45,12 @@ data class DemoDataset(
      * registers them again, each with a token the seed acts through - see [AgentSessionSpec].
      */
     val agents: List<AgentSpec> = emptyList(),
+    /**
+     * HTTP configurations, which the `http` subscriptions of [PromotionLevelSpec.httpCalls] name. They
+     * belong to the instance rather than to a project, so they outlive the projects the reset deletes:
+     * the seed creates them, or overwrites them, before the projects.
+     */
+    val httpConfigurations: List<HttpConfigurationSpec> = emptyList(),
 )
 
 /**
@@ -251,6 +257,9 @@ data class BranchSpec(
  * before it is promoted to this level - the *Assisted builds require* property (#2029), licensed. The
  * server fails closed: a build whose assisted change is not known yet counts as assisted, which is
  * why the seed waits for it before promoting to such a level.
+ * @property httpCalls Subscriptions of the level to the `http` channel (#2156): every promotion to it
+ * calls an API, and waits for what the call started to finish. The seed waits for every call the
+ * promotions of the dataset make, and stops when one does not succeed.
  */
 data class PromotionLevelSpec(
     val name: String,
@@ -261,6 +270,7 @@ data class PromotionLevelSpec(
     val requiresPreviousPromotion: Boolean = false,
     val agentsAdmitted: Boolean = false,
     val assistedBuildsRequire: List<String> = emptyList(),
+    val httpCalls: List<HttpCallSpec> = emptyList(),
 )
 
 /**
@@ -362,6 +372,67 @@ data class WorkflowNodeSpec(
             executorId == WorkflowSpec.NOTIFICATION_EXECUTOR && it.isNotBlank()
         }
 }
+
+/**
+ * An HTTP configuration on the instance's own mock deployment API, without authentication (#2156).
+ *
+ * The base URL is not part of the dataset: it is where the backend reaches itself, which only the
+ * instance knows - see [DemoTarget.checkHttpMockAvailable]. The URL the seed is pointed at is no
+ * answer: on a deployed instance, it is an ingress routing `/graphql` and `/hook` to the backend and
+ * everything else to the UI, and the backend may not even reach it.
+ */
+data class HttpConfigurationSpec(
+    val name: String,
+)
+
+/**
+ * A subscription to the `http` channel, on a promotion level: the call every promotion to the level
+ * makes, under an [HTTP configuration][HttpConfigurationSpec].
+ *
+ * @property name Name of the subscription
+ * @property config Name of the HTTP configuration, which the dataset declares
+ * @property method `GET`, `POST` or `PUT`
+ * @property path Path under the base URL of the configuration, templated
+ * @property body JSON body, `POST` and `PUT` only, whose string leaves are templated
+ * @property statusUrl CEL expression giving the URL to poll, on the initial response
+ * @property successCondition CEL condition of a successful call, evaluated on every response
+ * @property failureCondition CEL condition of a failed call
+ * @property intervalSeconds Time between two polls, 5 at least
+ * @property timeoutSeconds Time the call is waited for
+ */
+data class HttpCallSpec(
+    val name: String,
+    val config: String,
+    val method: String,
+    val path: String,
+    val body: JsonNode? = null,
+    val statusUrl: String? = null,
+    val successCondition: String? = null,
+    val failureCondition: String? = null,
+    val intervalSeconds: Int = MIN_INTERVAL_SECONDS,
+    val timeoutSeconds: Int = 60,
+) {
+    companion object {
+        /** The verbs of the `http` channel. */
+        val METHODS = setOf("GET", "POST", "PUT")
+
+        /** The shortest interval between two polls the `http` channel accepts. */
+        const val MIN_INTERVAL_SECONDS = 5
+    }
+}
+
+/**
+ * How the call of an `http` subscription ended, as its notification record tells it.
+ *
+ * @property succeeded Whether the record is OK
+ * @property attempts Number of requests made, the initial one included
+ * @property message What the record says of a failed call
+ */
+data class HttpCallRun(
+    val succeeded: Boolean,
+    val attempts: Int,
+    val message: String?,
+)
 
 /** How a workflow ended: all of its nodes succeeded, or one of them failed. */
 enum class WorkflowOutcome {

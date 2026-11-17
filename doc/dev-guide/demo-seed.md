@@ -12,7 +12,9 @@ Settings stay covered by CasC and users live in Keycloak, so projects, environme
 estates, dashboards and the dataset's two registered agents are the only things the seed has to
 reset. What they have in common is that
 they outlive a project deletion: a label is global and carried by several projects, so
-deleting every project leaves every label behind.
+deleting every project leaves every label behind. The one HTTP configuration of the dataset,
+`demo-deployments`, outlives them too; rather than deleted, it is overwritten - see
+[The HTTP call](#the-http-call).
 
 The token it runs with needs admin-level rights: it deletes projects, manages environments
 and labels (`LabelManagement`) and shares a dashboard (`DashboardSharing`). It also generates a
@@ -59,7 +61,7 @@ that is not a `demo.` host or a local instance. Naming another instance is possi
 ### What the target instance must have
 
 The dataset is not self-contained: it can only reference features the target instance
-actually runs. Three of them are off by default, are on automatically in the `dev` profile —
+actually runs. Four of them are off by default, are on automatically in the `dev` profile —
 so the local dev stack needs nothing — and must be switched on explicitly anywhere else,
 which for the demo means an environment variable in its Helm values:
 
@@ -68,6 +70,7 @@ which for the demo means an environment variable in its Helm values:
 | **Simulated gate** node executor (`executorId: mock`), which the two staging slot workflows are built on | `ontrack.config.extension.workflows.mock.enabled` | `ONTRACK_CONFIG_EXTENSION_WORKFLOWS_MOCK_ENABLED` |
 | **Mock Jenkins** notification channel (`mock-jenkins`), which the two Jenkins jobs of the CANARY promotion workflow run on | `ontrack.config.extension.jenkins.mock.enabled` | `ONTRACK_CONFIG_EXTENSION_JENKINS_MOCK_ENABLED` |
 | **Mock SCM**, which the change logs of `petclinic`, `petclinic-vets` and `audit-trail-demo` are read from | `ontrack.config.extension.scm.mock.enabled` | `ONTRACK_CONFIG_EXTENSION_SCM_MOCK_ENABLED` |
+| **Mock deployment API**, which the GOLD promotions of `petclinic`'s `main` start their deployments on, through the `http` channel | `ontrack.config.extension.notifications.http.mock.enabled` | `ONTRACK_CONFIG_EXTENSION_NOTIFICATIONS_HTTP_MOCK_ENABLED` |
 
 The mock Jenkins needs no Jenkins configuration: a `mock-jenkins` node naming a configuration the
 instance does not have runs on a mock Jenkins of that name (`demo-jenkins` for the demo), because
@@ -143,12 +146,50 @@ commit through one replica and points a build at it through another (#2099).
 Without the simulated gate or the mock Jenkins, the reset stops before anything is deleted: the
 seed asks the instance for its enabled workflow node executors and notification channels, and
 names what is missing, ending with "Nothing was deleted". Without the mock SCM it stops the same
-way, on a probe repository. The dataset validation cannot catch any of them, because it checks the
-dataset against Yontrack's rules, not against the target's configuration.
+way, on a probe repository, and without the mock deployment API on the query `httpMockDeploymentsUrl`,
+which exists only where it is enabled. The dataset validation cannot catch any of them, because it
+checks the dataset against Yontrack's rules, not against the target's configuration.
 
 None belongs on an instance tracking real deliveries: the first two let a workflow report a gate
-or a pipeline as passed without anything having been verified, the last lets a project claim an
-SCM that answers with whatever anyone posted to it.
+or a pipeline as passed without anything having been verified, the mock SCM lets a project claim an
+SCM that answers with whatever anyone posted to it, and the mock deployment API answers anyone
+reaching the backend, without authentication, about deployments which never happened.
+
+### The HTTP call
+
+`petclinic`'s `main` shows the HTTP call channel (#2156): GOLD - a human approving the build for
+release - starts its deployment. The level carries an `http` subscription (`PromotionLevelSpec.httpCalls`)
+which POSTs a deployment of the build to `/deployments`, with the project, the build and the promotion
+in a templated body, and polls the `Location` it is answered with (`response.headers['location']`) every
+five seconds until `response.body.status` is `SUCCEEDED` - or `FAILED`, its failure condition. The API is
+the instance's own **mock deployment API**, through the HTTP configuration `demo-deployments`, without
+authentication. A mock deployment runs twelve seconds, so the notification record of every GOLD
+promotion of the branch shows the POST and three polls.
+
+- **The base URL is the instance's to tell.** The backend calls itself, so the URL has to reach the
+  backend *from inside it*, and `YONTRACK_URL` is no answer: on a deployed instance it is the ingress,
+  which routes `/graphql` and `/hook` to the backend and everything else to the Next UI, and the backend
+  may not even resolve it. The seed asks the instance instead, through the GraphQL query
+  `httpMockDeploymentsUrl`, which answers where the backend reaches itself - on `localhost`, on the port
+  it is listening on, under its context path - and exists only where the mock deployment API is
+  enabled: the same call is the check of [What the target instance must have](#what-the-target-instance-must-have).
+  Nothing is configured on the seed's side for it, which is why there is no `DEMO_SEED_*` variable for
+  it. It assumes a backend listening on its loopback in plain HTTP, which the demo's and the local ones do.
+- **No authentication.** The mock deployment API answers anonymous calls where it is enabled, and only
+  its own paths (`WebSecurityConfig.mockDeploymentWebSecurity`). It reads and writes nothing, and the
+  demo's ingress does not route it from outside anyway.
+- **The configuration is overwritten, not reset.** An HTTP configuration belongs to the instance, like
+  a label, and outlives the projects: the seed saves `demo-deployments` before the projects - their
+  subscriptions name it, and the server refuses one naming a configuration it does not have - deleting
+  the one the previous reset left behind.
+- **The seed waits for the calls**, once every promotion has been made, the ones held for the CANARY
+  workflows included: it polls the `http` notification records of each GOLD build until they are over,
+  and stops if one did not succeed. A call runs in the background, holding a notification queue
+  consumer while it polls, and a reset leaving calls running - or failing unnoticed - is not the same
+  demo twice.
+
+`DemoHttpCallSeedTest` pins all of it. On the main branch only: the maintenance branch's GOLD builds
+are not deployed any more, and every call is a few seconds more of the reset.
 
 ### The changelog project
 

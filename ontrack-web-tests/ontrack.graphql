@@ -6696,6 +6696,8 @@ type Query {
   ): HookRecordingPaginated
   "List of the authentication types of an HTTP configuration"
   httpAuthenticators: [HttpAuthenticator!]!
+  "Base URL under which the backend reaches its own mock deployment API, to use in an HTTP configuration. Only where the mock deployment API is enabled."
+  httpMockDeploymentsUrl: String!
   "Gets information about the application"
   info: Info
   "List of issue services"

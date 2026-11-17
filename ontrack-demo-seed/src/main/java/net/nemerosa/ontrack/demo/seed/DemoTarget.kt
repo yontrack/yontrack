@@ -100,6 +100,24 @@ interface DemoTarget {
     fun checkWorkflowsAvailable(executorIds: Set<String>, notificationChannels: Set<String>)
 
     /**
+     * Checks the instance runs the mock deployment API, and returns the base URL under which its
+     * backend reaches it - what the HTTP configurations of the dataset point at.
+     *
+     * Called before the reset, for the same reason as [checkScmAvailable]: the mock deployment API is
+     * off unless `ontrack.config.extension.notifications.http.mock.enabled` is set, and finding that
+     * out on the first call - after every project has been deleted - leaves the demo with a failed
+     * call on every promotion it shows one on.
+     */
+    fun checkHttpMockAvailable(): String
+
+    /**
+     * Creates the HTTP configuration [name] on [url], without authentication, replacing any
+     * configuration of that name: a configuration belongs to the instance, and outlives the projects
+     * the reset deletes.
+     */
+    fun saveHttpConfiguration(name: String, url: String)
+
+    /**
      * Why the instance cannot offer [capability], or `null` when it can.
      *
      * Asked before the reset, and read-only: unlike [checkScmAvailable], a missing capability does
@@ -316,6 +334,12 @@ interface DemoBranch {
     fun setPromotionDependencies(promotionLevel: String, dependencies: List<String>)
 
     /**
+     * Subscribes [promotionLevel] to the `http` channel: every promotion to it makes the call. Named by
+     * its name, the HTTP configuration has to exist first.
+     */
+    fun subscribeHttpCall(promotionLevel: String, spec: HttpCallSpec)
+
+    /**
      * Requires the promotion level immediately below [promotionLevel] in the branch's order before
      * [promotionLevel] can be granted.
      *
@@ -387,6 +411,18 @@ interface DemoBuild {
         at: LocalDateTime,
         byPerson: Boolean = false,
     ): WorkflowRun
+
+    /**
+     * Waits for the call the promotion of this build to [promotionLevel] made through the `http`
+     * subscription [spec] to finish, and tells how it ended.
+     *
+     * The channel runs in the background, and waits for what the call started to finish: a seed going
+     * on without waiting would leave the demo with calls still running, or failed without anybody
+     * noticing.
+     *
+     * @throws IllegalStateException When the call does not finish in time
+     */
+    fun awaitHttpCall(promotionLevel: String, spec: HttpCallSpec): HttpCallRun
 
     /**
      * Records a run of [validationStamp] at [at].

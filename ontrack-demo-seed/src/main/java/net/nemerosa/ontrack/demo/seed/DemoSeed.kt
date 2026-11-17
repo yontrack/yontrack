@@ -61,9 +61,16 @@ class DemoSeed(
                 notificationChannels = workflows.flatMap { it.notificationChannels }.toSet(),
             )
         }
+        // And the HTTP calls: their configurations point at the instance's own mock deployment API,
+        // which is off unless switched on - and which only the instance can say where it reaches
+        val httpMockUrl = if (dataset.httpConfigurations.isNotEmpty()) {
+            target.checkHttpMockAvailable()
+        } else {
+            null
+        }
         val now = LocalDateTime.now(clock)
         reset(dataset)
-        create(dataset, now, evidence)
+        create(dataset, now, evidence, httpMockUrl)
     }
 
     /**
@@ -178,8 +185,9 @@ class DemoSeed(
 
     /**
      * @param evidence Whether the instance takes evidence
+     * @param httpMockUrl Where the backend reaches its mock deployment API, when the dataset calls it
      */
-    private fun create(dataset: DemoDataset, now: LocalDateTime, evidence: Boolean) {
+    private fun create(dataset: DemoDataset, now: LocalDateTime, evidence: Boolean, httpMockUrl: String?) {
         // Before anything is created through them, and revoked whatever happens: they are the tokens
         // of the account the seed runs as, an administrator's
         val tokens = dataset.projects
@@ -190,7 +198,7 @@ class DemoSeed(
                 target.openToken(name)
             }
         try {
-            create(dataset, now, evidence, tokens + agentTokens(dataset))
+            create(dataset, now, evidence, httpMockUrl, tokens + agentTokens(dataset))
         } finally {
             tokens.values.forEach { token ->
                 log("Revoking the API token ${token.name}")
@@ -221,12 +229,30 @@ class DemoSeed(
         (projects.flatMap { project -> project.branches.flatMap { branch -> branch.builds.mapNotNull { it.agent } } } +
                 deployments.mapNotNull { it.agent }).distinct()
 
-    private fun create(dataset: DemoDataset, now: LocalDateTime, evidence: Boolean, tokens: Map<String, DemoToken>) {
+    private fun create(
+        dataset: DemoDataset,
+        now: LocalDateTime,
+        evidence: Boolean,
+        httpMockUrl: String?,
+        tokens: Map<String, DemoToken>,
+    ) {
         val projects = mutableMapOf<String, DemoProject>()
         val branches = mutableMapOf<Pair<String, String>, DemoBranch>()
         val builds = mutableMapOf<BuildRef, DemoBuild>()
         // Left out of the ladders of their builds, and made once the deployments have run - see below
         val heldLadders = mutableListOf<HeldLadder>()
+        // Made by the promotions, and waited for once every promotion has been made - see below
+        val httpCalls = mutableListOf<PendingHttpCall>()
+
+        // Before the projects: an `http` subscription names its configuration, and the server refuses
+        // one naming a configuration which does not exist. Overwritten rather than reset: a
+        // configuration belongs to the instance, and the one the previous run left behind may point
+        // at a backend which has since moved.
+        dataset.httpConfigurations.forEach { spec ->
+            val url = checkNotNull(httpMockUrl) { "No mock deployment API to point ${spec.name} at" }
+            log("Saving the HTTP configuration ${spec.name} on $url")
+            target.saveHttpConfiguration(spec.name, url)
+        }
 
         // Before the projects: a project is given its labels as it is created, and the
         // assignment is written with label *ids*, so every label has to exist first.
@@ -251,7 +277,7 @@ class DemoSeed(
             if (spec.notGrantedMedals) project.enableNotGrantedMedals()
             spec.branches.forEach { branchSpec ->
                 branches[spec.name to branchSpec.name] =
-                    createBranch(spec, branchSpec, project, now, builds, tokens, evidence, heldLadders)
+                    createBranch(spec, branchSpec, project, now, builds, tokens, evidence, heldLadders, httpCalls)
             }
         }
 
@@ -379,6 +405,19 @@ class DemoSeed(
             }
         }
 
+        // Once every promotion has been made, the held ones included: an `http` call runs in the
+        // background, and waits for what it started to finish. Waited for rather than left running, so
+        // that the demo is the same at the end of every reset, and a call failing - the backend not
+        // reaching its mock deployment API - stops the seed instead of passing unnoticed.
+        httpCalls.forEach { call ->
+            log("Waiting for the ${call.spec.name} call of the promotion of ${call.where} to ${call.promotionLevel}")
+            val run = call.build.awaitHttpCall(call.promotionLevel, call.spec)
+            check(run.succeeded) {
+                "The ${call.spec.name} call of the promotion of ${call.where} to ${call.promotionLevel} " +
+                        "failed after ${run.attempts} attempt(s): ${run.message}"
+            }
+        }
+
         dataset.dashboard?.let { dashboard ->
             log("Saving dashboard ${dashboard.name}")
             target.saveDashboard(dashboard)
@@ -424,6 +463,7 @@ class DemoSeed(
         tokens: Map<String, DemoToken>,
         evidence: Boolean,
         heldLadders: MutableList<HeldLadder>,
+        httpCalls: MutableList<PendingHttpCall>,
     ): DemoBranch {
         val branch = project.createBranch(spec.name, spec.description)
         spec.scmBranch?.let { branch.configureScmBranch(it) }
@@ -451,6 +491,11 @@ class DemoSeed(
             // Names stamps of the branch, like the auto promotion
             promotionLevel.assistedBuildsRequire.takeIf { it.isNotEmpty() }
                 ?.let { branch.setAssistedBuildsRequire(promotionLevel.name, it) }
+            // Before the builds, so that their promotions make the calls
+            promotionLevel.httpCalls.forEach { call ->
+                log("Subscribing ${promotionLevel.name} of ${projectSpec.name}/${spec.name} to the HTTP call ${call.name}")
+                branch.subscribeHttpCall(promotionLevel.name, call)
+            }
         }
         // What an agent does itself, and what a person does for it: the agent policy, read off the dataset
         val agentsAdmitted = spec.promotionLevels.filter { it.agentsAdmitted }.map { it.name }.toSet()
@@ -472,6 +517,18 @@ class DemoSeed(
             )
             val byAgent = buildSpec.agent != null
             builds[BuildRef(projectSpec.name, spec.name, buildSpec.name)] = build
+            // The calls of every level the build is promoted to, waited for once per level and
+            // subscription: a build promoted twice to a level calls twice, and both are waited for at once
+            buildSpec.promotionLevels.distinct().forEach { promotionLevel ->
+                spec.promotionLevels.find { it.name == promotionLevel }?.httpCalls?.forEach { call ->
+                    httpCalls += PendingHttpCall(
+                        build = build,
+                        where = "${projectSpec.name}/${spec.name}/${buildSpec.name}",
+                        promotionLevel = promotionLevel,
+                        spec = call,
+                    )
+                }
+            }
             buildSpec.release?.let { build.setRelease(it) }
             // The build is built from the last commit declared for it; the ones before are
             // the work that went into it, and are what the change log with the previous
@@ -615,6 +672,16 @@ class DemoSeed(
             val expected: WorkflowOutcome?,
         )
     }
+
+    /**
+     * The call of an `http` subscription a promotion of [build] makes, waited for at the end.
+     */
+    private class PendingHttpCall(
+        val build: DemoBuild,
+        val where: String,
+        val promotionLevel: String,
+        val spec: HttpCallSpec,
+    )
 
     // validate() has already ruled out a reference the dataset does not create.
     private fun Map<BuildRef, DemoBuild>.resolve(ref: BuildRef): DemoBuild =

@@ -41,7 +41,18 @@ class InMemoryDemoTarget(
      * local dev stack.
      */
     private val missingWorkflowParts: Set<String> = emptySet(),
+    /**
+     * Whether the instance runs the mock deployment API. `false` models an instance which never
+     * enabled it.
+     */
+    private val httpMockEnabled: Boolean = true,
 ) : DemoTarget {
+
+    /**
+     * HTTP configurations, by name, with their base URL - held by the instance, where they outlive the
+     * projects the reset deletes.
+     */
+    val httpConfigurations = mutableMapOf<String, String>()
 
     /**
      * Names of the API tokens of the seeding account which are still valid.
@@ -198,6 +209,17 @@ class InMemoryDemoTarget(
         check(scmEnabled) { "The mock SCM is not enabled on this instance. Nothing was deleted." }
     }
 
+    override fun checkHttpMockAvailable(): String {
+        check(httpMockEnabled) { "The mock deployment API is not enabled on this instance. Nothing was deleted." }
+        return HTTP_MOCK_URL
+    }
+
+    override fun saveHttpConfiguration(name: String, url: String) {
+        checkName(name, "HTTP configuration")
+        httpConfigurations[name] = url
+        journal += "http configuration $name"
+    }
+
     override fun checkNativeFindingsFormats() {
         check(nativeFindingsFormats) { "The native scanner formats are not licensed on this instance. Nothing was deleted." }
     }
@@ -253,6 +275,7 @@ class InMemoryDemoTarget(
             add("agent ${agent.identifier} \"${agent.spec.displayName}\" ${agent.spec.tool} \"${agent.spec.description}\"")
             agent.tokens.sorted().forEach { add("  token $it${if (it in agent.readOnlyTokens) " read-only" else ""}") }
         }
+        httpConfigurations.forEach { (name, url) -> add("http configuration $name $url") }
         projects.forEach { project ->
             add("project ${project.name} \"${project.description}\"")
             if (project.favourite) add("  favourite")
@@ -275,6 +298,13 @@ class InMemoryDemoTarget(
                     if (promotionLevel in branch.previousPromotionRequired) add("      requires the previous promotion")
                     if (promotionLevel in branch.agentsAdmitted) add("      admits agents")
                     branch.assistedBuildsRequire[promotionLevel]?.let { add("      assisted builds require $it") }
+                    branch.httpCalls[promotionLevel]?.forEach { call ->
+                        add(
+                            "      http call ${call.name} ${call.method} ${call.config}${call.path} ${call.body} " +
+                                    "status ${call.statusUrl} until ${call.successCondition} or ${call.failureCondition} " +
+                                    "every ${call.intervalSeconds}s for ${call.timeoutSeconds}s"
+                        )
+                    }
                 }
                 branch.validationStamps.forEach { stamp ->
                     add("    validation stamp $stamp")
@@ -307,6 +337,9 @@ class InMemoryDemoTarget(
                         add("        report ${scan.report}")
                     }
                     build.links.forEach { add("      uses ${it.branch.project.name}/${it.name}") }
+                    build.httpCalls.forEach {
+                        add("      http call ${it.spec.name} on ${it.promotionLevel} to ${it.url}: ${it.attempts} attempt(s), ${if (it.succeeded) "succeeded" else "failed"}")
+                    }
                     build.trail.forEach { add("      trail $it") }
                 }
             }
@@ -612,6 +645,21 @@ class InMemoryDemoTarget(
         fun previousPromotionLevel(promotionLevel: String): String? =
             promotionLevels.indexOf(promotionLevel).takeIf { it > 0 }?.let { promotionLevels[it - 1] }
 
+        /** The `http` subscriptions of the promotion levels, by promotion level. */
+        val httpCalls = mutableMapOf<String, MutableList<HttpCallSpec>>()
+
+        /** Refused as the server refuses the subscription as it is saved. */
+        override fun subscribeHttpCall(promotionLevel: String, spec: HttpCallSpec) {
+            requirePromotionLevel(promotionLevel)
+            require(spec.config in httpConfigurations) { "HTTP configuration not found: ${spec.config}" }
+            require(spec.method in HttpCallSpec.METHODS) { "Unsupported method: ${spec.method}" }
+            require(spec.intervalSeconds >= HttpCallSpec.MIN_INTERVAL_SECONDS) { "The interval must be 5 s at least" }
+            require(spec.statusUrl == null || !spec.successCondition.isNullOrBlank()) {
+                "A status URL needs a success condition"
+            }
+            httpCalls.getOrPut(promotionLevel) { mutableListOf() } += spec
+        }
+
         private fun requirePromotionLevel(name: String) {
             require(name in promotionLevels) {
                 "Promotion level $name does not exist in ${project.name}/${this.name}"
@@ -820,10 +868,44 @@ class InMemoryDemoTarget(
             promotions += promotionLevel to at
             promotionActors += promoter
             entry("promotion.added", "promotionLevel" to promotionLevel, actor = promoter)
-            // As the server does it, whoever promotes: the subscription of the level fires
+            // As the server does it, whoever promotes: the subscriptions of the level fire
+            branch.httpCalls[promotionLevel]?.forEach { call -> httpCalls += callHttp(promotionLevel, call) }
             branch.workflows[promotionLevel]?.let { workflow ->
                 workflowRuns[promotionLevel] = runWorkflow(this, promotionLevel, workflow, at)
             }
+        }
+
+        /** The calls the promotions of the build made through the `http` subscriptions of their levels. */
+        val httpCalls = mutableListOf<InMemoryHttpCall>()
+
+        /**
+         * The call of an `http` subscription, as the channel makes it on the mock deployment API: it
+         * succeeds where the configuration points at the instance's own mock, after polling until the
+         * deployment the body asks for is over.
+         */
+        private fun callHttp(promotionLevel: String, spec: HttpCallSpec): InMemoryHttpCall {
+            val url = httpConfigurations.getValue(spec.config) + spec.path
+            val duration = spec.body?.path("durationSeconds")?.asInt(MOCK_DEPLOYMENT_SECONDS) ?: MOCK_DEPLOYMENT_SECONDS
+            val polls = (duration + spec.intervalSeconds - 1) / spec.intervalSeconds
+            journal += "http call ${spec.name} ${branch.project.name}/${branch.name}/$name $promotionLevel"
+            return InMemoryHttpCall(
+                promotionLevel = promotionLevel,
+                spec = spec,
+                url = url,
+                attempts = 1 + polls,
+                succeeded = url.startsWith(HTTP_MOCK_URL) && polls * spec.intervalSeconds <= spec.timeoutSeconds,
+            )
+        }
+
+        override fun awaitHttpCall(promotionLevel: String, spec: HttpCallSpec): HttpCallRun {
+            val calls = httpCalls.filter { it.promotionLevel == promotionLevel && it.spec == spec }
+            check(calls.isNotEmpty()) { "No ${spec.name} call for the promotion of $name to $promotionLevel" }
+            journal += "await http call ${spec.name} ${branch.project.name}/${branch.name}/$name $promotionLevel"
+            return HttpCallRun(
+                succeeded = calls.all { it.succeeded },
+                attempts = calls.sumOf { it.attempts },
+                message = calls.firstOrNull { !it.succeeded }?.let { "ERROR: the call to ${it.url} did not succeed" },
+            )
         }
 
         /** The runs of the workflows the promotions of the build started, by promotion level. */
@@ -1297,7 +1379,28 @@ class InMemoryDemoTarget(
         data class Commit(val scmBranch: String, val id: String, val message: String, val author: DemoPerson)
     }
 
+    /**
+     * A call made by an `http` subscription.
+     */
+    class InMemoryHttpCall(
+        val promotionLevel: String,
+        val spec: HttpCallSpec,
+        val url: String,
+        val attempts: Int,
+        val succeeded: Boolean,
+    )
+
     companion object {
+
+        /**
+         * Where the backend of the instance reaches its own mock deployment API.
+         */
+        const val HTTP_MOCK_URL = "http://localhost:8080/extension/notifications/http/mock"
+
+        /**
+         * How long a deployment of the mock deployment API runs when the body does not say.
+         */
+        const val MOCK_DEPLOYMENT_SECONDS = 5
 
         /**
          * The actor of what the account the seed runs as does by itself, without a token of the

@@ -6,6 +6,7 @@ import net.nemerosa.ontrack.kdsl.connector.graphql.schema.type.AuditTrailStorage
 import net.nemerosa.ontrack.kdsl.connector.support.DefaultConnector
 import net.nemerosa.ontrack.kdsl.spec.ValidationRun
 import net.nemerosa.ontrack.kdsl.spec.changeStatus
+import net.nemerosa.ontrack.kdsl.spec.configurations.configurations
 import net.nemerosa.ontrack.kdsl.spec.delete
 import net.nemerosa.ontrack.kdsl.spec.extension.audittrail.EvidenceFile
 import net.nemerosa.ontrack.kdsl.spec.extension.audittrail.attachEvidence
@@ -57,6 +58,10 @@ import net.nemerosa.ontrack.kdsl.spec.extension.general.previousPromotionConditi
 import net.nemerosa.ontrack.kdsl.spec.extension.general.promotionDependencies
 import net.nemerosa.ontrack.kdsl.spec.extension.license.isLicensedFeatureEnabled
 import net.nemerosa.ontrack.kdsl.spec.extension.notifications.NotificationsMgt
+import net.nemerosa.ontrack.kdsl.spec.extension.notifications.http.HttpAuthentication
+import net.nemerosa.ontrack.kdsl.spec.extension.notifications.http.HttpConfiguration
+import net.nemerosa.ontrack.kdsl.spec.extension.notifications.http.HttpNotificationChannelConfig
+import net.nemerosa.ontrack.kdsl.spec.extension.notifications.http.http
 import net.nemerosa.ontrack.kdsl.spec.extension.notifications.notifications
 import net.nemerosa.ontrack.kdsl.spec.extension.workflows.WorkflowInstanceNodeStatus
 import net.nemerosa.ontrack.kdsl.spec.extension.workflows.WorkflowInstanceStatus
@@ -114,6 +119,31 @@ class KdslDemoTarget(private val ontrack: Ontrack) : DemoTarget {
                     "are set, and that the licence enables the environments (\"slot-pipeline-*\"). " +
                     "Nothing was deleted."
         }
+    }
+
+    /**
+     * Asks the instance where its backend reaches its mock deployment API: the query exists only where
+     * the mock deployment API is enabled, as the mock SCM mutations do, and it is the only one who
+     * knows - see [HttpConfigurationSpec].
+     */
+    override fun checkHttpMockAvailable(): String =
+        try {
+            ontrack.notifications.http.mock.url
+        } catch (ex: Exception) {
+            error(
+                "The dataset calls the mock deployment API of the instance, and this instance does not " +
+                        "tell where it is. Check that `ontrack.config.extension.notifications.http.mock.enabled` " +
+                        "(`ONTRACK_CONFIG_EXTENSION_NOTIFICATIONS_HTTP_MOCK_ENABLED`) is set. Nothing was deleted." +
+                        "\n\nThe server said:\n${ex.message}"
+            )
+        }
+
+    override fun saveHttpConfiguration(name: String, url: String) {
+        val configurations = ontrack.configurations.http
+        if (configurations.findByName(name) != null) {
+            configurations.delete(name)
+        }
+        configurations.create(HttpConfiguration(name = name, url = url, authentication = HttpAuthentication.none()))
     }
 
     override fun unavailable(capability: DemoCapability): String? =
@@ -413,6 +443,18 @@ class KdslDemoTarget(private val ontrack: Ontrack) : DemoTarget {
         val WORKFLOW_TIMEOUT: Duration = Duration.ofMinutes(2)
 
         /**
+         * How long the notification of an `http` call may wait in the queue before it is sent, on top
+         * of the timeout of the call: the calls of the dataset run on the notification queue, each
+         * holding a consumer while it waits for what it started.
+         */
+        val HTTP_CALL_QUEUE_DELAY: Duration = Duration.ofMinutes(2)
+
+        /**
+         * The results of a notification record which is not finished yet.
+         */
+        val UNFINISHED_RESULTS = setOf("ONGOING", "ASYNC")
+
+        /**
          * The release property carries the version a build shows as its display name.
          */
         const val RELEASE_PROPERTY = "net.nemerosa.ontrack.extension.general.ReleasePropertyType"
@@ -640,6 +682,27 @@ private class KdslDemoBranch(
         }
     }
 
+    override fun subscribeHttpCall(promotionLevel: String, spec: HttpCallSpec) {
+        val level = promotionLevels.getValue(promotionLevel)
+        NotificationsMgt(level.connector).subscribe(
+            name = spec.name,
+            channel = HttpNotificationChannelConfig.CHANNEL,
+            channelConfig = HttpNotificationChannelConfig(
+                config = spec.config,
+                method = spec.method,
+                path = spec.path,
+                body = spec.body,
+                successCondition = spec.successCondition,
+                failureCondition = spec.failureCondition,
+                statusUrl = spec.statusUrl,
+                intervalSeconds = spec.intervalSeconds,
+                timeoutSeconds = spec.timeoutSeconds,
+            ),
+            events = listOf(KdslDemoTarget.NEW_PROMOTION_RUN_EVENT),
+            projectEntity = level,
+        )
+    }
+
     override fun createValidationStamp(
         name: String,
         description: String,
@@ -795,6 +858,32 @@ private class KdslDemoBuild(val build: Build, private val admin: Ontrack) : Demo
             errors = instance.nodesExecutions
                 .filter { it.status == WorkflowInstanceNodeStatus.ERROR }
                 .map { "${it.id}: ${it.error}" },
+        )
+    }
+
+    /**
+     * Polls the `http` notification records of the build until every one of them has finished: the
+     * build ID is new on every reset, and the build is promoted once to a level calling an API in the
+     * dataset, so they are the calls of its promotions.
+     */
+    override fun awaitHttpCall(promotionLevel: String, spec: HttpCallSpec): HttpCallRun {
+        val what = "The ${spec.name} call of the promotion of build ${build.name} to $promotionLevel"
+        // The time the call is allowed, and the time its notification may wait in the queue
+        val timeout = Duration.ofSeconds(spec.timeoutSeconds.toLong()).plus(KdslDemoTarget.HTTP_CALL_QUEUE_DELAY)
+        val records = pollUntil(timeout, intervalMs = 1000, { "$what did not finish" }) {
+            admin.notifications.notificationRecords(
+                channel = HttpNotificationChannelConfig.CHANNEL,
+                projectEntityType = GraphQLProjectEntityType.BUILD,
+                projectEntityId = build.id.toInt(),
+            ).takeIf { records ->
+                records.isNotEmpty() && records.none { it.result.type in KdslDemoTarget.UNFINISHED_RESULTS }
+            }
+        }
+        return HttpCallRun(
+            succeeded = records.all { it.result.type == "OK" },
+            attempts = records.sumOf { it.result.output?.path("attempts")?.asInt(0) ?: 0 },
+            message = records.firstOrNull { it.result.type != "OK" }
+                ?.let { "${it.result.type}: ${it.result.message}" },
         )
     }
 

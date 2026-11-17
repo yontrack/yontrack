@@ -229,14 +229,19 @@ To try the channel, or a workflow built on it, without any real deployment tool,
 deployment API**. It is a testing aid, disabled by default: enable it only on a demonstration or test
 instance, with the `ontrack.config.extension.notifications.http.mock.enabled` property (the
 `ONTRACK_CONFIG_EXTENSION_NOTIFICATIONS_HTTP_MOCK_ENABLED` environment variable). The `dev` profile
-enables it. When it is disabled, its paths answer `404` to an authenticated caller.
+enables it. When it is disabled, its paths are those of no API at all: refused without an
+authentication, `404` with one.
 
-It lives under `/extension/notifications/http/mock` on the backend of Yontrack, and is called like any
-other API of Yontrack, with an authentication: a `header` authentication named `X-Ontrack-Token`, whose
-value is an API token, for example. Point an [HTTP configuration](http-configuration.md) at it, with
-the base URL under which the backend reaches **itself**, which may differ from the URL of the UI, for
-example `http://localhost:8080/extension/notifications/http/mock`.
+It lives under `/extension/notifications/http/mock` on the backend of Yontrack and, where it is enabled,
+answers **without any authentication**: point an [HTTP configuration](http-configuration.md) at it with
+the `none` authentication. Only its own paths are open; everything else of Yontrack still requires an
+authentication. Its base URL is the one under which the backend reaches **itself**, which may differ
+from the URL of the UI, for example `http://localhost:8080/extension/notifications/http/mock`. The
+`httpMockDeploymentsUrl` GraphQL query gives it - the loopback URL of the backend, on the port it is
+listening on - and exists only where the mock is enabled.
 
+* A `GET` on the base URL itself describes the API, which is what the connection test of the
+  configuration reads.
 * `POST /deployments` starts a deployment and answers `201`, with its `Location` and the deployment,
   `{"id": "...", "status": "RUNNING", ...}`. The body is optional. It may give the `outcome` of the
   deployment, `SUCCEEDED` (the default) or `FAILED`, and its `durationSeconds`, 5 by default, at most

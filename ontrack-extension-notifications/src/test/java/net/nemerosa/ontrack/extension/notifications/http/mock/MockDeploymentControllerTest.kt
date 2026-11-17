@@ -25,6 +25,14 @@ class MockDeploymentControllerTest {
         controllerAt(start, contextPath).create(body?.parseAsJson())
 
     @Test
+    fun `The root of the API names where the deployments are`() {
+        assertEquals(
+            MockDeploymentRoot(deployments = "/yontrack/extension/notifications/http/mock/deployments"),
+            controllerAt(start, contextPath = "/yontrack").root(),
+        )
+    }
+
+    @Test
     fun `Creating a deployment returns it running, with its location`() {
         val response = create("""{"version": "1.0.0", "environment": "production"}""")
         assertEquals(HttpStatus.CREATED, response.statusCode)

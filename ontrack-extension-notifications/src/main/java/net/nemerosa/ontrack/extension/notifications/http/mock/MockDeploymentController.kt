@@ -18,6 +18,7 @@ import java.time.Clock
 /**
  * Mock deployment API, the target of the `http` channel in the KDSL acceptance tests and in the demo.
  *
+ * - `GET` on its root describes it, for the connection test of an HTTP configuration pointing at it.
  * - `POST deployments` starts a deployment, and answers `201` with the deployment, `RUNNING`, and its
  *   `Location`. The body is optional; it may carry `outcome` (`SUCCEEDED` by default, or `FAILED`) and
  *   `durationSeconds` (a few seconds by default), and anything else, which is ignored.
@@ -25,8 +26,11 @@ import java.time.Clock
  *   outcome. An unknown id is `404`.
  *
  * It is stateless (see [MockDeployment]), and it is there only when
- * [NotificationsConfigProperties.HTTP_MOCK_ENABLED] is set: otherwise, its paths are `404`. It is
- * called as any other API of Yontrack, with an authentication.
+ * [NotificationsConfigProperties.HTTP_MOCK_ENABLED] is set: otherwise, its paths are those of no end
+ * point - refused without an authentication, `404` with one. Where it is enabled, it answers without any
+ * authentication (`WebSecurityConfig.mockDeploymentWebSecurity` in `ontrack-ui`), as an HTTP
+ * configuration whose authentication is `none` calls it; [GQLRootQueryHttpMockDeploymentsUrl] tells
+ * where the backend reaches it.
  */
 @RestController
 @RequestMapping(MockDeploymentController.PATH)
@@ -47,6 +51,15 @@ class MockDeploymentController(
      * Time of the deployments. Only the tests replace it.
      */
     internal var clock: Clock = Clock.systemUTC()
+
+    /**
+     * Root of the API, which is what the connection test of an HTTP configuration pointing at it reads
+     * (a `GET` on its base URL): it answers rather than leaving it to an unknown path.
+     */
+    @GetMapping("")
+    fun root() = MockDeploymentRoot(
+        deployments = "${contextPath.trimEnd('/')}$PATH/deployments",
+    )
 
     @PostMapping("/deployments")
     fun create(
@@ -124,6 +137,15 @@ class MockDeploymentController(
         const val PATH = "/extension/notifications/http/mock"
     }
 }
+
+/**
+ * Root of the mock deployment API.
+ *
+ * @property deployments Path of the deployments
+ */
+data class MockDeploymentRoot(
+    val deployments: String,
+)
 
 /**
  * Fields of the body of `POST deployments`.
