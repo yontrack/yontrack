@@ -30,7 +30,7 @@ class HttpNotificationSettingsCascIT : AbstractCascTestSupport() {
                       "type": "integer"
                     },
                     "maxTimeoutSeconds": {
-                      "description": "Maximum timeout (in seconds) a subscription may set on an HTTP call",
+                      "description": "Maximum timeout (in seconds) a subscription may set on the wait of an HTTP call for its conditions: a longer one is capped to it",
                       "type": "integer"
                     },
                     "requestTimeoutSeconds": {

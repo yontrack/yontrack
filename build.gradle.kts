@@ -372,6 +372,10 @@ configure(javaProjects) {
         "com.jayway.jsonpath:json-path:3.0.0",
         "com.slack.api:slack-api-client:1.38.0",
         "org.springframework.vault:spring-vault-core:4.1.0",
+        // CEL, for the success and failure conditions of the `http` notification channel (#2154). It
+        // brings protobuf-java and Guava, which nothing else of the build uses; its Guava is the one
+        // pinned for the plugin classpath above.
+        "dev.cel:cel:0.15.0",
 
         "io.jsonwebtoken:jjwt-api:$jjwtVersion",
         "io.jsonwebtoken:jjwt-impl:$jjwtVersion",

@@ -2,7 +2,18 @@ import {Descriptions, Space, Tag, Typography} from "antd";
 import {FaArrowRight} from "react-icons/fa";
 import JsonDisplay from "@components/common/JsonDisplay";
 
-export default function HttpNotificationChannelConfig({config, method, path, headers, body}) {
+export default function HttpNotificationChannelConfig({
+                                                          config,
+                                                          method,
+                                                          path,
+                                                          headers,
+                                                          body,
+                                                          successCondition,
+                                                          failureCondition,
+                                                          statusUrl,
+                                                          intervalSeconds,
+                                                          timeoutSeconds,
+                                                      }) {
 
     const items = [
         {
@@ -44,6 +55,39 @@ export default function HttpNotificationChannelConfig({config, method, path, hea
             key: 'body',
             label: 'Body',
             children: <JsonDisplay value={JSON.stringify(body, null, 2)} width="600px" height="12em"/>,
+            span: 12,
+        })
+    }
+
+    if (successCondition) {
+        items.push({
+            key: 'successCondition',
+            label: 'Success condition',
+            children: <Typography.Text code>{successCondition}</Typography.Text>,
+            span: 12,
+        })
+        if (failureCondition) {
+            items.push({
+                key: 'failureCondition',
+                label: 'Failure condition',
+                children: <Typography.Text code>{failureCondition}</Typography.Text>,
+                span: 12,
+            })
+        }
+        if (statusUrl) {
+            items.push({
+                key: 'statusUrl',
+                label: 'Status URL',
+                children: <Typography.Text code>{statusUrl}</Typography.Text>,
+                span: 12,
+            })
+        }
+        items.push({
+            key: 'polling',
+            label: 'Polling',
+            children: <Typography.Text>
+                Every {intervalSeconds ?? 10} s, for at most {timeoutSeconds ?? 300} s
+            </Typography.Text>,
             span: 12,
         })
     }

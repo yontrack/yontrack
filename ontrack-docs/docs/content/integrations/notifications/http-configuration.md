@@ -90,7 +90,7 @@ _Settings_, then select _HTTP notifications_:
 
 | Setting                 | Default | Meaning                                                                       |
 |-------------------------|---------|-------------------------------------------------------------------------------|
-| `maxTimeoutSeconds`     | 3600    | Maximum timeout, in seconds, which a subscription may set on an HTTP call     |
+| `maxTimeoutSeconds`     | 3600    | Maximum timeout, in seconds, of the [wait of an HTTP call](http.md#waiting-for-a-condition) for its conditions: a longer one is capped to it |
 | `maxResponseBytes`      | 65536   | Maximum size, in bytes, of a response body read: a longer body is truncated   |
 | `requestTimeoutSeconds` | 30      | Timeout, in seconds, of a single request: both its connection and its reading |
 

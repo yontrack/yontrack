@@ -22,6 +22,11 @@ dependencies {
     implementation("io.micrometer:micrometer-core")
     implementation("jakarta.annotation:jakarta.annotation-api")
     implementation("org.springframework.boot:spring-boot-starter-mail")
+    // CEL conditions of the `http` channel (#2154). Its SnakeYAML (for CEL policies, unused here) is
+    // left to the version the Spring Boot BOM manages.
+    implementation("dev.cel:cel") {
+        exclude(group = "org.yaml", module = "snakeyaml")
+    }
 
 
     testImplementation("com.networknt:json-schema-validator")

@@ -10,7 +10,7 @@ export default function HttpNotificationsForm({id, ...values}) {
                 <Form.Item
                     name="maxTimeoutSeconds"
                     label="Maximum timeout (s)"
-                    extra="Maximum timeout (in seconds) a subscription may set on an HTTP call"
+                    extra="Maximum timeout (in seconds) a subscription may set on the wait of an HTTP call for its conditions: a longer one is capped to it"
                     rules={positive}
                 >
                     <InputNumber min={1} precision={0}/>

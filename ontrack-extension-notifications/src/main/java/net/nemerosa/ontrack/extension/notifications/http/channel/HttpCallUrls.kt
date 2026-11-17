@@ -63,3 +63,78 @@ fun resolveHttpCallUrl(baseUrl: String, path: String): URI {
 
     return candidate
 }
+
+/**
+ * Resolves the status URL of a call, as its CEL expression gives it, under the base URL of an HTTP
+ * configuration.
+ *
+ * - An absolute URL, as a `Location` header often holds, is taken as it is when it is under the base URL:
+ *   same scheme, host and port, no user information, and under the path of the base URL.
+ * - An absolute path already under the path of the base URL, as a `Location` header may also hold, is
+ *   taken as it is.
+ * - Anything else is a path appended to the base URL, as the path of the call ([resolveHttpCallUrl]).
+ *
+ * The result is checked as the path of the call is: no `.` or `..` segment, no backslash, no fragment.
+ *
+ * @param baseUrl Base URL of the HTTP configuration
+ * @param statusUrl Status URL, as evaluated
+ * @return URL to poll
+ * @throws HttpCallUrlException If the status URL cannot be polled under the base URL
+ */
+fun resolveHttpCallStatusUrl(baseUrl: String, statusUrl: String): URI {
+    fun refuse(reason: String): Nothing = throw HttpCallUrlException(baseUrl, statusUrl, reason)
+
+    val trimmed = statusUrl.trim()
+    val base = URI(baseUrl)
+    val basePath = (base.rawPath ?: "").trimEnd('/')
+    fun underBasePath(rawPath: String) =
+        basePath.isEmpty() || rawPath == basePath || rawPath.startsWith("$basePath/")
+
+    // Path relative to the base URL, checked as the path of a call
+    fun underBase(rawPathAndQuery: String): URI = try {
+        resolveHttpCallUrl(baseUrl, rawPathAndQuery.removePrefix(basePath))
+    } catch (ex: HttpCallUrlException) {
+        refuse(ex.reason)
+    }
+
+    return when {
+        absoluteUrl.containsMatchIn(trimmed) -> {
+            if (trimmed.contains('\\')) {
+                refuse("a backslash is not accepted")
+            }
+            val candidate = try {
+                URI(trimmed)
+            } catch (_: URISyntaxException) {
+                refuse("it is not a valid URL, encode its special characters")
+            }
+            if (candidate.rawFragment != null) {
+                refuse("a fragment is never sent")
+            }
+            val path = candidate.rawPath ?: ""
+            val sameOrigin = candidate.scheme.equals(base.scheme, ignoreCase = true) &&
+                    candidate.host.equals(base.host, ignoreCase = true) &&
+                    candidate.effectivePort() == base.effectivePort() &&
+                    candidate.rawUserInfo == null
+            if (!sameOrigin || !underBasePath(path)) {
+                refuse("it is outside the base URL")
+            }
+            underBase(path + (candidate.rawQuery?.let { "?$it" } ?: ""))
+        }
+
+        basePath.isNotEmpty() && trimmed.startsWith("/") && !trimmed.startsWith("//") &&
+                underBasePath(trimmed.substringBefore('?').substringBefore('#')) -> underBase(trimmed)
+
+        else -> try {
+            resolveHttpCallUrl(baseUrl, trimmed)
+        } catch (ex: HttpCallUrlException) {
+            refuse(ex.reason)
+        }
+    }
+}
+
+private fun URI.effectivePort(): Int = when {
+    port != -1 -> port
+    scheme.equals("https", ignoreCase = true) -> 443
+    scheme.equals("http", ignoreCase = true) -> 80
+    else -> -1
+}

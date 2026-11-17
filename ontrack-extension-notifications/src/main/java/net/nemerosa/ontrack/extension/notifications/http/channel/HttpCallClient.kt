@@ -28,18 +28,23 @@ class HttpCallResponse(
 ) {
 
     /**
+     * Content type of the response, if any and valid.
+     */
+    fun contentTypeOrNull(): MediaType? = try {
+        headers.contentType
+    } catch (_: Exception) {
+        null
+    }
+
+    /**
      * Body for the output: parsed when its content type is JSON and it was read entirely, as text
      * otherwise, absent when empty.
      */
     fun bodyAsJson(): JsonNode? {
         if (body.isEmpty()) return null
-        val contentType = try {
-            headers.contentType
-        } catch (_: Exception) {
-            null
-        }
+        val contentType = contentTypeOrNull()
         val text = String(body, contentType?.charset ?: Charsets.UTF_8)
-        return if (!truncated && contentType != null && contentType.isJson()) {
+        return if (!truncated && contentType != null && isJson(contentType)) {
             try {
                 text.parseAsJson()
             } catch (_: Exception) {
@@ -55,7 +60,21 @@ class HttpCallResponse(
      * headers which could carry a secret: `Authorization`, `Set-Cookie` and the headers set by the
      * authentication of the configuration.
      */
-    fun outputHeaders(configuration: HttpConfiguration): Map<String, String> {
+    fun outputHeaders(configuration: HttpConfiguration): Map<String, String> =
+        visibleHeaderNames(configuration)
+            .associateWith { name -> headers.getOrEmpty(name).joinToString(", ") }
+            .toSortedMap()
+
+    /**
+     * Headers for the CEL conditions, by lowercase name, with their first value only, without the headers
+     * which could carry a secret, as for [outputHeaders].
+     */
+    fun firstHeaders(configuration: HttpConfiguration): Map<String, String> =
+        visibleHeaderNames(configuration)
+            .associateWith { name -> headers.getOrEmpty(name).firstOrNull() ?: "" }
+            .toSortedMap()
+
+    private fun visibleHeaderNames(configuration: HttpConfiguration): List<String> {
         val dropped = (configuration.authentication.headers().keys + droppedHeaders)
             .map { it.lowercase() }
             .toSet()
@@ -63,14 +82,16 @@ class HttpCallResponse(
             .map { it.lowercase() }
             .distinct()
             .filter { it !in dropped }
-            .associateWith { name -> headers.getOrEmpty(name).joinToString(", ") }
-            .toSortedMap()
     }
 
-    private fun MediaType.isJson() =
-        isCompatibleWith(MediaType.APPLICATION_JSON) || subtype.endsWith("+json")
-
     companion object {
+
+        /**
+         * Is a content type JSON? `application/json`, or any `+json` subtype.
+         */
+        fun isJson(contentType: MediaType) =
+            contentType.isCompatibleWith(MediaType.APPLICATION_JSON) || contentType.subtype.endsWith("+json")
+
         private val droppedHeaders = listOf(
             HttpHeaders.AUTHORIZATION,
             HttpHeaders.PROXY_AUTHORIZATION,

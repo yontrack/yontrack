@@ -10,7 +10,7 @@ import net.nemerosa.ontrack.model.annotations.APILabel
  */
 @APIDescription("Settings of the HTTP call notifications")
 data class HttpNotificationSettings(
-    @APIDescription("Maximum timeout (in seconds) a subscription may set on an HTTP call")
+    @APIDescription("Maximum timeout (in seconds) a subscription may set on the wait of an HTTP call for its conditions: a longer one is capped to it")
     @APILabel("Maximum timeout (s)")
     val maxTimeoutSeconds: Int = DEFAULT_MAX_TIMEOUT_SECONDS,
     @APIDescription("Maximum size (in bytes) of a response body: a longer body is truncated")

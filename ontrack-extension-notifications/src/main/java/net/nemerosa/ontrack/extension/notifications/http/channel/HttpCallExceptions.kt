@@ -10,6 +10,6 @@ open class HttpCallConfigException(message: String) : InputException(message)
 /**
  * A path which cannot be called under the base URL of an HTTP configuration.
  */
-class HttpCallUrlException(baseUrl: String, path: String, reason: String) : HttpCallConfigException(
+class HttpCallUrlException(baseUrl: String, path: String, val reason: String) : HttpCallConfigException(
     """Path "$path" cannot be called under the base URL "$baseUrl": $reason."""
 )

@@ -32,7 +32,13 @@ data class HttpNotificationChannelOutput(
     @APIDescription("True when the body of the response was longer than the maximum response size, and was cut")
     @APILabel("Truncated")
     val truncated: Boolean = false,
-    @APIDescription("Number of requests sent")
+    @APIDescription("Number of requests sent: the initial one, and the polls")
     @APILabel("Attempts")
     val attempts: Int = 0,
+    @APIDescription("URL which is polled, when the call waits for a condition: the URL of a GET, or the status URL of a POST or PUT")
+    @APILabel("Status URL")
+    val statusUrl: String? = null,
+    @APIDescription("Outcome of the conditions on the last response: SUCCESS, FAILURE or PENDING. Absent when there is no condition, or when they could not be evaluated.")
+    @APILabel("Condition")
+    val condition: HttpCallConditionOutcome? = null,
 )

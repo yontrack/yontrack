@@ -1,4 +1,4 @@
-import {Button, Form, Input, Select, Space, Typography} from "antd";
+import {Button, Divider, Form, Input, InputNumber, Select, Space, Typography} from "antd";
 import {FaPlus, FaTrash} from "react-icons/fa";
 import {prefixedFormName} from "@components/form/formUtils";
 import SelectConfiguration from "@components/configurations/SelectConfiguration";
@@ -91,6 +91,71 @@ export default function HttpNotificationChannelForm({prefix}) {
                     <HttpBodyInput/>
                 </Form.Item>
             }
+            <Divider titlePlacement="start" plain>Waiting for a condition</Divider>
+            <Form.Item
+                name={prefixedFormName(prefix, 'successCondition')}
+                label="Success condition"
+                extra={<>
+                    CEL condition on a response telling that the call succeeded, for
+                    example <Typography.Text code>{"response.body.status == 'SUCCEEDED'"}</Typography.Text>.
+                    It sees <Typography.Text code>response.status</Typography.Text>,{' '}
+                    <Typography.Text code>response.headers</Typography.Text> (lowercase names),{' '}
+                    <Typography.Text code>response.body</Typography.Text> (parsed JSON)
+                    and <Typography.Text code>attempt</Typography.Text>.
+                    Leave it empty for any 2xx response to be a success. With it, the call is polled until a
+                    condition holds.
+                </>}
+            >
+                <Input placeholder="response.body.status == 'SUCCEEDED'"/>
+            </Form.Item>
+            <Form.Item
+                name={prefixedFormName(prefix, 'failureCondition')}
+                label="Failure condition"
+                extra={<>
+                    CEL condition on a response telling that the call failed, for
+                    example <Typography.Text code>{"response.body.status == 'FAILED'"}</Typography.Text>.
+                    Requires a success condition.
+                </>}
+            >
+                <Input placeholder="response.body.status == 'FAILED'"/>
+            </Form.Item>
+            {
+                acceptsBody &&
+                <Form.Item
+                    name={prefixedFormName(prefix, 'statusUrl')}
+                    label="Status URL"
+                    extra={<>
+                        CEL expression giving, from the response of the {method}, the URL to poll with GET, for
+                        example <Typography.Text code>{"response.headers['location']"}</Typography.Text> or{' '}
+                        <Typography.Text code>{"'/deployments/' + response.body.id"}</Typography.Text>.
+                        It must stay under the base URL of the configuration.
+                        Without it, the conditions are evaluated on the response of the {method} only.
+                    </>}
+                    preserve={false}
+                >
+                    <Input placeholder="response.headers['location']"/>
+                </Form.Item>
+            }
+            <Space size="large" wrap>
+                <Form.Item
+                    name={prefixedFormName(prefix, 'intervalSeconds')}
+                    label="Interval (s)"
+                    extra="Between two polls, at least 5 seconds."
+                    initialValue={10}
+                    rules={[{required: true, type: 'integer', min: 5, message: 'The interval must be at least 5 seconds.'}]}
+                >
+                    <InputNumber min={5} precision={0}/>
+                </Form.Item>
+                <Form.Item
+                    name={prefixedFormName(prefix, 'timeoutSeconds')}
+                    label="Timeout (s)"
+                    extra="Maximum wait, capped by the HTTP notifications settings."
+                    initialValue={300}
+                    rules={[{required: true, type: 'integer', min: 5, message: 'The timeout must be at least 5 seconds.'}]}
+                >
+                    <InputNumber min={5} precision={0}/>
+                </Form.Item>
+            </Space>
         </>
     )
 }

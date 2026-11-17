@@ -11,7 +11,23 @@ const statusColor = (status) => {
     }
 }
 
-export default function HttpNotificationChannelOutput({method, url, status, headers, body, truncated, attempts}) {
+const conditionColor = {
+    SUCCESS: 'success',
+    FAILURE: 'error',
+    PENDING: 'processing',
+}
+
+export default function HttpNotificationChannelOutput({
+                                                          method,
+                                                          url,
+                                                          status,
+                                                          headers,
+                                                          body,
+                                                          truncated,
+                                                          attempts,
+                                                          statusUrl,
+                                                          condition,
+                                                      }) {
 
     const items = [
         {
@@ -38,6 +54,27 @@ export default function HttpNotificationChannelOutput({method, url, status, head
             span: 6,
         },
     ]
+
+    if (statusUrl) {
+        items.push({
+            key: 'statusUrl',
+            label: 'Status URL',
+            children: <Space size={4} wrap>
+                <Tag>GET</Tag>
+                <Typography.Text code copyable>{statusUrl}</Typography.Text>
+            </Space>,
+            span: 12,
+        })
+    }
+
+    if (condition) {
+        items.push({
+            key: 'condition',
+            label: 'Condition',
+            children: <Tag color={conditionColor[condition]}>{condition}</Tag>,
+            span: 12,
+        })
+    }
 
     const headerNames = headers ? Object.keys(headers) : []
     if (headerNames.length > 0) {
