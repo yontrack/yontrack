@@ -336,6 +336,38 @@ The medium a notification is delivered through: mail, Slack, webhook, workflow,
 and others.
 _Avoid_: notification target, transport
 
+**HTTP configuration**:
+A named configuration, managed by admins, holding a **base URL** and an
+authentication: `none`, or one of a webhook's `basic`, `bearer` and `header`. Every HTTP call goes through one, `none` included for an anonymous API,
+and the set of HTTP configurations *is* the allowlist of hosts Yontrack may call:
+there is no other.
+_Avoid_: HTTP connection, credentials, endpoint, allowlist entry
+
+**HTTP call**:
+The notification channel `http`, which calls an API as a step of delivery: a
+`GET`, `POST` or `PUT` on a templated path under an HTTP configuration's base URL,
+never outside it. The call is always awaited, a non-2xx is an error, and it may go
+on waiting for a success condition. A **webhook** is the opposite: it pushes the
+event envelope to a listener and never looks at the answer.
+_Avoid_: webhook, HTTP request channel, REST call
+
+**Success condition** / **failure condition**:
+The CEL expressions an HTTP call waits on, evaluated against every response it
+gets, the first one included. They see `response.status`, `response.headers`
+(lowercased names, first value) and `response.body` (the parsed JSON), and
+`attempt`, and nothing else. The success condition holding means OK, the failure
+condition holding means an error; neither holding means the call is **still
+pending** and polled again, until the timeout turns it into an error.
+_Avoid_: assertion, check, validation, predicate
+
+**Status URL**:
+What an HTTP call polls while it waits: the request's own URL for a `GET`, and for
+a `POST` or `PUT` a CEL expression evaluated on the first response, such as
+`response.headers['location']`, resolved under the HTTP configuration's base URL.
+The `POST` or `PUT` itself is sent once; without a status URL its conditions are
+evaluated on its first response only.
+_Avoid_: callback URL, polling URL, location
+
 **Workflow**:
 One notification channel among many, in which a notification triggers a graph of
 executable nodes. A workflow is a *kind of* notification, so a count of an
