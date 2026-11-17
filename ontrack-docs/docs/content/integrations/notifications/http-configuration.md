@@ -2,7 +2,7 @@
 
 An _HTTP configuration_ is a named **base URL** together with the **authentication** used to call
 it. Every HTTP call that Yontrack makes on behalf of a notification goes through one: the calls stay
-under its base URL, and they carry its authentication.
+under its base URL, and they carry its authentication. The [HTTP call](http.md) channel makes its calls this way.
 
 The HTTP configurations are managed by administrators, and their list _is_ the list of the hosts
 Yontrack may call: there is no other allowlist. An anonymous API still needs a configuration, with

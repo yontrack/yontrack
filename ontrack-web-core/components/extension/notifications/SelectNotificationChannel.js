@@ -2,7 +2,7 @@ import {useQuery} from "@components/services/GraphQL";
 import {gql} from "graphql-request";
 import {Select, Space, Tag, Typography} from "antd";
 
-export default function SelectNotificationChannel({value, onChange, onSelectedNotificationChannel, style, allowClear}) {
+export default function SelectNotificationChannel({id, value, onChange, onSelectedNotificationChannel, style, allowClear}) {
 
     const {data: channels, loading, finished} = useQuery(
         gql`
@@ -38,6 +38,7 @@ export default function SelectNotificationChannel({value, onChange, onSelectedNo
     return (
         <>
             <Select
+                id={id}
                 options={options}
                 loading={loading || !finished}
                 value={value}
