@@ -104,7 +104,7 @@ test('creating an HTTP call subscription from its form', async ({page, ontrack})
     await expect(dialog).not.toBeVisible()
 
     // The subscription is displayed
-    await expect(page.getByText("/deployments?project=${project}")).toBeVisible()
+    await expect(page.getByText(`https://${configName}.example.com/api/deployments?project=\${project}`, {exact: true})).toBeVisible()
     await expect(page.getByText(configName, {exact: true})).toBeVisible()
     await expect(page.getByText("X-Request-Id")).toBeVisible()
 

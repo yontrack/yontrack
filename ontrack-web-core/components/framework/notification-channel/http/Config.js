@@ -1,6 +1,9 @@
 import {Descriptions, Space, Tag, Typography} from "antd";
 import {FaArrowRight} from "react-icons/fa";
+import {gql} from "graphql-request";
 import JsonDisplay from "@components/common/JsonDisplay";
+import {useQuery} from "@components/services/GraphQL";
+import {httpCallUrl} from "@components/extension/notifications/http/httpCallUrl";
 
 export default function HttpNotificationChannelConfig({
                                                           config,
@@ -15,13 +18,29 @@ export default function HttpNotificationChannelConfig({
                                                           timeoutSeconds,
                                                       }) {
 
+    const {data: baseUrl} = useQuery(
+        gql`
+            query HttpConfigurationBaseUrl($name: String!) {
+                configurationByName(type: "http", name: $name) {
+                    data
+                }
+            }
+        `,
+        {
+            variables: {name: config},
+            deps: [config],
+            condition: !!config,
+            dataFn: data => data.configurationByName?.data?.url,
+        }
+    )
+
     const items = [
         {
             key: 'call',
             label: 'Call',
             children: <Space size={4} wrap>
                 <Tag>{method ?? 'GET'}</Tag>
-                <Typography.Text code>{path || '/'}</Typography.Text>
+                <Typography.Text code>{httpCallUrl(baseUrl, path)}</Typography.Text>
                 <Typography.Text>on</Typography.Text>
                 <Typography.Text code>{config}</Typography.Text>
             </Space>,
