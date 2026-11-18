@@ -50,6 +50,23 @@ object DemoContent {
      */
     const val E2E = "petclinic-e2e"
 
+    /**
+     * The aggregate whose GOLD promotes the builds it is made of, through the
+     * `yontrack-dependencies-promotion` channel (#2146). A small project of its own, with its two
+     * [components][SUITE_CORE], so that no other story of the demo changes.
+     */
+    const val SUITE = "petclinic-suite"
+
+    /** Used by [SUITE] through an unqualified link, and already GOLD: the fan-out skips it. */
+    const val SUITE_CORE = "petclinic-suite-core"
+
+    /** Used twice by [SUITE], one build per module, through qualified links. */
+    const val SUITE_MODULES = "petclinic-suite-modules"
+
+    /** Qualifiers of the links of [SUITE] to [SUITE_MODULES]. */
+    const val SUITE_MODULE_BILLING = "module-billing"
+    const val SUITE_MODULE_VISITS = "module-visits"
+
     /** The suite of [E2E] run on every build, so its validation stamp has a long history. */
     const val E2E_SMOKE = "E2E.SMOKE"
 
@@ -363,6 +380,9 @@ object DemoContent {
             e2e(),
             vets(),
             portal(),
+            suiteCore(),
+            suiteModules(),
+            suite(),
             auditTrail(),
             auditTrailTampered(),
             changelogProject(changelog),
@@ -695,6 +715,106 @@ object DemoContent {
 
     /** The full set of checks, for the same projects. */
     private val fullValidationStamps = listOf(buildStamp, unitTests, integrationTests, securityScan)
+
+    private fun suiteCore() = ProjectSpec(
+        name = SUITE_CORE,
+        description = "Core of the petclinic suite.",
+        labels = listOf(LABEL_TEAM_PLATFORM, LABEL_LANGUAGE_KOTLIN),
+        branches = listOf(
+            BranchSpec(
+                name = MAIN,
+                description = "Main development branch.",
+                promotionLevels = listOf(PromotionLevelSpec(GOLD, "Released as part of the suite.")),
+                builds = listOf(
+                    BuildSpec(
+                        name = "1.2",
+                        release = "1.2.0",
+                        description = "Already released with a former suite.",
+                        creation = DaysAgo(6),
+                        promotionLevels = listOf(GOLD),
+                    ),
+                ),
+            ),
+        ),
+    )
+
+    private fun suiteModules() = ProjectSpec(
+        name = SUITE_MODULES,
+        description = "Modules of the petclinic suite, each one built on its own.",
+        labels = listOf(LABEL_TEAM_PLATFORM, LABEL_LANGUAGE_KOTLIN),
+        branches = listOf(
+            BranchSpec(
+                name = MAIN,
+                description = "Main development branch.",
+                promotionLevels = listOf(PromotionLevelSpec(GOLD, "Released as part of the suite.")),
+                builds = listOf(
+                    BuildSpec(
+                        name = "1.3",
+                        release = "1.3.0",
+                        description = "Billing module.",
+                        creation = DaysAgo(5),
+                    ),
+                    BuildSpec(
+                        name = "1.4",
+                        release = "1.4.0",
+                        description = "Visits module.",
+                        creation = DaysAgo(4),
+                    ),
+                ),
+            ),
+        ),
+    )
+
+    /**
+     * GOLD on the aggregate promotes what it is made of: one unqualified link, already GOLD and then
+     * skipped, and two qualified links to builds of the same project.
+     */
+    private fun suite() = ProjectSpec(
+        name = SUITE,
+        description = "Aggregate of the petclinic suite, whose release promotes its components.",
+        labels = listOf(LABEL_TEAM_PLATFORM, LABEL_LANGUAGE_KOTLIN),
+        branches = listOf(
+            BranchSpec(
+                name = MAIN,
+                description = "Main development branch.",
+                promotionLevels = listOf(
+                    PromotionLevelSpec(
+                        GOLD,
+                        "Releases the suite and the components it is made of.",
+                        workflow = WorkflowSpec(
+                            yaml = """
+                                name: Promote the components of the suite
+                                nodes:
+                                  - id: promote-components
+                                    executorId: notification
+                                    timeout: 60
+                                    data:
+                                        channel: ${WorkflowSpec.YONTRACK_DEPENDENCIES_PROMOTION_CHANNEL}
+                                        channelConfig:
+                                            project: $SUITE-.*
+                                            promotion: $GOLD
+                                        template: Released with the suite ${'$'}{build}
+                            """.trimIndent(),
+                        ),
+                    ),
+                ),
+                builds = listOf(
+                    BuildSpec(
+                        name = "10",
+                        release = "10.0.0",
+                        description = "First release of the suite with its modules.",
+                        creation = DaysAgo(3),
+                        promotionLevels = listOf(GOLD),
+                        links = listOf(
+                            BuildRef(SUITE_CORE, MAIN, "1.2"),
+                            BuildRef(SUITE_MODULES, MAIN, "1.3", SUITE_MODULE_BILLING),
+                            BuildRef(SUITE_MODULES, MAIN, "1.4", SUITE_MODULE_VISITS),
+                        ),
+                    ),
+                ),
+            ),
+        ),
+    )
 
     /**
      * A library everything else depends on — the bottom of the dependency graph.

@@ -506,6 +506,19 @@ Check the `yontrack-promotion` notifications whose `project`, `branch` or `build
 typically because of a build link which is not always there. Such a notification now fails, and a
 workflow node using it fails with it.
 
+### Waiting for a promotion reports its failed notifications
+
+With `waitForPromotion`, the `yontrack-promotion` notification channel waits for the notifications
+of the promotion run it creates. In Yontrack 5, a failed notification on most channels was not seen
+by this wait, which ended successfully. In Yontrack 6, any failed notification ends the wait in
+error.
+
+#### For workflow and subscription authors
+
+A `yontrack-promotion` notification using `waitForPromotion` now fails when a notification of the
+target promotion level fails. Fix the failing notification, or remove `waitForPromotion` if its
+outcome does not matter.
+
 ## Removed
 
 Yontrack 6 removes what Yontrack 5 deprecated. Each item is listed here with what to use instead,

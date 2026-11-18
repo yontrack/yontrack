@@ -95,7 +95,7 @@ class DemoCanaryWorkflowSeedTest {
         seed(target).run(DemoContent.dataset(emptyList()))
 
         val journal = target.journal
-        val workflows = journal.indices.filter { journal[it].startsWith("workflow ") }
+        val workflows = journal.indices.filter { journal[it].startsWith("workflow ${DemoContent.CANARY} ") }
         assertEquals(2, workflows.size, "One workflow per CANARY promotion: $journal")
         val lastDeploymentBefore = journal.indexOfLast { it == "deploy staging/${DemoContent.SERVICE} 107 RUNNING" }
         assertTrue(lastDeploymentBefore in 0 until workflows.first(), "The declared deployments come first: $journal")

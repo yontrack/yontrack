@@ -933,8 +933,8 @@ private class KdslDemoBuild(val build: Build, private val admin: Ontrack) : Demo
         )
     }
 
-    override fun linkTo(build: DemoBuild) {
-        this.build.linkTo((build as KdslDemoBuild).build)
+    override fun linkTo(build: DemoBuild, qualifier: String) {
+        this.build.linkTo((build as KdslDemoBuild).build, qualifier)
     }
 
     override fun setCommit(commitId: String) {

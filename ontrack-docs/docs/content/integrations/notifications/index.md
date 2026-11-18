@@ -163,6 +163,7 @@ ${promotionRun.changelog?project=dependency}
 * [GitHub workflows](github-workflow.md) - triggering a GitHub Actions workflow
 * [Jenkins](jenkins.md) - triggering a Jenkins job
 * [Ontrack validation](ontrack-validation.md) - forwarding a validation, and its status, to another build
+* [Yontrack dependencies promotion](yontrack-dependencies-promotion.md) - promoting the builds linked from a build
 
 ## Notification metrics
 

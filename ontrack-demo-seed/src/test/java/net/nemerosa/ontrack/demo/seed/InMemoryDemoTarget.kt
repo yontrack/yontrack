@@ -803,6 +803,9 @@ class InMemoryDemoTarget(
         val testRuns = mutableListOf<InMemoryTestRun>()
         val links = mutableListOf<InMemoryBuild>()
 
+        /** The qualifier of each of the [links], in the same order. */
+        val linkQualifiers = mutableListOf<String>()
+
         override fun setRelease(release: String) {
             releaseVersion = release
             entry("property.set", "propertyType" to "release")
@@ -1011,8 +1014,9 @@ class InMemoryDemoTarget(
             entry("validation.run", "validationStamp" to scan.validationStamp)
         }
 
-        override fun linkTo(build: DemoBuild) {
+        override fun linkTo(build: DemoBuild, qualifier: String) {
             links += build as InMemoryBuild
+            linkQualifiers += qualifier
             entry("link.added", "target" to "${build.branch.project.name}/${build.name}")
         }
 
@@ -1510,6 +1514,24 @@ private fun InMemoryDemoTarget.runWorkflow(
                             WorkflowSpec.YONTRACK_PROMOTION_CHANNEL -> {
                                 build.promote(config.path("promotion").asString(), "", at, byPerson = true)
                                 null
+                            }
+                            WorkflowSpec.YONTRACK_DEPENDENCIES_PROMOTION_CHANNEL -> {
+                                val promotion = config.path("promotion").asString()
+                                val projects = config.path("project").takeIf { !it.isMissingNode }?.asString()?.toRegex()
+                                build.links
+                                    .filter { it !== build && (projects == null || projects.matches(it.branch.project.name)) }
+                                    .distinct()
+                                    .filter { target -> target.promotions.none { it.first == promotion } }
+                                    .mapNotNull { target ->
+                                        try {
+                                            target.promote(promotion, "", at, byPerson = true)
+                                            null
+                                        } catch (ex: Exception) {
+                                            "${target.name}: ${ex.message}"
+                                        }
+                                    }
+                                    .takeIf { it.isNotEmpty() }
+                                    ?.joinToString("; ")
                             }
                             else -> "Notification channel not found: $channel"
                         }

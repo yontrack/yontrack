@@ -187,8 +187,11 @@ class Build(
 
     /**
      * Links this build to another build
+     *
+     * @param build Build to link to
+     * @param qualifier Qualifier of the link, empty for an unqualified link
      */
-    fun linkTo(build: Build) {
+    fun linkTo(build: Build, qualifier: String = "") {
         graphqlConnector.mutate(
             LinksBuildMutation(
                 branch.project.name,
@@ -196,6 +199,7 @@ class Build(
                 listOf(
                     LinksBuildInputItem(
                         project = build.branch.project.name,
+                        qualifier = Optional.presentIfNotNull(qualifier.takeIf { it.isNotEmpty() }),
                         build = build.name
                     )
                 )

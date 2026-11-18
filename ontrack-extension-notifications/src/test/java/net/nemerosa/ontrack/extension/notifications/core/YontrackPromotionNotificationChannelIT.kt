@@ -1,10 +1,14 @@
 package net.nemerosa.ontrack.extension.notifications.core
 
+import net.nemerosa.ontrack.common.Time
 import net.nemerosa.ontrack.extension.notifications.AbstractNotificationTestSupport
 import net.nemerosa.ontrack.extension.notifications.channels.NotificationResultType
+import net.nemerosa.ontrack.extension.notifications.recording.NotificationRecord
+import net.nemerosa.ontrack.extension.notifications.recording.NotificationRecordResult
 import net.nemerosa.ontrack.extension.notifications.recording.NotificationRecordingService
 import net.nemerosa.ontrack.extension.notifications.subscriptions.subscribe
 import net.nemerosa.ontrack.it.AsAdminTest
+import net.nemerosa.ontrack.json.asJson
 import net.nemerosa.ontrack.model.events.EventFactory
 import net.nemerosa.ontrack.model.structure.Build
 import net.nemerosa.ontrack.model.structure.PromotionLevel
@@ -136,6 +140,58 @@ class YontrackPromotionNotificationChannelIT : AbstractNotificationTestSupport()
                             assertEquals("Build: $name", fv.value?.asText())
                         }
                     }
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `Waiting ends in error when a notification of the promotion failed`() {
+        project {
+            branch {
+                val promotionLevel = promotionLevel()
+                // Ends in error, because the promotion level it targets does not exist
+                eventSubscriptionService.subscribe(
+                    name = uid("s"),
+                    projectEntity = promotionLevel,
+                    channel = yontrackPromotionNotificationChannel,
+                    channelConfig = YontrackPromotionNotificationChannelConfig(promotion = "not-existing"),
+                    keywords = null,
+                    origin = "test",
+                    contentTemplate = null,
+                    eventTypes = arrayOf(EventFactory.NEW_PROMOTION_RUN),
+                )
+                build {
+                    val config = YontrackPromotionNotificationChannelConfig(
+                        promotion = promotionLevel.name,
+                        waitForPromotion = true,
+                    )
+                    val published = yontrackPromotionNotificationChannel.publish(
+                        recordId = "1",
+                        config = config,
+                        event = eventFactory.newBuild(this),
+                        context = emptyMap(),
+                        template = null,
+                    ) { it }
+                    assertEquals(NotificationResultType.ASYNC, published.type)
+
+                    val result = yontrackPromotionNotificationChannel.getNotificationResult(
+                        NotificationRecord(
+                            id = uid("r"),
+                            source = null,
+                            timestamp = Time.now,
+                            channel = yontrackPromotionNotificationChannel.type,
+                            channelConfig = config.asJson(),
+                            event = emptyMap<String, String>().asJson(),
+                            result = NotificationRecordResult(
+                                type = published.type,
+                                message = null,
+                                output = published.output?.asJson(),
+                            ),
+                        )
+                    )
+
+                    assertEquals(NotificationResultType.ERROR, result?.type)
                 }
             }
         }

@@ -456,7 +456,7 @@ fun DemoDataset.validate() {
                                 "${ref.build} of ${ref.project}, which is left out of the reset on an " +
                                 "instance which cannot offer what it requires."
                     }
-                    if (ref !in buildRefs) {
+                    if (ref.target !in buildRefs) {
                         problems += "Build ${build.name} of ${project.name}/${branch.name} " +
                                 "uses ${ref.build} of ${ref.project}/${ref.branch}, " +
                                 "which the dataset never creates."

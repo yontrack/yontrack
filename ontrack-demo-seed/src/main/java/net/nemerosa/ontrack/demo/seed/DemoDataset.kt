@@ -351,6 +351,7 @@ data class WorkflowSpec(
         const val NOTIFICATION_EXECUTOR = "notification"
         const val SLOT_PIPELINE_CREATION_EXECUTOR = "slot-pipeline-creation"
         const val YONTRACK_PROMOTION_CHANNEL = "yontrack-promotion"
+        const val YONTRACK_DEPENDENCIES_PROMOTION_CHANNEL = "yontrack-dependencies-promotion"
     }
 }
 
@@ -791,12 +792,19 @@ data class AcceptanceSpec(
 
 /**
  * Points at a build of another project, by name.
+ *
+ * @property qualifier Qualifier of the link, when this reference is a [link][BuildSpec.links] of a
+ * build. It says nothing about the build itself, see [target].
  */
 data class BuildRef(
     val project: String,
     val branch: String,
     val build: String,
-)
+    val qualifier: String = "",
+) {
+    /** The build pointed at, whatever the qualifier of the link leading to it. */
+    val target: BuildRef get() = copy(qualifier = "")
+}
 
 data class EnvironmentSpec(
     val name: String,

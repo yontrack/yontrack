@@ -469,9 +469,10 @@ interface DemoBuild {
     fun validateWithTests(run: TestRunSpec, at: LocalDateTime)
 
     /**
-     * Records that this build uses [build].
+     * Records that this build uses [build], under a [qualifier] when it uses several builds of the
+     * same project.
      */
-    fun linkTo(build: DemoBuild)
+    fun linkTo(build: DemoBuild, qualifier: String = "")
 
     /**
      * Records the commit this build was built from, which is where a change log involving

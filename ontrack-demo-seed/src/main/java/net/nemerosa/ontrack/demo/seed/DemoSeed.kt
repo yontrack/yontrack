@@ -287,7 +287,7 @@ class DemoSeed(
                 branchSpec.builds.forEach { buildSpec ->
                     val build = builds.getValue(BuildRef(spec.name, branchSpec.name, buildSpec.name))
                     buildSpec.links.forEach { ref ->
-                        build.linkTo(builds.resolve(ref))
+                        build.linkTo(builds.resolve(ref), ref.qualifier)
                     }
                 }
             }
@@ -685,7 +685,7 @@ class DemoSeed(
 
     // validate() has already ruled out a reference the dataset does not create.
     private fun Map<BuildRef, DemoBuild>.resolve(ref: BuildRef): DemoBuild =
-        getValue(ref)
+        getValue(ref.target)
 
     /** How a slot reads in the log: "production/petclinic", or "production/petclinic [canary]". */
     private fun slotName(spec: EnvironmentSpec, slotSpec: SlotSpec): String =
