@@ -489,6 +489,23 @@ and out of order, while two backends ran side by side
   GitHub ingestion payloads, which the `queue` filter of their GraphQL query matches, and the queue
   of the new TFC queue records take the new names. The older ones keep the old names.
 
+### Promotion notifications fail on a blank target
+
+The `project`, `branch` and `build` fields of the `yontrack-promotion` notification channel are
+templates. In Yontrack 5, a field rendered blank was treated as if it was not configured, and the
+entity of the event was used instead: a `${build.linked?project=B}` whose link is absent promoted
+the build of the event itself.
+
+In Yontrack 6, a field which is configured and rendered blank ends the notification in error, naming
+the field, and nothing is promoted. A field which is absent or blank in the configuration still uses
+the entity of the event.
+
+#### For workflow and subscription authors
+
+Check the `yontrack-promotion` notifications whose `project`, `branch` or `build` can render blank,
+typically because of a build link which is not always there. Such a notification now fails, and a
+workflow node using it fails with it.
+
 ## Removed
 
 Yontrack 6 removes what Yontrack 5 deprecated. Each item is listed here with what to use instead,

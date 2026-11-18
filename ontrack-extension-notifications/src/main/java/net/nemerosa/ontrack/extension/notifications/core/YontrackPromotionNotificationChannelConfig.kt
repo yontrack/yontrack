@@ -9,11 +9,11 @@ import net.nemerosa.ontrack.model.json.DurationSerializer
 import java.time.Duration
 
 data class YontrackPromotionNotificationChannelConfig(
-    @APIDescription("[template] Name of the project to promote. If not provided, looks for the event's project if available.")
+    @APIDescription("[template] Name of the project to promote. If not provided, looks for the event's project if available. If provided and rendered blank, the notification fails and nothing is promoted.")
     val project: String? = null,
-    @APIDescription("[template] Name of the branch to promote. If not provided, looks for the event's branch if available.")
+    @APIDescription("[template] Name of the branch to promote. If not provided, looks for the event's branch if available. If provided and rendered blank, the notification fails and nothing is promoted.")
     val branch: String? = null,
-    @APIDescription("[template] Name of the build to promote. If not provided, looks for the event's build if available.")
+    @APIDescription("[template] Name of the build to promote. If not provided, looks for the event's build if available. If provided and rendered blank, the notification fails and nothing is promoted.")
     val build: String? = null,
     @APIDescription("Name of the promotion level to use.")
     val promotion: String,

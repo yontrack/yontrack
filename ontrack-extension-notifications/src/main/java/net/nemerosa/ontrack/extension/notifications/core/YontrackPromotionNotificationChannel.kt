@@ -85,7 +85,11 @@ class YontrackPromotionNotificationChannel(
         outputProgressCallback: (current: YontrackPromotionNotificationChannelOutput) -> YontrackPromotionNotificationChannelOutput
     ): NotificationResult<YontrackPromotionNotificationChannelOutput> {
 
-        val build = securityService.asAdmin { getTargetBuild(config, event, context) }
+        val build = try {
+            securityService.asAdmin { getTargetBuild(config, event, context) }
+        } catch (ex: YontrackPromotionBlankTargetException) {
+            return NotificationResult.error(ex.message)
+        }
         val description = eventTemplatingService.renderEvent(event, context, template)
 
         val promotionLevel = structureService.findPromotionLevelByName(
@@ -273,9 +277,9 @@ class YontrackPromotionNotificationChannel(
         event: Event,
         context: Map<String, Any>
     ): Build {
-        val buildName = config.build?.run { eventTemplatingService.renderEvent(event, context, this) }
-        val branchName = config.branch?.run { eventTemplatingService.renderEvent(event, context, this) }
-        val projectName = config.project?.run { eventTemplatingService.renderEvent(event, context, this) }
+        val buildName = renderTarget("build", config.build, event, context)
+        val branchName = renderTarget("branch", config.branch, event, context)
+        val projectName = renderTarget("project", config.project, event, context)
         return yontrackBuildNotificationHelper.getBuild(
             event = event,
             projectName = projectName,
@@ -283,6 +287,26 @@ class YontrackPromotionNotificationChannel(
             buildName = buildName,
         )
     }
+
+    /**
+     * Renders a target of the promotion.
+     *
+     * @return The rendered value, or `null` when the target is not configured, in which case the entity of the event
+     * is used
+     * @throws YontrackPromotionBlankTargetException When the target is configured but is rendered blank
+     */
+    private fun renderTarget(
+        field: String,
+        template: String?,
+        event: Event,
+        context: Map<String, Any>,
+    ): String? =
+        template
+            ?.takeIf { it.isNotBlank() }
+            ?.let { eventTemplatingService.renderEvent(event, context, it) }
+            ?.also { rendered ->
+                if (rendered.isBlank()) throw YontrackPromotionBlankTargetException(field)
+            }
 
     override fun toSearchCriteria(text: String): JsonNode =
         mapOf(
@@ -292,4 +316,13 @@ class YontrackPromotionNotificationChannel(
     override val type: String = "yontrack-promotion"
     override val displayName: String = "Yontrack promotion"
     override val enabled: Boolean = true
+}
+
+/**
+ * A target of the promotion is configured, but its template is rendered blank.
+ */
+internal class YontrackPromotionBlankTargetException(field: String) : RuntimeException(
+    "The $field of the promotion is configured but was rendered blank. Nothing has been promoted."
+) {
+    override val message: String get() = super.message!!
 }
