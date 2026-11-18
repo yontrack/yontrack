@@ -70,4 +70,8 @@ tasks.named<Test>("test") {
     inputs.dir("../compose/keycloak/import")
         .withPropertyName("keycloakRealms")
         .withPathSensitivity(PathSensitivity.RELATIVE)
+    // BackendImageTest reads the Jib configuration of the backend image
+    inputs.file("../ontrack-ui/build.gradle.kts")
+        .withPropertyName("backendImageBuildScript")
+        .withPathSensitivity(PathSensitivity.RELATIVE)
 }

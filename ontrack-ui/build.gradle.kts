@@ -141,6 +141,8 @@ jib {
         }
     }
     container {
+        // Mitigation of CVE-2026-114938 (#2158): remove once the base image is on JDK 25.0.5.1 or later
+        jvmFlags = listOf("-XX:-UseBASE64Intrinsics")
         ports = listOf("8080", "8800")
         volumes = listOf("/var/ontrack/data")
         environment = mapOf(
