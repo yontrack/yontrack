@@ -33,7 +33,6 @@ class AutoVersioningRetryServiceImplTest {
         override val now: LocalDateTime = this@AutoVersioningRetryServiceImplTest.now
     }
 
-    private lateinit var auditQueryService: AutoVersioningAuditQueryService
     private lateinit var auditService: AutoVersioningAuditService
     private lateinit var auditStore: AutoVersioningAuditStore
     private lateinit var eventService: AutoVersioningEventService
@@ -45,14 +44,12 @@ class AutoVersioningRetryServiceImplTest {
 
     @BeforeEach
     fun init() {
-        auditQueryService = mockk()
         auditService = mockk(relaxed = true)
         auditStore = mockk()
         eventService = mockk(relaxed = true)
         cachedSettingsService = mockk()
         metrics = mockk(relaxed = true)
         service = AutoVersioningRetryServiceImpl(
-            autoVersioningAuditQueryService = auditQueryService,
             autoVersioningAuditService = auditService,
             autoVersioningAuditStore = auditStore,
             autoVersioningEventService = eventService,
@@ -106,7 +103,7 @@ class AutoVersioningRetryServiceImplTest {
     fun `No retry when a newer order for the same target is running`() {
         settings(retryMaxCount = 2)
         val newer = branch.createOrder(sourceProject = "source", targetVersion = "3.0.0")
-        every { auditQueryService.findByFilter(any()) } returns listOf(
+        every { auditStore.auditVersioningEntries(any(), any()) } returns listOf(
             auditEntry(order),
             auditEntry(newer),
         )
@@ -168,7 +165,7 @@ class AutoVersioningRetryServiceImplTest {
     @Test
     fun `The failure is recorded and notified even when the retry decision fails`() {
         settings(retryMaxCount = 2)
-        every { auditQueryService.findByUUID(any(), any()) } throws IllegalStateException("DB is down")
+        every { auditStore.findByUUID(any(), any()) } throws IllegalStateException("DB is down")
 
         service.onError(order, AutoVersioningDeferredErrorException("GitHub is down", transient))
 
@@ -322,11 +319,11 @@ class AutoVersioningRetryServiceImplTest {
     }
 
     private fun entry(order: AutoVersioningOrder, vararg creationData: Pair<String, String>) {
-        every { auditQueryService.findByUUID(order.branch, order.uuid) } returns auditEntry(order, *creationData)
+        every { auditStore.findByUUID(order.branch, order.uuid) } returns auditEntry(order, *creationData)
     }
 
     private fun noOtherRunningOrder() {
-        every { auditQueryService.findByFilter(any()) } returns listOf(auditEntry(order))
+        every { auditStore.auditVersioningEntries(any(), any()) } returns listOf(auditEntry(order))
     }
 
     private fun auditEntry(order: AutoVersioningOrder, vararg creationData: Pair<String, String>) =

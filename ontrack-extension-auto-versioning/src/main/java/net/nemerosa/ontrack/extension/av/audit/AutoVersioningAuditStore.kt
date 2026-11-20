@@ -6,6 +6,10 @@ import java.time.LocalDateTime
 
 /**
  * Storage abstraction for the auto versioning events.
+ *
+ * The store does not check any permission: it is used as such by the internal processing (queue,
+ * scheduling, retries, retention), which must see every entry. The reads on behalf of a user go
+ * through [AutoVersioningAuditQueryService], which restricts them to the visible target projects.
  */
 interface AutoVersioningAuditStore {
 
@@ -77,10 +81,13 @@ interface AutoVersioningAuditStore {
      * Global query to get audit versioning entries.
      *
      * @param filter Filter to use
+     * @param projectIds IDs of the target projects the entries are restricted to, `null` for all
+     * the projects (no restriction)
      * @return List of audit entries matching the [filter]
      */
     fun auditVersioningEntries(
-        filter: AutoVersioningAuditQueryFilter
+        filter: AutoVersioningAuditQueryFilter,
+        projectIds: Collection<Int>? = null,
     ): List<AutoVersioningAuditEntry>
 
     /**
@@ -94,10 +101,13 @@ interface AutoVersioningAuditStore {
      * Global query to get the count versioning entries.
      *
      * @param filter Filter to use
+     * @param projectIds IDs of the target projects the entries are restricted to, `null` for all
+     * the projects (no restriction)
      * @return Count of audit entries matching the [filter]
      */
     fun auditVersioningEntriesCount(
-        filter: AutoVersioningAuditQueryFilter
+        filter: AutoVersioningAuditQueryFilter,
+        projectIds: Collection<Int>? = null,
     ): Int
 
     /**

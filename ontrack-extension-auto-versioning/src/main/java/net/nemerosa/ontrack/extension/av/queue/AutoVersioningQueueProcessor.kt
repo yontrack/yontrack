@@ -1,8 +1,8 @@
 package net.nemerosa.ontrack.extension.av.queue
 
 import net.nemerosa.ontrack.extension.av.AutoVersioningConfigProperties
-import net.nemerosa.ontrack.extension.av.audit.AutoVersioningAuditQueryService
 import net.nemerosa.ontrack.extension.av.audit.AutoVersioningAuditService
+import net.nemerosa.ontrack.extension.av.audit.AutoVersioningAuditStore
 import net.nemerosa.ontrack.extension.av.dispatcher.AutoVersioningOrder
 import net.nemerosa.ontrack.extension.av.metrics.AutoVersioningMetricsService
 import net.nemerosa.ontrack.extension.av.processing.AutoVersioningProcessingService
@@ -19,7 +19,7 @@ import kotlin.reflect.KClass
 @Component
 class AutoVersioningQueueProcessor(
     autoVersioningConfigProperties: AutoVersioningConfigProperties,
-    private val autoVersioningAuditQueryService: AutoVersioningAuditQueryService,
+    private val autoVersioningAuditStore: AutoVersioningAuditStore,
     private val metrics: AutoVersioningMetricsService,
     private val securityService: SecurityService,
     private val autoVersioningAuditService: AutoVersioningAuditService,
@@ -45,10 +45,13 @@ class AutoVersioningQueueProcessor(
     /**
      * First check, without any lock: the decision to process the order is taken by [process],
      * under the lock on its routing identifier and on its audit entry.
+     *
+     * Reads the store directly: this runs outside of any security context, and the entry must be
+     * found whatever the visibility of its target project.
      */
     override fun isCancelled(payload: AutoVersioningQueuePayload): String? {
         val order = payload.order
-        val entry = autoVersioningAuditQueryService.findByUUID(order.branch, order.uuid)
+        val entry = autoVersioningAuditStore.findByUUID(order.branch, order.uuid)
         return if (entry == null) {
             val message = "No audit entry found upon receiving the processing order [${order.uuid}]"
             logger.warn(message)

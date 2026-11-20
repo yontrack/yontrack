@@ -1174,6 +1174,11 @@ the project of the build, and an operation on all the requests at once needs a g
 | Cleaning up the [audit entries](#audit-cleanup) on demand (`cleanupAutoVersioningAuditEntries`) | the global `ApplicationManagement` | the _Administrators_ |
 | Purging all the audit entries (`purgeAutoVersioningAuditEntries`) | the global `ApplicationManagement` | the _Administrators_ |
 
+A user sees only the requests whose **target** project they can see: the audit pages, the `autoVersioningAuditEntries`
+and `autoVersioningAuditEntry` queries, their counts and pages, and the pending requests counted by
+`GET /extension/auto-versioning/stats` leave the other requests out, whatever their source project. A request on a
+project the user cannot see is not found, as if it did not exist.
+
 The background jobs which [schedule](#scheduling) the due requests and [clean up](#audit-cleanup) the audit entries
 run as administrators, without any user: they need no role.
 

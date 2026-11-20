@@ -409,17 +409,26 @@ class AutoVersioningAuditStoreImpl(
             Int::class.java
         ) ?: 0
 
-    override fun auditVersioningEntriesCount(filter: AutoVersioningAuditQueryFilter): Int {
+    override fun auditVersioningEntriesCount(filter: AutoVersioningAuditQueryFilter, projectIds: Collection<Int>?): Int {
         val params = mutableMapOf<String, Any>()
-        val query = auditVersioningEntriesQuery(filter, params, select = "SELECT COUNT(S.UUID)", limits = false)
+        val query = auditVersioningEntriesQuery(
+            filter,
+            projectIds,
+            params,
+            select = "SELECT COUNT(S.UUID)",
+            limits = false
+        )
 
         // Runs the query
         return namedParameterJdbcTemplate!!.queryForObject(query, params, Int::class.java) ?: 0
     }
 
-    override fun auditVersioningEntries(filter: AutoVersioningAuditQueryFilter): List<AutoVersioningAuditEntry> {
+    override fun auditVersioningEntries(
+        filter: AutoVersioningAuditQueryFilter,
+        projectIds: Collection<Int>?,
+    ): List<AutoVersioningAuditEntry> {
         val params = mutableMapOf<String, Any>()
-        val query = auditVersioningEntriesQuery(filter, params)
+        val query = auditVersioningEntriesQuery(filter, projectIds, params)
 
         // Runs the query
         return namedParameterJdbcTemplate!!.query(query, params) { rs, _ ->
@@ -445,10 +454,15 @@ class AutoVersioningAuditStoreImpl(
         }
     }
 
+    /**
+     * @param projectIds IDs of the target projects the entries are restricted to, `null` for no
+     * restriction
+     */
     private fun auditVersioningEntriesQuery(
         filter: AutoVersioningAuditQueryFilter,
+        projectIds: Collection<Int>?,
         params: MutableMap<String, Any>,
-        select: String = "SELECT * ",
+        select: String = "SELECT S.* ",
         limits: Boolean = true,
     ): String {
         // Base query
@@ -508,9 +522,23 @@ class AutoVersioningAuditStoreImpl(
             params += "targetPaths" to paths.joinToString(",")
         }
 
+        // The target branch is needed to restrict or to filter on the target project
+        if (projectIds != null || !filter.project.isNullOrBlank()) {
+            joins += "INNER JOIN BRANCHES B ON B.ID = S.BRANCH_ID"
+        }
+
+        // Target projects the entries are restricted to
+        if (projectIds != null) {
+            if (projectIds.isEmpty()) {
+                queries += "FALSE"
+            } else {
+                queries += "B.PROJECTID IN (:projectIds)"
+                params += "projectIds" to projectIds
+            }
+        }
+
         // Target project filter
         if (!filter.project.isNullOrBlank()) {
-            joins += "INNER JOIN BRANCHES B ON B.ID = S.BRANCH_ID"
             joins += "INNER JOIN PROJECTS P ON P.ID = B.PROJECTID"
             queries += "P.NAME = :project"
             params += "project" to filter.project

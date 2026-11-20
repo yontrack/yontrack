@@ -640,6 +640,13 @@ See [Permissions](../integrations/auto-versioning/auto-versioning.md#permissions
     (`purgeAutoVersioningAuditEntries`) need the global `ApplicationManagement` function, that is
     the administrators ([#2167](https://github.com/yontrack/yontrack/issues/2167)). The background
     jobs which schedule the due requests and clean up the audit entries run as before.
+* **Reading the requests** - the auto-versioning audit pages, the `autoVersioningAuditEntries` and
+    `autoVersioningAuditEntry` queries and `GET /extension/auto-versioning/stats` - shows only the
+    requests whose **target** project the user can see
+    ([#2168](https://github.com/yontrack/yontrack/issues/2168)). In Yontrack 5, every user saw the
+    requests of all the projects. A user who sees all the projects - the administrators, a global
+    role such as `READ_ONLY`, or everybody when the view of all the projects is granted to all -
+    sees no change.
 
 #### For API clients
 
@@ -656,6 +663,12 @@ still ignores a build the caller cannot see, as in Yontrack 5. The
 `scheduleAutoVersioning`, `cleanupAutoVersioningAuditEntries` and `purgeAutoVersioningAuditEntries`
 mutations are refused to a caller who is not an administrator, with the error
 `Global function 'ApplicationManagement' is not granted.`
+
+The `autoVersioningAuditEntries` query, its `pageInfo.totalSize`, and the `pendingOrders` of
+`GET /extension/auto-versioning/stats` only count the requests whose target project the caller can
+see. For a request on a project the caller cannot see, `autoVersioningAuditEntry` returns `null`
+and `rescheduleAutoVersioning` fails with `Auto versioning audit entry for UUID = … cannot be
+found.`, exactly as for a UUID which does not exist.
 
 #### For administrators and CasC users
 

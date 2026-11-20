@@ -14,9 +14,11 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.stereotype.Service
 import java.util.*
 
+/**
+ * Part of the processing of the orders: it reads the audit entries through the store, which sees them all.
+ */
 @Service
 class AutoVersioningRetryServiceImpl(
-    private val autoVersioningAuditQueryService: AutoVersioningAuditQueryService,
     private val autoVersioningAuditService: AutoVersioningAuditService,
     private val autoVersioningAuditStore: AutoVersioningAuditStore,
     private val autoVersioningEventService: AutoVersioningEventService,
@@ -27,14 +29,12 @@ class AutoVersioningRetryServiceImpl(
 
     @Autowired
     constructor(
-        autoVersioningAuditQueryService: AutoVersioningAuditQueryService,
         autoVersioningAuditService: AutoVersioningAuditService,
         autoVersioningAuditStore: AutoVersioningAuditStore,
         autoVersioningEventService: AutoVersioningEventService,
         cachedSettingsService: CachedSettingsService,
         metrics: AutoVersioningMetricsService,
     ) : this(
-        autoVersioningAuditQueryService = autoVersioningAuditQueryService,
         autoVersioningAuditService = autoVersioningAuditService,
         autoVersioningAuditStore = autoVersioningAuditStore,
         autoVersioningEventService = autoVersioningEventService,
@@ -170,7 +170,7 @@ class AutoVersioningRetryServiceImpl(
      * and retrying this order after it would overwrite it with an older version.
      */
     private fun isSuperseded(order: AutoVersioningOrder): Boolean =
-        autoVersioningAuditQueryService.findByFilter(
+        autoVersioningAuditStore.auditVersioningEntries(
             AutoVersioningAuditQueryFilter(
                 source = order.sourceProject,
                 project = order.branch.project.name,
@@ -184,7 +184,7 @@ class AutoVersioningRetryServiceImpl(
         ).any { it.order.uuid != order.uuid }
 
     private fun getCreationData(order: AutoVersioningOrder): Map<String, String> =
-        autoVersioningAuditQueryService.findByUUID(order.branch, order.uuid)?.creationData ?: emptyMap()
+        autoVersioningAuditStore.findByUUID(order.branch, order.uuid)?.creationData ?: emptyMap()
 
     private val AutoVersioningAuditEntry.creationData: Map<String, String>
         get() = audit.lastOrNull { it.state == AutoVersioningAuditState.CREATED }?.data ?: emptyMap()

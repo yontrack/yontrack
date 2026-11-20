@@ -3,9 +3,9 @@ package net.nemerosa.ontrack.extension.av.scheduler
 import net.nemerosa.ontrack.common.Time
 import net.nemerosa.ontrack.common.TimeServer
 import net.nemerosa.ontrack.extension.av.audit.AutoVersioningAuditEntry
-import net.nemerosa.ontrack.extension.av.audit.AutoVersioningAuditQueryService
 import net.nemerosa.ontrack.extension.av.audit.AutoVersioningAuditService
 import net.nemerosa.ontrack.extension.av.audit.AutoVersioningAuditState
+import net.nemerosa.ontrack.extension.av.audit.AutoVersioningAuditStore
 import net.nemerosa.ontrack.extension.av.metrics.AutoVersioningMetricsService
 import net.nemerosa.ontrack.extension.av.queue.AutoVersioningQueuePayload
 import net.nemerosa.ontrack.extension.av.queue.AutoVersioningQueueProcessor
@@ -24,7 +24,7 @@ import java.time.LocalDateTime
 @Service
 @Transactional
 class AutoVersioningScheduler(
-    private val autoVersioningAuditQueryService: AutoVersioningAuditQueryService,
+    private val autoVersioningAuditStore: AutoVersioningAuditStore,
     private val autoVersioningAuditService: AutoVersioningAuditService,
     private val queueDispatcher: QueueDispatcher,
     private val queueProcessor: AutoVersioningQueueProcessor,
@@ -54,8 +54,8 @@ class AutoVersioningScheduler(
     fun schedule(time: LocalDateTime) {
         securityService.checkGlobalFunction(ApplicationManagement::class.java)
         logger.info("Launching scheduling for time = $time")
-        // Gets all the queued orders
-        val entries = autoVersioningAuditQueryService.findByReady(time = time)
+        // Gets all the queued orders, whatever their target project
+        val entries = autoVersioningAuditStore.findByReady(time = time)
         // Logging
         logger.info("Found ${entries.size} entries to schedule")
         // Schedules each entry
