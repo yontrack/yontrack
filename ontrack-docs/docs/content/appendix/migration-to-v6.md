@@ -527,7 +527,8 @@ project: saving a role replaced the one it had. In Yontrack 6, an account or a g
 allow - as it already could through the several groups it belongs to. No role excludes another. See
 [Roles](../security/roles.md) ([#2161](https://github.com/yontrack/yontrack/issues/2161),
 [#2162](https://github.com/yontrack/yontrack/issues/2162),
-[#2163](https://github.com/yontrack/yontrack/issues/2163)).
+[#2163](https://github.com/yontrack/yontrack/issues/2163),
+[#2165](https://github.com/yontrack/yontrack/issues/2165)).
 
 The *Global permissions* page lists every account and group with all its global roles: adding a
 role to an account or a group keeps the roles it holds, and each role is removed on its own.
@@ -554,6 +555,12 @@ role to an account or a group keeps the roles it holds, and each role is removed
 * **Reading the project roles**: `Project.projectRoles` lists an account or a group under each of its
   roles, and `Account.authorizedProjects` and `AccountGroup.authorizedProjects` list one entry per
   project **and role** - a client expecting one entry per project must expect several.
+* **The REST permission endpoints are [deprecated](#newly-deprecated)**, every one of them under
+  `/rest/accounts/permissions`, reads included: only GraphQL handles several roles. They keep their
+  Yontrack 5 semantics - saving a global or project permission replaces **all** the roles the
+  account or the group held, and deleting one removes all of them - so a client still calling them
+  wipes the roles granted through GraphQL, CasC or the UI. Move to the GraphQL queries and mutations
+  above.
 
 #### For configuration as code
 
@@ -792,15 +799,30 @@ nor in the logs.
 
 ### REST API
 
-| Deprecated                                 | Use instead                                         |
-|--------------------------------------------|-----------------------------------------------------|
-| `GET /rest/events/root`                    | The `events` GraphQL query                          |
-| `GET /rest/events/{entityType}/{entityId}` | The `events` GraphQL query, filtered by its project |
+| Deprecated                                                           | Use instead                                                                          |
+|----------------------------------------------------------------------|--------------------------------------------------------------------------------------|
+| `GET /rest/events/root`                                              | The `events` GraphQL query                                                           |
+| `GET /rest/events/{entityType}/{entityId}`                           | The `events` GraphQL query, filtered by its project                                  |
+| `GET /rest/accounts/permissions/search/{token}`                      | The `permissionTargets` GraphQL query                                                |
+| `GET /rest/accounts/permissions/globals`                             | The `globalPermissions` GraphQL query                                                |
+| `GET /rest/accounts/permissions/globals/roles`                       | The `globalRoles` GraphQL query                                                      |
+| `PUT /rest/accounts/permissions/globals/{type}/{id}`                 | The `grantGlobalRoleToAccount` and `grantGlobalRoleToAccountGroup` mutations         |
+| `DELETE /rest/accounts/permissions/globals/{type}/{id}`              | The `revokeGlobalRoleFromAccount` and `revokeGlobalRoleFromAccountGroup` mutations   |
+| `GET /rest/accounts/permissions/projects/roles`                      | The `Project.projectRoles` GraphQL field of any project, which lists every role      |
+| `GET /rest/accounts/permissions/projects/{projectId}`                | The `Project.projectRoles` GraphQL field                                             |
+| `PUT /rest/accounts/permissions/projects/{projectId}/{type}/{id}`    | The `grantProjectRoleToAccount` and `grantProjectRoleToAccountGroup` mutations       |
+| `DELETE /rest/accounts/permissions/projects/{projectId}/{type}/{id}` | The `revokeProjectRoleFromAccount` and `revokeProjectRoleFromAccountGroup` mutations |
 
 The `events` query is restricted to the `EventsAudit` global function, which only administrators
-have: once these endpoints are removed, the events of a project or of one of its entities are no
-longer readable by non-administrators. Each call to one of the endpoints is counted under its item,
-with `surface="rest"`.
+have: once the `/rest/events` endpoints are removed, the events of a project or of one of its
+entities are no longer readable by non-administrators.
+
+The `/rest/accounts/permissions` endpoints keep their Yontrack 5 semantics: saving a permission
+replaces all the roles of the account or the group, deleting one removes all of them, while the
+GraphQL mutations grant or revoke one role and keep the others - see
+[Roles add up](#roles-add-up) ([#2165](https://github.com/yontrack/yontrack/issues/2165)).
+
+Each call to one of these endpoints is counted under its item, with `surface="rest"`.
 
 ### GitHub configurations
 

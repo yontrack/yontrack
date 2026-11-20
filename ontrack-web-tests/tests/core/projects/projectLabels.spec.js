@@ -79,8 +79,8 @@ test('labels command hidden for a user without the labels authorization', async 
     // The demo user gets the READ_ONLY role on this project only: it may see the project
     // and its labels, but holds no ProjectLabelManagement
     const groupName = generate("grp-")
-    await ontrack.admin().createGroup({name: groupName, description: ""})
-    await ontrack.admin().setGroupProjectRole(groupName, project.id, "READ_ONLY")
+    const group = await ontrack.admin().createGroup({name: groupName, description: ""})
+    await ontrack.admin().grantProjectRoleToGroup(group, project.id, "READ_ONLY")
     await ontrack.admin().mapGroup("/ReadOnly", groupName)
 
     await login(page, ontrack, "demo@ontrack.local", "demo")
