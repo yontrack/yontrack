@@ -456,7 +456,9 @@ including the functions which extensions add later.
 Never granted, whatever the owner may do: `SlotPipelineOverride`, `SlotPipelineCancel`,
 `SlotPipelineDelete`, the creation, edition and deletion of projects, branches, promotion levels,
 validation stamps and slots, `ProjectConfig`, the subscriptions, the CasC, `AccountManagement`,
-`ApplicationManagement`, `EventsAudit`, `BuildEdit`, `BuildDelete` and `PromotionRunDelete`.
+`ApplicationManagement`, `EventsAudit`, `BuildEdit`, `BuildDelete`, `PromotionRunDelete` and the
+rescheduling of [auto-versioning](../integrations/auto-versioning/auto-versioning.md#permissions) requests
+(`AutoVersioningReschedule`).
 
 A refusal by the agent policy always says why, in the GraphQL error or in the body of the HTTP 403:
 

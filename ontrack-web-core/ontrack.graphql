@@ -396,9 +396,11 @@ type AutoPromotionValidationStampCondition {
 }
 
 "Audit entry for an auto versioning processing order."
-type AutoVersioningAuditEntry {
+type AutoVersioningAuditEntry implements Authorizable {
   "History of the different states"
   audit: [AutoVersioningAuditEntryState!]!
+  "Authorizations for this context"
+  authorizations: [Authorization!]!
   "Elapsed time between the creation of this process and its last state (in ms)"
   duration: Int
   "Automatic retries & manual reschedules this entry is part of"

@@ -980,6 +980,9 @@ original request shows _Manually rescheduled as_.
 A manually rescheduled request is not an [automatic retry](#automatic-retries): its count of automatic retries starts
 again from 0, as the confirmation of the _Reschedule_ button reminds you.
 
+Rescheduling needs a [permission](#permissions) on the target project of the request: the _Reschedule_ button is shown
+only to the users who hold it.
+
 ## Automatic retries
 
 Some failures are only transient: an external system, like GitHub, is momentarily unavailable, and the very same
@@ -1153,6 +1156,33 @@ Yontrack exports some [operational metrics](../../operations/metrics.md) about t
 
 See the [reference](../../generated/metrics/net.nemerosa.ontrack.extension.av.metrics.AutoVersioningMetrics.md) for the
 list of these metrics.
+
+## Permissions
+
+Operating the auto-versioning is restricted by [roles](../../security/roles.md), checked on the **target** project of
+the auto-versioning requests. The source project is not checked.
+
+| Operation | Function | Held by |
+|---|---|---|
+| [Rescheduling](#rescheduling) a request | `AutoVersioningReschedule`, on top of the view of the target project | the _Auto-versioning controllers_ of the target project, the _Global auto-versioning controllers_, the project _Owners_ and _Project managers_, the _Automation_ and the _Administrators_ |
+
+The _Participants_ cannot reschedule a request: a group which must both comment on the validation runs and reschedule
+the auto-versioning requests is granted both roles, which [add up](../../security/roles.md#roles-add-up):
+
+```yaml
+ontrack:
+  admin:
+    project-permissions:
+      - group: Developers
+        role: PARTICIPANT
+        projects: [yontrack]
+      - group: Developers
+        role: AUTO_VERSIONING_CONTROLLER
+        projects: [yontrack]
+```
+
+The [agents](../../agents/index.md) and the [read-only tokens](../../security/tokens.md#read-only-tokens) never reschedule a request, whatever their
+owner may do.
 
 ## Integrations
 

@@ -10,6 +10,7 @@ import net.nemerosa.ontrack.extension.scm.service.SCMPullRequest
 import net.nemerosa.ontrack.graphql.schema.GQLType
 import net.nemerosa.ontrack.graphql.schema.GQLTypeCache
 import net.nemerosa.ontrack.graphql.schema.GQLTypePromotionRun
+import net.nemerosa.ontrack.graphql.schema.authorizations.GQLInterfaceAuthorizableService
 import net.nemerosa.ontrack.graphql.support.*
 import net.nemerosa.ontrack.model.structure.ID
 import net.nemerosa.ontrack.model.structure.StructureService
@@ -23,6 +24,7 @@ class GQLTypeAutoVersioningAuditEntry(
     private val autoVersioningAuditEntryService: AutoVersioningAuditEntryService,
     private val gqlTypeAutoVersioningAuditEntryLineage: GQLTypeAutoVersioningAuditEntryLineage,
     private val autoVersioningRetryService: AutoVersioningRetryService,
+    private val gqlInterfaceAuthorizableService: GQLInterfaceAuthorizableService,
 ) : GQLType {
 
     override fun getTypeName(): String = AutoVersioningAuditEntry::class.java.simpleName
@@ -91,6 +93,10 @@ class GQLTypeAutoVersioningAuditEntry(
                         val entry: AutoVersioningAuditEntry = env.getSource()!!
                         autoVersioningRetryService.getLineage(entry)
                     }
+            }
+            // Authorizations, like rescheduling the order
+            .apply {
+                gqlInterfaceAuthorizableService.apply(this, AutoVersioningAuditEntry::class)
             }
             // OK
             .build()

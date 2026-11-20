@@ -583,26 +583,64 @@ ontrack:
       - group: Developers
         role: PARTICIPANT
       - group: Developers
-        role: CREATOR
+        role: GLOBAL_AUTO_VERSIONING_CONTROLLER
     project-permissions:
       - group: Developers
         role: PARTICIPANT
         projects: [yontrack, yontrack-cli]
       - group: Developers
-        role: PROMOTER
+        role: AUTO_VERSIONING_CONTROLLER
         projects: [yontrack]
 ```
 
 | | Yontrack 5 | Yontrack 6 |
 |---|---|---|
-| Developers, global | `CREATOR` only (last entry wins) | `PARTICIPANT` + `CREATOR` |
-| Developers × `yontrack` | `PROMOTER` only (last entry wins) | `PARTICIPANT` + `PROMOTER` |
+| Developers, global | one role, whichever entry is saved last | `PARTICIPANT` + `GLOBAL_AUTO_VERSIONING_CONTROLLER` |
+| Developers × `yontrack` | `AUTO_VERSIONING_CONTROLLER` only (last entry wins) | `PARTICIPANT` + `AUTO_VERSIONING_CONTROLLER` |
 | Developers × `yontrack-cli` | `PARTICIPANT` | `PARTICIPANT` |
-| Rerun without the `PROMOTER` entry | - | `yontrack` back to `PARTICIPANT` only |
+| Rerun without the `AUTO_VERSIONING_CONTROLLER` entry | - | `yontrack` back to `PARTICIPANT` only |
 | Group, or group and project, absent from CasC | untouched | untouched |
 
 A group, or a group and project, listed with a single entry behaves as in Yontrack 5: it ends up
 with this role only.
+
+The auto-versioning controller roles of this example are new in Yontrack 6: see
+[Auto-versioning operations require permissions](#auto-versioning-operations-require-permissions).
+
+### Auto-versioning operations require permissions
+
+In Yontrack 5, the auto-versioning operations checked no permission: any authenticated user could,
+for example, reschedule any auto-versioning request, even on a project they could not see. Yontrack 6
+checks the operations below, on the **target** project of the requests, and new roles grant them.
+See [Permissions](../integrations/auto-versioning/auto-versioning.md#permissions).
+
+* **Rescheduling a request** needs the view of its target project and a new project function,
+    `AutoVersioningReschedule` ([#2166](https://github.com/yontrack/yontrack/issues/2166)). It is held
+    by:
+    * the new project role **`AUTO_VERSIONING_CONTROLLER`** (_Auto-versioning controller_), which
+      only views the project and reschedules its requests;
+    * the new global role **`GLOBAL_AUTO_VERSIONING_CONTROLLER`** (_Global auto-versioning
+      controller_), which does the same on every project;
+    * the project roles `OWNER` and `PROJECT_MANAGER`, the global role `AUTOMATION`, and the
+      administrators.
+
+    It is **not** held by the participants, and never by the agents or the read-only tokens. The
+    *Reschedule* button of a request is shown only to the users who may reschedule it.
+
+#### For API clients
+
+The `rescheduleAutoVersioning` mutation is refused to a caller without the function on the target
+project of the request, with the error `Project function 'AutoVersioningReschedule' is not granted`
+(or `'ProjectView'` when the caller cannot see the project). `AutoVersioningAuditEntry` now has
+`authorizations`, with `auto_versioning_audit_entry` / `reschedule` telling whether the caller may
+reschedule its order.
+
+#### For administrators and CasC users
+
+A user, a group or a CI account which reschedules auto-versioning requests and is neither an owner
+nor a project manager of their target projects needs one of the new roles: grant
+`AUTO_VERSIONING_CONTROLLER` on the target projects, or `GLOBAL_AUTO_VERSIONING_CONTROLLER`, on top
+of the roles it holds - [roles add up](#roles-add-up).
 
 ## Removed
 

@@ -30,6 +30,7 @@ object ReadOnlyTokenPolicy {
     private const val ENVIRONMENTS = "net.nemerosa.ontrack.extension.environments.security"
     private const val NOTIFICATIONS = "net.nemerosa.ontrack.extension.notifications"
     private const val WORKFLOWS = "net.nemerosa.ontrack.extension.workflows.acl"
+    private const val AUTO_VERSIONING = "net.nemerosa.ontrack.extension.av.security"
 
     /**
      * Functions a read-only token may hold, when its account holds them.
@@ -120,6 +121,8 @@ object ReadOnlyTokenPolicy {
         "$ENVIRONMENTS.SlotPipelineOverride",
         "$ENVIRONMENTS.SlotPipelineCancel",
         "$ENVIRONMENTS.SlotPipelineDelete",
+        // Operating the auto-versioning
+        "$AUTO_VERSIONING.AutoVersioningReschedule",
     )
 
     /**

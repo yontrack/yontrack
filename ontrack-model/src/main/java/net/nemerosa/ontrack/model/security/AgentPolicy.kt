@@ -34,6 +34,7 @@ object AgentPolicy {
     private const val ENVIRONMENTS = "net.nemerosa.ontrack.extension.environments.security"
     private const val NOTIFICATIONS = "net.nemerosa.ontrack.extension.notifications"
     private const val WORKFLOWS = "net.nemerosa.ontrack.extension.workflows.acl"
+    private const val AUTO_VERSIONING = "net.nemerosa.ontrack.extension.av.security"
 
     /**
      * Functions an agent may hold, when its owner holds them.
@@ -127,6 +128,8 @@ object AgentPolicy {
         "$ENVIRONMENTS.SlotPipelineOverride",
         "$ENVIRONMENTS.SlotPipelineCancel",
         "$ENVIRONMENTS.SlotPipelineDelete",
+        // Operating the auto-versioning
+        "$AUTO_VERSIONING.AutoVersioningReschedule",
     )
 
     /**

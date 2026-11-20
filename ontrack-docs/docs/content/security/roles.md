@@ -19,10 +19,10 @@ project. What it may do is the **union** of the functions of all the roles it ho
 this project, directly or through any of its groups. No role excludes another: holding a role never
 takes a function away.
 
-So a group of release engineers can be both *PARTICIPANT* and *VALIDATION_MANAGER* on a project,
-and gets the functions of both there - and none of them on the projects where it holds no role. In
-the same way, a group can be both a global *CREATOR* and a global *PARTICIPANT*: it creates projects
-and comments on the validation runs of all of them.
+So a group of release engineers can be both *PARTICIPANT* and *AUTO_VERSIONING_CONTROLLER* on a
+project: it comments on the validation runs and reschedules the auto-versioning requests there - and
+does none of it on the projects where it holds no role. In the same way, a group can be both a global
+*PARTICIPANT* and a global *GLOBAL_AUTO_VERSIONING_CONTROLLER*: it does the same on all projects.
 
 ## Global roles
 
@@ -46,6 +46,11 @@ them. It is suited for a basic CI
 need when the Ontrack structure already exists and does not need to be created.
 
 A **GLOBAL VALIDATION MANAGER** can manage validation stamps across all projects.
+
+A **GLOBAL_AUTO_VERSIONING_CONTROLLER** (_Global auto-versioning controller_) can view all projects
+and [reschedule](../integrations/auto-versioning/auto-versioning.md#rescheduling) the
+auto-versioning requests targeting any of them. It can do nothing else, and is meant to be held
+together with another role, like _PARTICIPANT_.
 
 A **PARTICIPANT** can view all projects, and can add comments to all validation runs.
 
@@ -89,7 +94,7 @@ ontrack:
       - group: Developers
         role: PARTICIPANT
       - group: Developers
-        role: CREATOR
+        role: GLOBAL_AUTO_VERSIONING_CONTROLLER
 ```
 
 Two roles for a group are two entries. Every group listed in `group-permissions` gets **exactly**
@@ -118,6 +123,12 @@ VALIDATION_MANAGER. He can additionally manage branches (creation / edition / de
 build filters. He can also assign [labels](../concepts/model/project-labels.md) to the project.
 
 A project **READ_ONLY** user can view this project, but cannot perform any action on it.
+
+A project **AUTO_VERSIONING_CONTROLLER** (_Auto-versioning controller_) can view this project and
+[reschedule](../integrations/auto-versioning/auto-versioning.md#rescheduling) the auto-versioning
+requests targeting it. It can do nothing else, and is meant to be held alone or together with another
+role, like _PARTICIPANT_. Project owners and project managers can reschedule these requests too; the
+participants cannot.
 
 Only project owners, automation users and administrators can grant rights
 in a project: they hold the `ProjectAuthorisationMgt` function on the project.
@@ -174,7 +185,7 @@ ontrack:
           - yontrack
           - yontrack-cli
       - group: Developers
-        role: PROMOTER
+        role: AUTO_VERSIONING_CONTROLLER
         projects:
           - yontrack
 ```
@@ -182,7 +193,7 @@ ontrack:
 The entries are grouped by group and project: for every group and project listed, the group gets
 **exactly** the listed roles on the project - the missing ones are granted and the others are
 revoked, including the roles granted outside CasC. Above, _Developers_ holds `PARTICIPANT` and
-`PROMOTER` on `yontrack`, and `PARTICIPANT` only on `yontrack-cli`. A group and project pair which
+`AUTO_VERSIONING_CONTROLLER` on `yontrack`, and `PARTICIPANT` only on `yontrack-cli`. A group and project pair which
 is not listed keeps all its roles.
 
 !!! note

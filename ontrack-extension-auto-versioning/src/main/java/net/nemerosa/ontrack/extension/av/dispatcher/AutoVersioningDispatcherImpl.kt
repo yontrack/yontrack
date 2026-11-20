@@ -8,8 +8,10 @@ import net.nemerosa.ontrack.extension.av.config.AutoVersioningPushMode
 import net.nemerosa.ontrack.extension.av.config.AutoVersioningSourceConfig
 import net.nemerosa.ontrack.extension.av.scheduler.AutoVersioningScheduler
 import net.nemerosa.ontrack.extension.av.scheduler.ScheduleService
+import net.nemerosa.ontrack.extension.av.security.AutoVersioningReschedule
 import net.nemerosa.ontrack.extension.av.tracking.AutoVersioningBranchTrail
 import net.nemerosa.ontrack.extension.av.tracking.AutoVersioningTracking
+import net.nemerosa.ontrack.model.security.ProjectView
 import net.nemerosa.ontrack.model.security.SecurityService
 import net.nemerosa.ontrack.model.structure.Branch
 import net.nemerosa.ontrack.model.structure.PromotionRun
@@ -88,8 +90,14 @@ class AutoVersioningDispatcherImpl(
      * Reschedule an entry, without any schedule.
      *
      * The new order is not an automatic retry and starts with a full budget of automatic retries.
+     *
+     * Needs [ProjectView], then [AutoVersioningReschedule], on the target project of the order.
      */
     override fun reschedule(branch: Branch, uuid: String): AutoVersioningOrder {
+        // Checking the rights on the target project
+        securityService.checkProjectFunction(branch, ProjectView::class.java)
+        securityService.checkProjectFunction(branch, AutoVersioningReschedule::class.java)
+
         // Getting the entry to reschedule
         val entry = autoVersioningAuditStore.findByUUID(branch, uuid)
             ?: throw AutoVersioningAuditEntryUUIDNotFoundException(uuid)

@@ -3,6 +3,14 @@ import {FaRedo} from "react-icons/fa";
 import {useMutation} from "@components/services/GraphQL";
 import {gql} from "graphql-request";
 import {useRouter} from "next/router";
+import {isAuthorized} from "@components/common/authorizations";
+
+/**
+ * Can the current user reschedule the order of this audit entry?
+ *
+ * @param entry Audit entry, with its `authorizations`
+ */
+export const canReschedule = (entry) => !!isAuthorized(entry, 'auto_versioning_audit_entry', 'reschedule')
 
 export default function AutoVersioningAuditEntryReschedule({entry}) {
 
@@ -31,6 +39,10 @@ export default function AutoVersioningAuditEntryReschedule({entry}) {
 
     const reschedule = async () => {
         await mutate({uuid: entry.order.uuid})
+    }
+
+    if (!canReschedule(entry)) {
+        return null
     }
 
     const retryMaxCount = entry.lineage?.configuredRetryMaxCount ?? 0

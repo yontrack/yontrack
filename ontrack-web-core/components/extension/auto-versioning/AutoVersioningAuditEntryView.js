@@ -67,6 +67,11 @@ export default function AutoVersioningAuditEntryView({uuid}) {
                         routing
                         queue
                         upgradeBranch
+                        authorizations {
+                            name
+                            action
+                            authorized
+                        }
                         promotionRun {
                             ...PromotionRunContent
                         }
