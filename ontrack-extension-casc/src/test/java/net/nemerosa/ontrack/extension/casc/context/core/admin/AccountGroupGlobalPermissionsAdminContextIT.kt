@@ -11,7 +11,6 @@ import net.nemerosa.ontrack.model.security.Roles
 import net.nemerosa.ontrack.test.TestUtils.uid
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
-import kotlin.jvm.optionals.getOrNull
 import kotlin.test.assertEquals
 
 internal class AccountGroupGlobalPermissionsAdminContextIT : AbstractCascTestSupport() {
@@ -67,8 +66,8 @@ internal class AccountGroupGlobalPermissionsAdminContextIT : AbstractCascTestSup
                             - group: $name
                               role: AUTOMATION
             """.trimIndent())
-            val role = accountService.getGlobalRoleForAccountGroup(group).getOrNull()
-            assertEquals(Roles.GLOBAL_AUTOMATION, role?.id)
+            val roles = accountService.getGlobalRolesForAccountGroup(group).map { it.id }
+            assertEquals(listOf(Roles.GLOBAL_AUTOMATION), roles)
         }
     }
 
@@ -87,8 +86,8 @@ internal class AccountGroupGlobalPermissionsAdminContextIT : AbstractCascTestSup
                             - group: $name
                               role: AUTOMATION
             """.trimIndent())
-            val role = accountService.getGlobalRoleForAccountGroup(group).getOrNull()
-            assertEquals(Roles.GLOBAL_AUTOMATION, role?.id)
+            val roles = accountService.getGlobalRolesForAccountGroup(group).map { it.id }
+            assertEquals(listOf(Roles.GLOBAL_AUTOMATION), roles)
         }
     }
 
@@ -110,11 +109,11 @@ internal class AccountGroupGlobalPermissionsAdminContextIT : AbstractCascTestSup
                               role: AUTOMATION
             """.trimIndent())
             // New role added
-            assertEquals(Roles.GLOBAL_AUTOMATION,
-                accountService.getGlobalRoleForAccountGroup(group).getOrNull()?.id)
+            assertEquals(listOf(Roles.GLOBAL_AUTOMATION),
+                accountService.getGlobalRolesForAccountGroup(group).map { it.id })
             // Old mapping preserved
-            assertEquals(Roles.GLOBAL_ADMINISTRATOR,
-                accountService.getGlobalRoleForAccountGroup(existingGroup).getOrNull()?.id)
+            assertEquals(listOf(Roles.GLOBAL_ADMINISTRATOR),
+                accountService.getGlobalRolesForAccountGroup(existingGroup).map { it.id })
         }
     }
 

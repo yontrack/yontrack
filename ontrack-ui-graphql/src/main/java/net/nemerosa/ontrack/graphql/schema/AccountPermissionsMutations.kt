@@ -2,7 +2,6 @@ package net.nemerosa.ontrack.graphql.schema
 
 import net.nemerosa.ontrack.graphql.support.TypedMutationProvider
 import net.nemerosa.ontrack.model.security.AccountService
-import net.nemerosa.ontrack.model.security.PermissionInput
 import net.nemerosa.ontrack.model.security.PermissionTargetType
 import net.nemerosa.ontrack.common.api.APIDescription
 import net.nemerosa.ontrack.model.structure.ID
@@ -16,30 +15,53 @@ class AccountPermissionsMutations(
     override val mutations: List<Mutation> = listOf(
         unitMutation(
             name = "grantGlobalRoleToAccount",
-            description = "Grants a global role to an account",
+            description = "Grants a global role to an account, keeping the other global roles it holds. Does nothing when the account already holds the role.",
             input = GrantGlobalRoleToAccountInput::class,
         ) { input ->
-            accountService.saveGlobalPermission(
+            accountService.grantGlobalPermission(
                 PermissionTargetType.ACCOUNT,
                 input.accountId,
-                PermissionInput(role = input.globalRole)
+                input.globalRole,
             )
         },
         unitMutation(
             name = "grantGlobalRoleToAccountGroup",
-            description = "Grants a global role to an account group",
+            description = "Grants a global role to an account group, keeping the other global roles it holds. Does nothing when the group already holds the role.",
             input = GrantGlobalRoleToAccountGroupInput::class,
         ) { input ->
-            accountService.saveGlobalPermission(
+            accountService.grantGlobalPermission(
                 PermissionTargetType.GROUP,
                 input.accountGroupId,
-                PermissionInput(role = input.globalRole)
+                input.globalRole,
+            )
+        },
+        unitMutation(
+            name = "revokeGlobalRoleFromAccount",
+            description = "Revokes one global role from an account, keeping the other global roles it holds",
+            input = RevokeGlobalRoleFromAccountInput::class,
+        ) { input ->
+            accountService.revokeGlobalPermission(
+                PermissionTargetType.ACCOUNT,
+                input.accountId,
+                input.globalRole,
+            )
+        },
+        unitMutation(
+            name = "revokeGlobalRoleFromAccountGroup",
+            description = "Revokes one global role from an account group, keeping the other global roles it holds",
+            input = RevokeGlobalRoleFromAccountGroupInput::class,
+        ) { input ->
+            accountService.revokeGlobalPermission(
+                PermissionTargetType.GROUP,
+                input.accountGroupId,
+                input.globalRole,
             )
         },
         unitMutation(
             name = "deleteGlobalRoleFromAccount",
-            description = "Removes any global role from an account",
+            description = "Removes all the global roles of an account",
             input = DeleteGlobalRoleFromAccountInput::class,
+            deprecation = "Removed in V7. Use revokeGlobalRoleFromAccount instead. See #2162",
         ) { input ->
             accountService.deleteGlobalPermission(
                 PermissionTargetType.ACCOUNT,
@@ -48,8 +70,9 @@ class AccountPermissionsMutations(
         },
         unitMutation(
             name = "deleteGlobalRoleFromAccountGroup",
-            description = "Removes any global role from an account group",
+            description = "Removes all the global roles of an account group",
             input = DeleteGlobalRoleFromAccountGroupInput::class,
+            deprecation = "Removed in V7. Use revokeGlobalRoleFromAccountGroup instead. See #2162",
         ) { input ->
             accountService.deleteGlobalPermission(
                 PermissionTargetType.GROUP,
@@ -108,12 +131,30 @@ class AccountPermissionsMutations(
 }
 
 data class GrantGlobalRoleToAccountInput(
+    @APIDescription("ID of the account")
     val accountId: Int,
+    @APIDescription("ID of the global role to grant")
     val globalRole: String,
 )
 
 data class GrantGlobalRoleToAccountGroupInput(
+    @APIDescription("ID of the account group")
     val accountGroupId: Int,
+    @APIDescription("ID of the global role to grant")
+    val globalRole: String,
+)
+
+data class RevokeGlobalRoleFromAccountInput(
+    @APIDescription("ID of the account")
+    val accountId: Int,
+    @APIDescription("ID of the global role to revoke")
+    val globalRole: String,
+)
+
+data class RevokeGlobalRoleFromAccountGroupInput(
+    @APIDescription("ID of the account group")
+    val accountGroupId: Int,
+    @APIDescription("ID of the global role to revoke")
     val globalRole: String,
 )
 

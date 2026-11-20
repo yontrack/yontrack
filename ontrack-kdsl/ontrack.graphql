@@ -97,8 +97,10 @@ type Account {
   email: String!
   "Full name of the account"
   fullName: String!
-  "Global role for the account"
-  globalRole: GlobalRole
+  "First global role of the account, by ID. An account may hold several global roles: use globalRoles."
+  globalRole: GlobalRole @deprecated(reason : "Removed in V7. Use globalRoles instead. See #2162")
+  "Global roles of the account, sorted by ID - not those of its groups"
+  globalRoles: [GlobalRole!]!
   "List of groups the account belongs to"
   groups: [AccountGroup!]!
   id: ID!
@@ -118,8 +120,10 @@ type AccountGroup {
   "List of authorized projects"
   authorizedProjects: [AuthorizedProject!]!
   description: String
-  "Global role for the account group"
-  globalRole: GlobalRole
+  "First global role of the account group, by ID. A group may hold several global roles: use globalRoles."
+  globalRole: GlobalRole @deprecated(reason : "Removed in V7. Use globalRoles instead. See #2162")
+  "Global roles of the account group, sorted by ID"
+  globalRoles: [GlobalRole!]!
   id: ID!
   name: String
 }
@@ -4417,16 +4421,16 @@ type Mutation {
     "Input for the mutation"
     input: DeleteGenericPropertyInput
   ): DeleteGenericPropertyPayload
-  "Removes any global role from an account"
+  "Removes all the global roles of an account"
   deleteGlobalRoleFromAccount(
     "Input for the mutation"
     input: DeleteGlobalRoleFromAccountInput
-  ): DeleteGlobalRoleFromAccountPayload
-  "Removes any global role from an account group"
+  ): DeleteGlobalRoleFromAccountPayload @deprecated(reason : "Removed in V7. Use revokeGlobalRoleFromAccount instead. See #2162")
+  "Removes all the global roles of an account group"
   deleteGlobalRoleFromAccountGroup(
     "Input for the mutation"
     input: DeleteGlobalRoleFromAccountGroupInput
-  ): DeleteGlobalRoleFromAccountGroupPayload
+  ): DeleteGlobalRoleFromAccountGroupPayload @deprecated(reason : "Removed in V7. Use revokeGlobalRoleFromAccountGroup instead. See #2162")
   "Deletes a Jenkins configuration"
   deleteJenkinsConfiguration(
     "Input for the mutation"
@@ -4869,12 +4873,12 @@ type Mutation {
     "Input for the mutation"
     input: GitHubIngestionValidateDataByRunIdInput
   ): GitHubIngestionValidateDataByRunIdPayload
-  "Grants a global role to an account"
+  "Grants a global role to an account, keeping the other global roles it holds. Does nothing when the account already holds the role."
   grantGlobalRoleToAccount(
     "Input for the mutation"
     input: GrantGlobalRoleToAccountInput
   ): GrantGlobalRoleToAccountPayload
-  "Grants a global role to an account group"
+  "Grants a global role to an account group, keeping the other global roles it holds. Does nothing when the group already holds the role."
   grantGlobalRoleToAccountGroup(
     "Input for the mutation"
     input: GrantGlobalRoleToAccountGroupInput
@@ -5021,6 +5025,16 @@ type Mutation {
   ): RevokeAllAgentTokensPayload
   "Revokes all tokens"
   revokeAllTokens: RevokeAllTokensPayload
+  "Revokes one global role from an account, keeping the other global roles it holds"
+  revokeGlobalRoleFromAccount(
+    "Input for the mutation"
+    input: RevokeGlobalRoleFromAccountInput
+  ): RevokeGlobalRoleFromAccountPayload
+  "Revokes one global role from an account group, keeping the other global roles it holds"
+  revokeGlobalRoleFromAccountGroup(
+    "Input for the mutation"
+    input: RevokeGlobalRoleFromAccountGroupInput
+  ): RevokeGlobalRoleFromAccountGroupPayload
   "Revokes one project role from an account, keeping the other roles it holds on the project"
   revokeProjectRoleFromAccount(
     "Input for the mutation"
@@ -7372,6 +7386,18 @@ type RevokeAllAgentTokensPayload implements Payload {
 
 "Output type for the revokeAllTokens mutation."
 type RevokeAllTokensPayload implements Payload {
+  "List of errors"
+  errors: [UserError]
+}
+
+"Output type for the revokeGlobalRoleFromAccountGroup mutation."
+type RevokeGlobalRoleFromAccountGroupPayload implements Payload {
+  "List of errors"
+  errors: [UserError]
+}
+
+"Output type for the revokeGlobalRoleFromAccount mutation."
+type RevokeGlobalRoleFromAccountPayload implements Payload {
   "List of errors"
   errors: [UserError]
 }
@@ -12147,17 +12173,17 @@ input GitHubIngestionValidationDataInput {
 
 "Input type for the grantGlobalRoleToAccountGroup mutation."
 input GrantGlobalRoleToAccountGroupInput {
-  "accountGroupId field"
+  "ID of the account group"
   accountGroupId: Int!
-  "globalRole field"
+  "ID of the global role to grant"
   globalRole: String!
 }
 
 "Input type for the grantGlobalRoleToAccount mutation."
 input GrantGlobalRoleToAccountInput {
-  "accountId field"
+  "ID of the account"
   accountId: Int!
-  "globalRole field"
+  "ID of the global role to grant"
   globalRole: String!
 }
 
@@ -12533,6 +12559,22 @@ input RevokeAgentTokenInput {
 input RevokeAllAgentTokensInput {
   "ID of the agent"
   id: Int!
+}
+
+"Input type for the revokeGlobalRoleFromAccountGroup mutation."
+input RevokeGlobalRoleFromAccountGroupInput {
+  "ID of the account group"
+  accountGroupId: Int!
+  "ID of the global role to revoke"
+  globalRole: String!
+}
+
+"Input type for the revokeGlobalRoleFromAccount mutation."
+input RevokeGlobalRoleFromAccountInput {
+  "ID of the account"
+  accountId: Int!
+  "ID of the global role to revoke"
+  globalRole: String!
 }
 
 "Input type for the revokeProjectRoleFromAccountGroup mutation."

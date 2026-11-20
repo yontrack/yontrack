@@ -10,6 +10,7 @@ import org.springframework.stereotype.Repository;
 
 import javax.sql.DataSource;
 import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import java.util.function.BiFunction;
 import java.util.function.Function;
@@ -24,44 +25,82 @@ public class RoleJdbcRepository extends AbstractJdbcRepository implements RoleRe
     }
 
     @Override
-    public Optional<String> findGlobalRoleByAccount(int accountId) {
-        return Optional.ofNullable(
-                getFirstItem(
-                        "SELECT ROLE FROM GLOBAL_AUTHORIZATIONS WHERE ACCOUNT = :accountId",
-                        params("accountId", accountId),
-                        String.class
+    public List<String> findGlobalRolesByAccount(int accountId) {
+        return getNamedParameterJdbcTemplate().queryForList(
+                "SELECT ROLE FROM GLOBAL_AUTHORIZATIONS WHERE ACCOUNT = :accountId ORDER BY ROLE",
+                params("accountId", accountId),
+                String.class
+        );
+    }
+
+    @Override
+    public List<String> findGlobalRolesByGroup(int groupId) {
+        return getNamedParameterJdbcTemplate().queryForList(
+                "SELECT ROLE FROM GROUP_GLOBAL_AUTHORIZATIONS WHERE ACCOUNTGROUP = :groupId ORDER BY ROLE",
+                params("groupId", groupId),
+                String.class
+        );
+    }
+
+    @Override
+    public Ack grantGlobalRoleForAccount(int accountId, String role) {
+        getNamedParameterJdbcTemplate().update(
+                "INSERT INTO GLOBAL_AUTHORIZATIONS (ACCOUNT, ROLE) VALUES (:accountId, :role) " +
+                        "ON CONFLICT DO NOTHING",
+                params("accountId", accountId).addValue("role", role)
+        );
+        return Ack.OK;
+    }
+
+    @Override
+    public Ack grantGlobalRoleForGroup(int groupId, String role) {
+        getNamedParameterJdbcTemplate().update(
+                "INSERT INTO GROUP_GLOBAL_AUTHORIZATIONS (ACCOUNTGROUP, ROLE) VALUES (:groupId, :role) " +
+                        "ON CONFLICT DO NOTHING",
+                params("groupId", groupId).addValue("role", role)
+        );
+        return Ack.OK;
+    }
+
+    @Override
+    public Ack revokeGlobalRoleForAccount(int accountId, String role) {
+        return Ack.one(
+                getNamedParameterJdbcTemplate().update(
+                        "DELETE FROM GLOBAL_AUTHORIZATIONS WHERE ACCOUNT = :accountId AND ROLE = :role",
+                        params("accountId", accountId).addValue("role", role)
                 )
         );
     }
 
     @Override
-    public Optional<String> findGlobalRoleByGroup(int groupId) {
-        return Optional.ofNullable(
-                getFirstItem(
-                        "SELECT ROLE FROM GROUP_GLOBAL_AUTHORIZATIONS WHERE ACCOUNTGROUP = :groupId",
-                        params("groupId", groupId),
-                        String.class
+    public Ack revokeGlobalRoleForGroup(int groupId, String role) {
+        return Ack.one(
+                getNamedParameterJdbcTemplate().update(
+                        "DELETE FROM GROUP_GLOBAL_AUTHORIZATIONS WHERE ACCOUNTGROUP = :groupId AND ROLE = :role",
+                        params("groupId", groupId).addValue("role", role)
                 )
         );
     }
 
     @Override
     public Ack deleteGlobalRoleForAccount(int accountId) {
-        return Ack.one(
+        // Several roles may be removed at once
+        return Ack.Companion.validate(
                 getNamedParameterJdbcTemplate().update(
                         "DELETE FROM GLOBAL_AUTHORIZATIONS WHERE ACCOUNT = :accountId",
                         params("accountId", accountId)
-                )
+                ) > 0
         );
     }
 
     @Override
     public Ack deleteGlobalRoleForGroup(int groupId) {
-        return Ack.one(
+        // Several roles may be removed at once
+        return Ack.Companion.validate(
                 getNamedParameterJdbcTemplate().update(
                         "DELETE FROM GROUP_GLOBAL_AUTHORIZATIONS WHERE ACCOUNTGROUP = :groupId",
                         params("groupId", groupId)
-                )
+                ) > 0
         );
     }
 
@@ -135,21 +174,23 @@ public class RoleJdbcRepository extends AbstractJdbcRepository implements RoleRe
 
     @Override
     public Ack deleteProjectRoleForAccount(int projectId, int accountId) {
-        return Ack.one(
+        // Several roles may be removed at once
+        return Ack.Companion.validate(
                 getNamedParameterJdbcTemplate().update(
                         "DELETE FROM PROJECT_AUTHORIZATIONS WHERE ACCOUNT = :accountId AND PROJECT = :projectId",
                         params("accountId", accountId).addValue("projectId", projectId)
-                )
+                ) > 0
         );
     }
 
     @Override
     public Ack deleteProjectRoleForGroup(int projectId, int accountGroupId) {
-        return Ack.one(
+        // Several roles may be removed at once
+        return Ack.Companion.validate(
                 getNamedParameterJdbcTemplate().update(
                         "DELETE FROM GROUP_PROJECT_AUTHORIZATIONS WHERE ACCOUNTGROUP = :accountGroupId AND PROJECT = :projectId",
                         params("accountGroupId", accountGroupId).addValue("projectId", projectId)
-                )
+                ) > 0
         );
     }
 

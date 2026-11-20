@@ -62,7 +62,7 @@ class AgentServiceIT : AbstractDSLTestSupport() {
         // No group, no ACL
         assertTrue(accountGroupRepository.findByAccount(agent.id()).isEmpty(), "No group")
         asAdmin {
-            assertFalse(accountService.getGlobalRoleForAccount(agent).isPresent, "No global role")
+            assertTrue(accountService.getGlobalRolesForAccount(agent).isEmpty(), "No global role")
         }
     }
 

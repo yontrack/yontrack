@@ -117,14 +117,16 @@ export const useMutationAddGlobalPermissionToAccountGroup = ({onSuccess}) => {
     return {addGlobalPermissionToAccountGroup, loading}
 }
 
-export const useMutationDeleteGlobalPermissionAccount = ({onSuccess}) => {
+export const useMutationRevokeGlobalRoleFromAccount = ({onSuccess}) => {
     const {mutate, loading} = useMutation(
         gql`
-            mutation DeleteGlobalPermissionAccount(
-                $accountId: Int!
+            mutation RevokeGlobalRoleFromAccount(
+                $accountId: Int!,
+                $role: String!,
             ) {
-                deleteGlobalRoleFromAccount(input: {
+                revokeGlobalRoleFromAccount(input: {
                     accountId: $accountId,
+                    globalRole: $role,
                 }) {
                     errors {
                         message
@@ -133,28 +135,31 @@ export const useMutationDeleteGlobalPermissionAccount = ({onSuccess}) => {
             }
         `,
         {
-            userNodeName: 'deleteGlobalRoleFromAccount',
+            userNodeName: 'revokeGlobalRoleFromAccount',
             onSuccess,
         }
     )
 
-    const deleteGlobalPermissionAccount = async ({accountId}) => {
+    const revokeGlobalRoleFromAccount = async ({accountId, role}) => {
         await mutate({
             accountId: Number(accountId),
+            role,
         })
     }
 
-    return {deleteGlobalPermissionAccount, loading}
+    return {revokeGlobalRoleFromAccount, loading}
 }
 
-export const useMutationDeleteGlobalPermissionAccountGroup = ({onSuccess}) => {
+export const useMutationRevokeGlobalRoleFromAccountGroup = ({onSuccess}) => {
     const {mutate, loading} = useMutation(
         gql`
-            mutation DeleteGlobalPermissionAccountGroup(
-                $accountGroupId: Int!
+            mutation RevokeGlobalRoleFromAccountGroup(
+                $accountGroupId: Int!,
+                $role: String!,
             ) {
-                deleteGlobalRoleFromAccountGroup(input: {
+                revokeGlobalRoleFromAccountGroup(input: {
                     accountGroupId: $accountGroupId,
+                    globalRole: $role,
                 }) {
                     errors {
                         message
@@ -163,16 +168,37 @@ export const useMutationDeleteGlobalPermissionAccountGroup = ({onSuccess}) => {
             }
         `,
         {
-            userNodeName: 'deleteGlobalRoleFromAccountGroup',
+            userNodeName: 'revokeGlobalRoleFromAccountGroup',
             onSuccess,
         }
     )
 
-    const deleteGlobalPermissionAccountGroup = async ({accountGroupId}) => {
+    const revokeGlobalRoleFromAccountGroup = async ({accountGroupId, role}) => {
         await mutate({
             accountGroupId: Number(accountGroupId),
+            role,
         })
     }
 
-    return {deleteGlobalPermissionAccountGroup, loading}
+    return {revokeGlobalRoleFromAccountGroup, loading}
+}
+
+/**
+ * Groups the global permissions - one per target and role - into one entry per target, holding
+ * all its roles, in the order of the permissions.
+ */
+export const groupGlobalPermissionsByTarget = (globalPermissions) => {
+    const index = {}
+    const rows = []
+    globalPermissions.forEach(({target, role}) => {
+        const key = `${target.type}-${target.id}`
+        let row = index[key]
+        if (!row) {
+            row = {key, target, roles: []}
+            index[key] = row
+            rows.push(row)
+        }
+        row.roles.push(role)
+    })
+    return rows
 }

@@ -10,6 +10,7 @@ import {Button, Form, Space} from "antd";
 import Table from "@components/common/table/Table";
 import {useRefresh} from "@components/common/RefreshUtils";
 import {
+    groupGlobalPermissionsByTarget,
     useGlobalPermissions,
     useMutationAddGlobalPermissionToAccount,
     useMutationAddGlobalPermissionToAccountGroup
@@ -20,12 +21,14 @@ import TableFormSection from "@components/common/table/TableFormSection";
 import {FaPlus} from "react-icons/fa";
 import SelectGlobalRole from "@components/core/admin/account-management/SelectGlobalRole";
 import SelectPermissionTarget from "@components/core/admin/account-management/SelectPermissionTarget";
-import DeleteGlobalPermissionCommand from "@components/core/admin/account-management/DeleteGlobalPermissionCommand";
+import RevokeGlobalRoleCommand from "@components/core/admin/account-management/RevokeGlobalRoleCommand";
 
 export default function GlobalPermissionsView() {
 
     const [refreshState, refresh] = useRefresh()
     const {globalPermissions, loading} = useGlobalPermissions({refreshState})
+    // One row per account or group, with all its global roles
+    const rows = groupGlobalPermissionsByTarget(globalPermissions)
 
     const [form] = Form.useForm()
 
@@ -97,25 +100,38 @@ export default function GlobalPermissionsView() {
                         </Form>
                     </TableFormSection>
                     <Table
-                        dataSource={globalPermissions}
+                        dataSource={rows}
+                        rowKey="key"
                         loading={loading}
                         pagination={false}
                     >
                         <Table.Column
                             key="name"
                             title="Name"
-                            render={(_, globalPermission) => <PermissionTarget target={globalPermission.target}/>}
+                            render={(_, row) => <PermissionTarget target={row.target}/>}
                         />
                         <Table.Column
-                            key="role"
-                            title="Role"
-                            render={(_, globalPermission) => <GlobalRole role={globalPermission.role}/>}
-                        />
-                        <Table.Column
-                            key="actions"
-                            title="Actions"
-                            render={(_, globalPermission) =>
-                                    <DeleteGlobalPermissionCommand globalPermission={globalPermission} refresh={refresh}/>
+                            key="roles"
+                            title="Roles"
+                            render={(_, row) =>
+                                <Space wrap data-testid={`global-roles-${row.key}`}>
+                                    {
+                                        row.roles.map(role =>
+                                            <Space
+                                                key={role.id}
+                                                size={0}
+                                                data-testid={`global-role-${row.key}-${role.id}`}
+                                            >
+                                                <GlobalRole role={role}/>
+                                                <RevokeGlobalRoleCommand
+                                                    target={row.target}
+                                                    role={role}
+                                                    refresh={refresh}
+                                                />
+                                            </Space>
+                                        )
+                                    }
+                                </Space>
                             }
                         />
                     </Table>

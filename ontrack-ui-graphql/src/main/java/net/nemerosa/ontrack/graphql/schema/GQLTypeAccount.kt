@@ -62,9 +62,22 @@ class GQLTypeAccount(
             }
             .field {
                 it.name("globalRole")
-                    .description("Global role for the account")
+                    .description("First global role of the account, by ID. An account may hold several global roles: use globalRoles.")
                     .type(globalRole.typeRef)
-                    .dataFetcher(accountGlobalRoleFetcher())
+                    .deprecate("Removed in V7. Use globalRoles instead. See #2162")
+                    .dataFetcher { env ->
+                        val account: Account = env.getSource()!!
+                        accountService.getGlobalRolesForAccount(account).firstOrNull()
+                    }
+            }
+            .field {
+                it.name("globalRoles")
+                    .description("Global roles of the account, sorted by ID - not those of its groups")
+                    .type(listType(globalRole.typeRef))
+                    .dataFetcher { env ->
+                        val account: Account = env.getSource()!!
+                        accountService.getGlobalRolesForAccount(account)
+                    }
             }
             .field {
                 it.name("authorizedProjects")
@@ -107,11 +120,6 @@ class GQLTypeAccount(
     private fun accountAuthorizedProjectsFetcher() = DataFetcher<Collection<ProjectRoleAssociation>> { env ->
         val account: Account = env.getSource()!!
         accountService.getProjectPermissionsForAccount(account)
-    }
-
-    private fun accountGlobalRoleFetcher() = DataFetcher { env ->
-        val account: Account = env.getSource()!!
-        accountService.getGlobalRoleForAccount(account).orElse(null)
     }
 
     private fun accountAccountGroupsFetcher() = DataFetcher<List<AccountGroup>> { env ->

@@ -5,13 +5,18 @@ import net.nemerosa.ontrack.kdsl.connector.Connector
 import net.nemerosa.ontrack.kdsl.connector.graphql.checkData
 import net.nemerosa.ontrack.kdsl.connector.graphql.convert
 import com.apollographql.apollo.api.Optional
+import net.nemerosa.ontrack.kdsl.connector.graphql.schema.AccountGlobalRolesQuery
 import net.nemerosa.ontrack.kdsl.connector.graphql.schema.AccountGroupByNameQuery
+import net.nemerosa.ontrack.kdsl.connector.graphql.schema.AccountGroupGlobalRolesQuery
 import net.nemerosa.ontrack.kdsl.connector.graphql.schema.CreateAccountGroupMutation
 import net.nemerosa.ontrack.kdsl.connector.graphql.schema.CreateUserMutation
 import net.nemerosa.ontrack.kdsl.connector.graphql.schema.DeleteAccountMutation
+import net.nemerosa.ontrack.kdsl.connector.graphql.schema.GrantGlobalRoleToAccountGroupMutation
 import net.nemerosa.ontrack.kdsl.connector.graphql.schema.GrantGlobalRoleToAccountMutation
 import net.nemerosa.ontrack.kdsl.connector.graphql.schema.GrantProjectRoleToAccountGroupMutation
 import net.nemerosa.ontrack.kdsl.connector.graphql.schema.GrantProjectRoleToAccountMutation
+import net.nemerosa.ontrack.kdsl.connector.graphql.schema.RevokeGlobalRoleFromAccountGroupMutation
+import net.nemerosa.ontrack.kdsl.connector.graphql.schema.RevokeGlobalRoleFromAccountMutation
 import net.nemerosa.ontrack.kdsl.connector.graphql.schema.RevokeProjectRoleFromAccountGroupMutation
 import net.nemerosa.ontrack.kdsl.connector.graphql.schema.RevokeProjectRoleFromAccountMutation
 import net.nemerosa.ontrack.kdsl.connector.graphqlConnector
@@ -79,6 +84,10 @@ class AdminMgt(connector: Connector) : Connected(connector) {
         ) { it?.deleteAccount?.payloadUserErrors?.convert() }
     }
 
+    /**
+     * Grants a global role to an account, keeping the other global roles it holds.
+     * Does nothing when the account already holds the role.
+     */
     fun grantGlobalRoleToAccount(account: Account, globalRole: String) {
         graphqlConnector.mutate(
             GrantGlobalRoleToAccountMutation(
@@ -87,6 +96,61 @@ class AdminMgt(connector: Connector) : Connected(connector) {
             )
         ) { it?.grantGlobalRoleToAccount?.payloadUserErrors?.convert() }
     }
+
+    /**
+     * Grants a global role to an account group, keeping the other global roles it holds.
+     * Does nothing when the group already holds the role.
+     */
+    fun grantGlobalRoleToAccountGroup(group: AccountGroup, globalRole: String) {
+        graphqlConnector.mutate(
+            GrantGlobalRoleToAccountGroupMutation(
+                group.id,
+                globalRole
+            )
+        ) { it?.grantGlobalRoleToAccountGroup?.payloadUserErrors?.convert() }
+    }
+
+    /**
+     * Revokes one global role from an account, keeping the other global roles it holds.
+     */
+    fun revokeGlobalRoleFromAccount(account: Account, globalRole: String) {
+        graphqlConnector.mutate(
+            RevokeGlobalRoleFromAccountMutation(
+                account.id,
+                globalRole
+            )
+        ) { it?.revokeGlobalRoleFromAccount?.payloadUserErrors?.convert() }
+    }
+
+    /**
+     * Revokes one global role from an account group, keeping the other global roles it holds.
+     */
+    fun revokeGlobalRoleFromAccountGroup(group: AccountGroup, globalRole: String) {
+        graphqlConnector.mutate(
+            RevokeGlobalRoleFromAccountGroupMutation(
+                group.id,
+                globalRole
+            )
+        ) { it?.revokeGlobalRoleFromAccountGroup?.payloadUserErrors?.convert() }
+    }
+
+    /**
+     * IDs of the global roles of an account, sorted - not those of its groups.
+     */
+    fun getGlobalRoles(account: Account): List<String> =
+        graphqlConnector.query(
+            AccountGlobalRolesQuery(account.id)
+        )?.accounts?.firstOrNull()?.globalRoles?.map { it.id }
+            ?: error("Cannot find account ${account.id}")
+
+    /**
+     * IDs of the global roles of an account group, sorted.
+     */
+    fun getGlobalRoles(group: AccountGroup): List<String> =
+        graphqlConnector.query(
+            AccountGroupGlobalRolesQuery(group.id)
+        )?.accountGroups?.firstOrNull()?.globalRoles?.map { it.id }
+            ?: error("Cannot find account group ${group.id}")
 
     /**
      * Creating an account group

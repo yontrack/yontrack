@@ -521,14 +521,30 @@ outcome does not matter.
 
 ### Roles add up
 
-In Yontrack 5, an account or a group held at most one role on a project: saving a role replaced the
-one it had. In Yontrack 6, an account or a group may hold **several roles on a project**, and may do
-on it the union of what they allow - as it already could through the several groups it belongs to.
-No role excludes another. See [Roles](../security/roles.md)
-([#2161](https://github.com/yontrack/yontrack/issues/2161)).
+In Yontrack 5, an account or a group held at most one global role, and at most one role on a
+project: saving a role replaced the one it had. In Yontrack 6, an account or a group may hold
+**several global roles** and **several roles on a project**, and may do the union of what they
+allow - as it already could through the several groups it belongs to. No role excludes another. See
+[Roles](../security/roles.md) ([#2161](https://github.com/yontrack/yontrack/issues/2161),
+[#2162](https://github.com/yontrack/yontrack/issues/2162)).
+
+The *Global permissions* page lists every account and group with all its global roles: adding a
+role to an account or a group keeps the roles it holds, and each role is removed on its own.
 
 #### For API clients
 
+* **The `grantGlobalRoleToAccount` and `grantGlobalRoleToAccountGroup` mutations add a global role**
+  instead of replacing the one the account or the group held. A client which relied on them to
+  change a global role must now revoke the old one. Granting a role the target already holds does
+  nothing.
+* **New GraphQL mutations** revoke one global role, keeping the others:
+  `revokeGlobalRoleFromAccount` and `revokeGlobalRoleFromAccountGroup`. They take the ID of the
+  account or group and the ID of the global role, and need the right to manage the accounts, or the
+  groups. They replace `deleteGlobalRoleFromAccount` and `deleteGlobalRoleFromAccountGroup`, which
+  remove every global role and are [deprecated](#newly-deprecated).
+* **Reading the global roles**: `Account.globalRoles` and `AccountGroup.globalRoles` list all the
+  global roles, and replace the deprecated `globalRole` fields, which return only the first of them,
+  by ID. The `globalPermissions` query lists one entry per account or group **and global role**.
 * **New GraphQL mutations** grant one project role, keeping the others, and revoke one project role,
   keeping the others: `grantProjectRoleToAccount`, `grantProjectRoleToAccountGroup`,
   `revokeProjectRoleFromAccount` and `revokeProjectRoleFromAccountGroup`. They take the ID of the
@@ -711,6 +727,10 @@ Yontrack 7. Each use of one of them is counted in `ontrack_deprecated_usage_tota
 | The `Branch.upstreamLinks` field                       | `consumerLinks`, which returns the same links                 |
 | The `Build.autoVersioning(direction)` argument         | `refRole`: `DOWN` is `CONSUMER`, `UP` is `DEPENDENCY`         |
 | The `Branch.autoVersioning(direction)` argument        | `refRole`: `DOWN` is `CONSUMER`, `UP` is `DEPENDENCY`         |
+| The `Mutation.deleteGlobalRoleFromAccount` mutation     | `revokeGlobalRoleFromAccount`, once per global role           |
+| The `Mutation.deleteGlobalRoleFromAccountGroup` mutation | `revokeGlobalRoleFromAccountGroup`, once per global role     |
+| The `Account.globalRole` field                         | `globalRoles`, a list of all the global roles                 |
+| The `AccountGroup.globalRole` field                    | `globalRoles`, a list of all the global roles                 |
 
 ### Build links
 

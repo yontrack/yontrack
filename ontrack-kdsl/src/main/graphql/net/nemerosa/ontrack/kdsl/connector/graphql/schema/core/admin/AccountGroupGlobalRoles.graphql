@@ -1,0 +1,7 @@
+query AccountGroupGlobalRoles($id: Int!) {
+    accountGroups(id: $id) {
+        globalRoles {
+            id
+        }
+    }
+}

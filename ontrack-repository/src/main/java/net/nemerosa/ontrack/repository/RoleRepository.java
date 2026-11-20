@@ -6,6 +6,7 @@ import net.nemerosa.ontrack.model.structure.ID;
 import net.nemerosa.ontrack.model.structure.Project;
 
 import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import java.util.function.BiFunction;
 import java.util.function.Function;
@@ -13,9 +14,9 @@ import java.util.function.Function;
 public interface RoleRepository {
 
     /**
-     * Gets the global role for an account
+     * Gets all the global roles of an account, sorted by ID - an account may hold several global roles.
      */
-    Optional<String> findGlobalRoleByAccount(int accountId);
+    List<String> findGlobalRolesByAccount(int accountId);
 
     Collection<ProjectRoleAssociation> findProjectRoleAssociationsByAccount(
             int accountId,
@@ -29,14 +30,52 @@ public interface RoleRepository {
             int accountId, int projectId,
             BiFunction<Integer, String, Optional<ProjectRoleAssociation>> projectRoleAssociationMapper);
 
+    /**
+     * Replaces all the global roles of the account by the given one.
+     * <p>
+     * Kept for the replace semantics of {@link net.nemerosa.ontrack.model.security.AccountService#saveGlobalPermission}
+     * until its callers move to {@link #grantGlobalRoleForAccount(int, String)}.
+     */
     Ack saveGlobalRoleForAccount(int accountId, String role);
 
+    /**
+     * Replaces all the global roles of the group by the given one.
+     * <p>
+     * Kept for the replace semantics of {@link net.nemerosa.ontrack.model.security.AccountService#saveGlobalPermission}
+     * until its callers move to {@link #grantGlobalRoleForGroup(int, String)}.
+     */
     Ack saveGlobalRoleForGroup(int accountGroupId, String role);
 
     /**
-     * Gets the global role for an account group
+     * Grants a global role to an account, keeping its other global roles.
+     * Does nothing when the account already holds the role.
      */
-    Optional<String> findGlobalRoleByGroup(int groupId);
+    Ack grantGlobalRoleForAccount(int accountId, String role);
+
+    /**
+     * Grants a global role to a group, keeping its other global roles.
+     * Does nothing when the group already holds the role.
+     */
+    Ack grantGlobalRoleForGroup(int accountGroupId, String role);
+
+    /**
+     * Revokes one global role of an account, keeping its other global roles.
+     *
+     * @return OK if the role was held and is now removed
+     */
+    Ack revokeGlobalRoleForAccount(int accountId, String role);
+
+    /**
+     * Revokes one global role of a group, keeping its other global roles.
+     *
+     * @return OK if the role was held and is now removed
+     */
+    Ack revokeGlobalRoleForGroup(int accountGroupId, String role);
+
+    /**
+     * Gets all the global roles of a group, sorted by ID - a group may hold several global roles.
+     */
+    List<String> findGlobalRolesByGroup(int groupId);
 
     Collection<ProjectRoleAssociation> findProjectRoleAssociationsByGroup(
             int groupId,
@@ -51,8 +90,14 @@ public interface RoleRepository {
             BiFunction<Integer, String, Optional<ProjectRoleAssociation>> projectRoleAssociationMapper
     );
 
+    /**
+     * Removes all the global roles of the account.
+     */
     Ack deleteGlobalRoleForAccount(int accountId);
 
+    /**
+     * Removes all the global roles of the group.
+     */
     Ack deleteGlobalRoleForGroup(int groupId);
 
     /**

@@ -34,14 +34,17 @@ abstract class TypedMutationProvider protected constructor(
      * Builds a mutation which does not return anything but allows the declaration of arbitrary fields.
      *
      * Suitable for deletions.
+     *
+     * @param deprecation Deprecation marker of the mutation (ADR 0018), if any
      */
     fun <I : Any> unitMutation(
             name: String,
             description: String,
             input: KClass<I>,
             outputFields: List<GraphQLFieldDefinition> = emptyList(),
+            deprecation: String? = null,
             fetcher: (I) -> Unit
-    ): Mutation = UnitTypedMutation(name, description, input, outputFields, fetcher)
+    ): Mutation = UnitTypedMutation(name, description, input, outputFields, deprecation, fetcher)
 
     /**
      * Builds a mutation which does not return anything and has no parameter.
@@ -119,6 +122,7 @@ abstract class TypedMutationProvider protected constructor(
             override val description: String,
             private val input: KClass<I>,
             override val outputFields: List<GraphQLFieldDefinition>,
+            override val deprecation: String?,
             private val fetcher: (I) -> Unit
     ) : Mutation {
 

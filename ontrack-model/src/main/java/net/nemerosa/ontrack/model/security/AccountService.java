@@ -8,7 +8,6 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.Collection;
 import java.util.List;
-import java.util.Optional;
 
 /**
  * Management of accounts.
@@ -91,22 +90,48 @@ public interface AccountService {
     Collection<PermissionTarget> searchPermissionTargets(String token);
 
     /**
-     * Saves the permission for the {@link net.nemerosa.ontrack.model.security.PermissionTarget} defined
-     * by the <code>type</code> and <code>id</code>.
+     * Saves the global permission for the {@link net.nemerosa.ontrack.model.security.PermissionTarget} defined
+     * by the <code>type</code> and <code>id</code>, <b>replacing</b> all the global roles the target holds.
      *
      * @param type  Group or account level permission
      * @param id    ID of the group or account
      * @param input Permissions to set
+     * @see #grantGlobalPermission(PermissionTargetType, int, String) to add a role instead
      */
     Ack saveGlobalPermission(PermissionTargetType type, int id, PermissionInput input);
 
     /**
-     * Gets the list of global permissions.
+     * Grants a global role to the {@link net.nemerosa.ontrack.model.security.PermissionTarget} defined
+     * by the <code>type</code> and <code>id</code>, keeping the other global roles it holds.
+     * Does nothing when the target already holds the role.
+     *
+     * @param type Group or account
+     * @param id   ID of the group or account
+     * @param role ID of the global role to grant
+     * @throws net.nemerosa.ontrack.model.exceptions.RoleNotFoundException when the global role does not exist
+     * @throws net.nemerosa.ontrack.model.exceptions.NotFoundException when the account or the group does not exist
+     */
+    Ack grantGlobalPermission(PermissionTargetType type, int id, String role);
+
+    /**
+     * Revokes one global role from the {@link net.nemerosa.ontrack.model.security.PermissionTarget} defined
+     * by the <code>type</code> and <code>id</code>, keeping the other global roles it holds.
+     *
+     * @param type Group or account
+     * @param id   ID of the group or account
+     * @param role ID of the global role to revoke
+     * @throws net.nemerosa.ontrack.model.exceptions.RoleNotFoundException when the global role does not exist
+     */
+    Ack revokeGlobalPermission(PermissionTargetType type, int id, String role);
+
+    /**
+     * Gets the list of global permissions: one entry per target and role, since a target may hold
+     * several global roles.
      */
     Collection<GlobalPermission> getGlobalPermissions();
 
     /**
-     * Deletes a permission
+     * Deletes all the global roles of a target.
      */
     Ack deleteGlobalPermission(PermissionTargetType type, int id);
 
@@ -167,12 +192,12 @@ public interface AccountService {
     Collection<ProjectRoleAssociation> getProjectPermissionsForAccount(Account account);
 
     /**
-     * Gets the optional global role for an account
+     * Gets all the global roles of an account, sorted by ID - not those of its groups.
      *
      * @param account Account
-     * @return Optional role
+     * @return Global roles of the account, empty if none
      */
-    Optional<GlobalRole> getGlobalRoleForAccount(Account account);
+    List<GlobalRole> getGlobalRolesForAccount(Account account);
 
     /**
      * Gets the list of accounts associated with this account group.
@@ -183,12 +208,12 @@ public interface AccountService {
     List<Account> getAccountsForGroup(AccountGroup accountGroup);
 
     /**
-     * Gets the optional global role for an account group.
+     * Gets all the global roles of an account group, sorted by ID.
      *
      * @param group Account group
-     * @return Optional role
+     * @return Global roles of the group, empty if none
      */
-    Optional<GlobalRole> getGlobalRoleForAccountGroup(AccountGroup group);
+    List<GlobalRole> getGlobalRolesForAccountGroup(AccountGroup group);
 
     /**
      * Gets the list of project permissions for a given account group

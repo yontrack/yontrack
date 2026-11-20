@@ -87,6 +87,9 @@ class GraphqlSchemaServiceImpl(
                 .name(mutation.name)
                 .description(mutation.description)
                 .apply {
+                    mutation.deprecation?.let { deprecate(it) }
+                }
+                .apply {
                     if (inputType != null) {
                         argument {
                             it.name("input")

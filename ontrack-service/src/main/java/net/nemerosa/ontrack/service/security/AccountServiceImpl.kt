@@ -147,15 +147,57 @@ class AccountServiceImpl(
         }
     }
 
+    override fun grantGlobalPermission(type: PermissionTargetType, id: Int, role: String): Ack =
+        when (type) {
+            PermissionTargetType.ACCOUNT -> {
+                securityService.checkGlobalFunction(AccountManagement::class.java)
+                checkGlobalRole(role)
+                // Not found errors rather than constraint violations
+                accountRepository.getAccount(ID.of(id))
+                roleRepository.grantGlobalRoleForAccount(id, role)
+            }
+
+            PermissionTargetType.GROUP -> {
+                securityService.checkGlobalFunction(AccountGroupManagement::class.java)
+                checkGlobalRole(role)
+                accountGroupRepository.getById(ID.of(id))
+                roleRepository.grantGlobalRoleForGroup(id, role)
+            }
+        }
+
+    override fun revokeGlobalPermission(type: PermissionTargetType, id: Int, role: String): Ack =
+        when (type) {
+            PermissionTargetType.ACCOUNT -> {
+                securityService.checkGlobalFunction(AccountManagement::class.java)
+                // A mistyped role is an error, not a silent no-op
+                checkGlobalRole(role)
+                roleRepository.revokeGlobalRoleForAccount(id, role)
+            }
+
+            PermissionTargetType.GROUP -> {
+                securityService.checkGlobalFunction(AccountGroupManagement::class.java)
+                checkGlobalRole(role)
+                roleRepository.revokeGlobalRoleForGroup(id, role)
+            }
+        }
+
+    private fun checkGlobalRole(role: String) {
+        rolesService.getGlobalRole(role).getOrNull() ?: throw RoleNotFoundException(role)
+    }
+
     override fun getGlobalPermissions(): Collection<GlobalPermission> {
         val permissions: MutableCollection<GlobalPermission> = ArrayList()
         // Users first
         permissions.addAll(
-            accountRepository.findAll().mapNotNull { getGlobalPermission(it) }
+            accountRepository.findAll().flatMap { account ->
+                getGlobalRolesForAccount(account).map { GlobalPermission(account.asPermissionTarget(), it) }
+            }
         )
         // ... then groups
         permissions.addAll(
-            accountGroupRepository.findAll().mapNotNull { group: AccountGroup -> getGroupGlobalPermission(group) }
+            accountGroupRepository.findAll().flatMap { group ->
+                getGlobalRolesForAccountGroup(group).map { GlobalPermission(group.asPermissionTarget(), it) }
+            }
         )
         // OK
         return permissions
@@ -266,19 +308,21 @@ class AccountServiceImpl(
             .collect(Collectors.toList())
     }
 
-    override fun getGlobalRoleForAccount(account: Account): Optional<GlobalRole> {
-        return roleRepository.findGlobalRoleByAccount(account.id())
-            .flatMap { id: String? -> rolesService.getGlobalRole(id!!) }
-    }
+    override fun getGlobalRolesForAccount(account: Account): List<GlobalRole> =
+        globalRoles(roleRepository.findGlobalRolesByAccount(account.id()))
 
     override fun getAccountsForGroup(accountGroup: AccountGroup): List<Account> {
         return accountRepository.getAccountsForGroup(accountGroup)
     }
 
-    override fun getGlobalRoleForAccountGroup(group: AccountGroup): Optional<GlobalRole> {
-        return roleRepository.findGlobalRoleByGroup(group.id())
-            .flatMap { id: String? -> rolesService.getGlobalRole(id!!) }
-    }
+    override fun getGlobalRolesForAccountGroup(group: AccountGroup): List<GlobalRole> =
+        globalRoles(roleRepository.findGlobalRolesByGroup(group.id()))
+
+    /**
+     * Global roles from their IDs, ignoring the ones which are no longer defined.
+     */
+    private fun globalRoles(ids: List<String>): List<GlobalRole> =
+        ids.mapNotNull { rolesService.getGlobalRole(it).getOrNull() }
 
     override fun getProjectPermissionsForAccountGroup(group: AccountGroup): Collection<ProjectRoleAssociation> {
         return roleRepository.findProjectRoleAssociationsByGroup(group.id()) { project: Int, roleId: String ->
@@ -323,34 +367,6 @@ class AccountServiceImpl(
             projectId.value
         ) { project: Int, roleId: String -> rolesService.getProjectRoleAssociation(project, roleId) }
             .map { ProjectPermission(projectId, account.asPermissionTarget(), it.projectRole) }
-
-    private fun getGroupGlobalPermission(group: AccountGroup): GlobalPermission? {
-        val roleId = roleRepository.findGlobalRoleByGroup(group.id())
-        if (roleId.isPresent) {
-            val globalRole = rolesService.getGlobalRole(roleId.get())
-            if (globalRole.isPresent) {
-                return GlobalPermission(
-                    group.asPermissionTarget(),
-                    globalRole.get()
-                )
-            }
-        }
-        return null
-    }
-
-    private fun getGlobalPermission(account: Account): GlobalPermission? {
-        val roleId = roleRepository.findGlobalRoleByAccount(account.id())
-        if (roleId.isPresent) {
-            val globalRole = rolesService.getGlobalRole(roleId.get())
-            if (globalRole.isPresent) {
-                return GlobalPermission(
-                    account.asPermissionTarget(),
-                    globalRole.get()
-                )
-            }
-        }
-        return null
-    }
 
     override fun getAccount(accountId: ID): Account {
         securityService.checkGlobalFunction(AccountManagement::class.java)

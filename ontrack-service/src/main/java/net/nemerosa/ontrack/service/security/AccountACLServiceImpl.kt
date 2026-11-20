@@ -23,9 +23,7 @@ class AccountACLServiceImpl(
         return Authorisations()
             .withProjectFunctions(autoProjectFunctions)
             .withGlobalFunctions(autoGlobalFunctions)
-            .withGlobalRole(
-                roleRepository.findGlobalRoleByAccount(account.id()).getOrNull()
-                    ?.let { id: String -> rolesService.getGlobalRole(id).getOrNull() })
+            .withGlobalRoles(globalRoles(roleRepository.findGlobalRolesByAccount(account.id())))
             .withProjectRoles(roleRepository.findProjectRoleAssociationsByAccount(account.id()) { project: Int, roleId: String ->
                 rolesService.getProjectRoleAssociation(
                     project,
@@ -75,11 +73,9 @@ class AccountACLServiceImpl(
 
     private fun getGroupACL(group: AccountGroup): Authorisations =
         Authorisations()
-            // Global role
-            .withGlobalRole(
-                roleRepository.findGlobalRoleByGroup(group.id()).getOrNull()
-                    ?.let { id: String -> rolesService.getGlobalRole(id).getOrNull() }
-            ) // Project roles
+            // Global roles
+            .withGlobalRoles(globalRoles(roleRepository.findGlobalRolesByGroup(group.id())))
+            // Project roles
             .withProjectRoles(
                 roleRepository.findProjectRoleAssociationsByGroup(group.id()) { project: Int, roleId: String ->
                     rolesService.getProjectRoleAssociation(
@@ -88,4 +84,10 @@ class AccountACLServiceImpl(
                     )
                 }
             )
+
+    /**
+     * Global roles from their IDs, ignoring the ones which are no longer defined.
+     */
+    private fun globalRoles(ids: List<String>): List<GlobalRole> =
+        ids.mapNotNull { rolesService.getGlobalRole(it).getOrNull() }
 }

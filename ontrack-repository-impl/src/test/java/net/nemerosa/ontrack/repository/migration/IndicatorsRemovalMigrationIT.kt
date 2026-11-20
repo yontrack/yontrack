@@ -115,13 +115,13 @@ class IndicatorsRemovalMigrationIT : AbstractRepositoryTestSupport() {
         )
 
         // Indicator grants are gone, not the others
-        assertEquals(null, roleRepository.findGlobalRoleByAccount(indicatorManager).orElse(null))
-        assertEquals(null, roleRepository.findGlobalRoleByGroup(indicatorManagers).orElse(null))
+        assertEquals(emptyList(), roleRepository.findGlobalRolesByAccount(indicatorManager))
+        assertEquals(emptyList(), roleRepository.findGlobalRolesByGroup(indicatorManagers))
         assertEquals(emptyList(), projectRoles("PROJECT_AUTHORIZATIONS", "ACCOUNT", projectIndicatorManager))
         assertEquals(emptyList(), projectRoles("GROUP_PROJECT_AUTHORIZATIONS", "ACCOUNTGROUP", projectIndicatorManagers))
 
-        assertEquals(Roles.GLOBAL_CONTROLLER, roleRepository.findGlobalRoleByAccount(controller).orElse(null))
-        assertEquals(Roles.GLOBAL_CONTROLLER, roleRepository.findGlobalRoleByGroup(controllers).orElse(null))
+        assertEquals(listOf(Roles.GLOBAL_CONTROLLER), roleRepository.findGlobalRolesByAccount(controller))
+        assertEquals(listOf(Roles.GLOBAL_CONTROLLER), roleRepository.findGlobalRolesByGroup(controllers))
         assertEquals(listOf(Roles.PROJECT_OWNER), projectRoles("PROJECT_AUTHORIZATIONS", "ACCOUNT", projectOwner))
         assertEquals(listOf(Roles.PROJECT_OWNER), projectRoles("GROUP_PROJECT_AUTHORIZATIONS", "ACCOUNTGROUP", projectOwners))
     }

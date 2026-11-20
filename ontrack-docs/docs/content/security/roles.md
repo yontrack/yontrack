@@ -14,13 +14,15 @@ Roles are either scoped:
 
 ## Roles add up
 
-An account or a group may hold **several project roles** on the same project. What it may do on a
-project is the **union** of the functions of all the roles it holds - globally, on this project,
-directly or through any of its groups. No role excludes another: holding a role never takes a
-function away.
+An account or a group may hold **several global roles**, and **several project roles** on the same
+project. What it may do is the **union** of the functions of all the roles it holds - globally, on
+this project, directly or through any of its groups. No role excludes another: holding a role never
+takes a function away.
 
 So a group of release engineers can be both *PARTICIPANT* and *VALIDATION_MANAGER* on a project,
-and gets the functions of both there - and none of them on the projects where it holds no role.
+and gets the functions of both there - and none of them on the projects where it holds no role. In
+the same way, a group can be both a global *CREATOR* and a global *PARTICIPANT*: it creates projects
+and comments on the validation runs of all of them.
 
 ## Global roles
 
@@ -57,6 +59,8 @@ A _global permission_ is created by associating:
 * a _permission target_ (an account or a group)
 * a _global role_
 
+The page lists each account and group once, with all its global roles.
+
 Creation:
 
 1. type the first letter of the account or the group you want to add a permission for
@@ -64,7 +68,15 @@ Creation:
 3. select the role you want to give
 4. click on _Add permission_
 
-Global permissions are created or deleted, not updated.
+Adding a role to an account or a group keeps the global roles it already holds. Each role is
+removed on its own, with the remove button next to it. Global permissions are created or deleted,
+not updated.
+
+The GraphQL API grants and revokes global roles one at a time, with the `grantGlobalRoleToAccount`,
+`grantGlobalRoleToAccountGroup`, `revokeGlobalRoleFromAccount` and
+`revokeGlobalRoleFromAccountGroup` mutations: granting a role keeps the other global roles of the
+account or group, and revoking a role removes this role only. `Account.globalRoles` and
+`AccountGroup.globalRoles` list the global roles.
 
 By using [Configuration as Code](../configuration/casc.md), you have a better control over the global permissions:
 

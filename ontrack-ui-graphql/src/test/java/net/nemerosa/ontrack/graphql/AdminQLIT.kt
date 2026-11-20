@@ -170,32 +170,36 @@ class AdminQLIT : AbstractQLKTITSupport() {
             run(
                 """{
                 accounts(id:${a.id}) {
-                    globalRole {
+                    globalRoles {
                         id name
                     }
                 }
             }"""
             )
         }
-        assertTrue(data["accounts"].first()["globalRole"].isNull)
+        assertEquals(0, data["accounts"].first()["globalRoles"].size())
     }
 
     @Test
-    fun `Account global role`() {
-        val a = doCreateAccountWithGlobalRole("CONTROLLER")
+    fun `Account global roles`() {
+        val a = doCreateAccountWithGlobalRole(Roles.GLOBAL_CONTROLLER)
+        asAdmin {
+            accountService.grantGlobalPermission(PermissionTargetType.ACCOUNT, a.id(), Roles.GLOBAL_CREATOR)
+        }
         val data = asUser().with(AccountManagement::class.java).call {
             run(
                 """{
                 accounts(id:${a.id}) {
-                    globalRole {
+                    globalRoles {
                         id name
                     }
                 }
             }"""
             )
         }
-        assertEquals("CONTROLLER", data["accounts"].first()["globalRole"]["id"].asText())
-        assertEquals("Controller", data["accounts"].first()["globalRole"].path("name").asText())
+        val roles = data["accounts"].first()["globalRoles"]
+        assertEquals(listOf(Roles.GLOBAL_CONTROLLER, Roles.GLOBAL_CREATOR), roles.values().map { it["id"].asText() })
+        assertEquals(listOf("Controller", "Creator"), roles.values().map { it["name"].asText() })
     }
 
     @Test
@@ -244,15 +248,18 @@ class AdminQLIT : AbstractQLKTITSupport() {
     }
 
     @Test
-    fun `Account group global role`() {
-        val g = doCreateAccountGroupWithGlobalRole("CONTROLLER")
+    fun `Account group global roles`() {
+        val g = doCreateAccountGroupWithGlobalRole(Roles.GLOBAL_CONTROLLER)
+        asAdmin {
+            accountService.grantGlobalPermission(PermissionTargetType.GROUP, g.id(), Roles.GLOBAL_PARTICIPANT)
+        }
         val data = asUser()
             .with(AccountManagement::class.java)
             .with(AccountGroupManagement::class.java).call {
                 run(
                     """{
                 accountGroups(id: ${g.id}) {
-                    globalRole {
+                    globalRoles {
                         id
                         name
                     }
@@ -260,8 +267,9 @@ class AdminQLIT : AbstractQLKTITSupport() {
             }"""
                 )
             }
-        assertEquals("CONTROLLER", data["accountGroups"].first()["globalRole"]["id"].asText())
-        assertEquals("Controller", data["accountGroups"].first()["globalRole"].path("name").asText())
+        val roles = data["accountGroups"].first()["globalRoles"]
+        assertEquals(listOf(Roles.GLOBAL_CONTROLLER, Roles.GLOBAL_PARTICIPANT), roles.values().map { it["id"].asText() })
+        assertEquals(listOf("Controller", "Participant"), roles.values().map { it["name"].asText() })
     }
 
     @Test

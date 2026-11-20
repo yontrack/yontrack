@@ -1,0 +1,11 @@
+mutation GrantGlobalRoleToAccountGroup(
+    $accountGroupId: Int!,
+    $globalRole: String!,
+) {
+    grantGlobalRoleToAccountGroup(input: {
+        accountGroupId: $accountGroupId,
+        globalRole: $globalRole,
+    }) {
+        ...PayloadUserErrors
+    }
+}

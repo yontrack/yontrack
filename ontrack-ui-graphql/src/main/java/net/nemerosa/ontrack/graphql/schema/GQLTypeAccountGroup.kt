@@ -10,7 +10,6 @@ import net.nemerosa.ontrack.model.security.Account
 import net.nemerosa.ontrack.model.security.AccountGroup
 import net.nemerosa.ontrack.model.security.AccountService
 import org.springframework.stereotype.Component
-import kotlin.jvm.optionals.getOrNull
 
 /**
  * @see AccountGroup
@@ -40,14 +39,24 @@ class GQLTypeAccountGroup(
                         val accountGroup: AccountGroup = env.getSource()!!
                         getAccountsForGroup(accountGroup)
                     }
-            } // Global role
+            } // Global roles
             .field { field ->
                 field.name("globalRole")
-                    .description("Global role for the account group")
+                    .description("First global role of the account group, by ID. A group may hold several global roles: use globalRoles.")
                     .type(globalRole.typeRef)
+                    .deprecate("Removed in V7. Use globalRoles instead. See #2162")
                     .dataFetcher { env ->
                         val accountGroup: AccountGroup = env.getSource()!!
-                        accountService.getGlobalRoleForAccountGroup(accountGroup).getOrNull()
+                        accountService.getGlobalRolesForAccountGroup(accountGroup).firstOrNull()
+                    }
+            }
+            .field { field ->
+                field.name("globalRoles")
+                    .description("Global roles of the account group, sorted by ID")
+                    .type(listType(globalRole.typeRef))
+                    .dataFetcher { env ->
+                        val accountGroup: AccountGroup = env.getSource()!!
+                        accountService.getGlobalRolesForAccountGroup(accountGroup)
                     }
             } // Authorised projects
             .field { field ->

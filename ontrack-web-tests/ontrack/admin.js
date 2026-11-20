@@ -31,7 +31,7 @@ class AdminMgt {
             `,
             {name, description}
         )
-        return data.accountGroup
+        return data.createAccountGroup.accountGroup
     }
 
     async getGroupByName(groupName) {
@@ -70,6 +70,29 @@ class AdminMgt {
             this.ontrack.connection,
             `/rest/accounts/permissions/projects/${projectId}/GROUP/${group.id}`,
             {role}
+        )
+    }
+
+    /**
+     * Grants a global role to a group, keeping the other global roles it holds.
+     */
+    async grantGlobalRoleToGroup(group, globalRole) {
+        await graphQLCallMutation(
+            this.ontrack.connection,
+            'grantGlobalRoleToAccountGroup',
+            gql`
+                mutation GrantGlobalRoleToAccountGroup($accountGroupId: Int!, $globalRole: String!) {
+                    grantGlobalRoleToAccountGroup(input: {
+                        accountGroupId: $accountGroupId,
+                        globalRole: $globalRole,
+                    }) {
+                        errors {
+                            message
+                        }
+                    }
+                }
+            `,
+            {accountGroupId: Number(group.id), globalRole}
         )
     }
 

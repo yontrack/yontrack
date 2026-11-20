@@ -1,0 +1,11 @@
+mutation RevokeGlobalRoleFromAccount(
+    $accountId: Int!,
+    $globalRole: String!,
+) {
+    revokeGlobalRoleFromAccount(input: {
+        accountId: $accountId,
+        globalRole: $globalRole,
+    }) {
+        ...PayloadUserErrors
+    }
+}
