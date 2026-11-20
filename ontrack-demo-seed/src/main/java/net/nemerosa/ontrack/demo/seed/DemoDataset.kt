@@ -51,6 +51,13 @@ data class DemoDataset(
      * the seed creates them, or overwrites them, before the projects.
      */
     val httpConfigurations: List<HttpConfigurationSpec> = emptyList(),
+    /**
+     * Account groups, which [ProjectSpec.groupRoles] grant project roles to. They belong to the
+     * instance rather than to a project, so they outlive the projects the reset deletes - and the
+     * roles they hold on a project go with it. Found by name, or created, before the reset: never
+     * deleted, since a group may have members the instance maps to it.
+     */
+    val groups: List<AccountGroupSpec> = emptyList(),
 )
 
 /**
@@ -122,7 +129,45 @@ data class ProjectSpec(
     val labels: List<String> = emptyList(),
     val requires: List<DemoCapability> = emptyList(),
     val notGrantedMedals: Boolean = false,
+    /**
+     * Project roles granted to account groups of [DemoDataset.groups], which the project permissions
+     * page shows. Roles add up: a group listed with two roles holds both.
+     */
+    val groupRoles: List<ProjectGroupRolesSpec> = emptyList(),
 )
+
+/**
+ * An account group of the instance - see [DemoDataset.groups].
+ *
+ * @property name Name of the group, unique on the instance, which is how the seed finds it again
+ * @property description Used only when the seed creates the group
+ */
+data class AccountGroupSpec(
+    val name: String,
+    val description: String,
+)
+
+/**
+ * Project roles granted to an account group on a project - see [ProjectSpec.groupRoles].
+ *
+ * @property group Name of a group of [DemoDataset.groups]
+ * @property roles The roles the group holds on the project, which add up
+ */
+data class ProjectGroupRolesSpec(
+    val group: String,
+    val roles: List<DemoProjectRole>,
+)
+
+/**
+ * The project roles the demo grants, by their ID on the server. Only the ones the dataset uses: a role
+ * is named here once, so that a typo is a compile error rather than a refusal after the reset.
+ */
+enum class DemoProjectRole(val id: String) {
+    PARTICIPANT("PARTICIPANT"),
+
+    /** Contributed by the auto-versioning extension (#2166). */
+    AUTO_VERSIONING_CONTROLLER("AUTO_VERSIONING_CONTROLLER"),
+}
 
 /**
  * What a part of the dataset needs of the instance and the instance may not offer - each checked

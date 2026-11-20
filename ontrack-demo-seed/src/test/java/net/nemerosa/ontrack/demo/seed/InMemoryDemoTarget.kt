@@ -46,6 +46,11 @@ class InMemoryDemoTarget(
      * enabled it.
      */
     private val httpMockEnabled: Boolean = true,
+    /**
+     * Whether the seeding account may manage account groups. `false` models a token without
+     * `AccountGroupManagement`, which neither finds nor creates one.
+     */
+    private val accountGroupsManaged: Boolean = true,
 ) : DemoTarget {
 
     /**
@@ -220,6 +225,38 @@ class InMemoryDemoTarget(
         journal += "http configuration $name"
     }
 
+    /**
+     * Account groups, by name, with their description - held by the instance, where they outlive the
+     * projects the reset deletes.
+     */
+    private val accountGroups = mutableMapOf<String, String>()
+
+    /** Names of the account groups of the instance, in creation order. */
+    fun accountGroupNames(): List<String> = accountGroups.keys.toList()
+
+    /**
+     * Creates a group as an administrator would, refusing a second one of the same name as the server
+     * does.
+     */
+    fun createAccountGroup(name: String, description: String): DemoAccountGroup {
+        require(name.isNotBlank()) { "An account group needs a name." }
+        require(name !in accountGroups) { "Account group $name already exists" }
+        accountGroups[name] = description
+        journal += "account group $name"
+        return InMemoryAccountGroup(name)
+    }
+
+    override fun accountGroup(spec: AccountGroupSpec): DemoAccountGroup =
+        if (!accountGroupsManaged) {
+            error("The seeding account may not manage account groups.")
+        } else if (spec.name in accountGroups) {
+            InMemoryAccountGroup(spec.name)
+        } else {
+            createAccountGroup(spec.name, spec.description)
+        }
+
+    inner class InMemoryAccountGroup(override val name: String) : DemoAccountGroup
+
     override fun checkNativeFindingsFormats() {
         check(nativeFindingsFormats) { "The native scanner formats are not licensed on this instance. Nothing was deleted." }
     }
@@ -276,10 +313,14 @@ class InMemoryDemoTarget(
             agent.tokens.sorted().forEach { add("  token $it${if (it in agent.readOnlyTokens) " read-only" else ""}") }
         }
         httpConfigurations.forEach { (name, url) -> add("http configuration $name $url") }
+        accountGroups.forEach { (name, description) -> add("account group $name \"$description\"") }
         projects.forEach { project ->
             add("project ${project.name} \"${project.description}\"")
             if (project.favourite) add("  favourite")
             if (project.labels.isNotEmpty()) add("  labels ${project.labels.joinToString(", ")}")
+            project.groupRoles.forEach { (group, roles) ->
+                add("  group $group: ${roles.joinToString(", ") { it.id }}")
+            }
             if (project.scorecardComputed) add("  scorecard computed")
             project.scmRepositoryName?.let { repositoryName ->
                 val repository = scmRepositories.getValue(repositoryName)
@@ -443,6 +484,19 @@ class InMemoryDemoTarget(
         /** The labels this project carries, by their display form, in assignment order. */
         var labels: List<String> = emptyList()
             private set
+
+        /**
+         * Project roles of the account groups, by group name, in the order they were granted. Held by
+         * the project, as on the server: deleting the project deletes them.
+         */
+        val groupRoles = mutableMapOf<String, List<DemoProjectRole>>()
+
+        /** Keeps the other roles of the group, and does nothing when it holds [role] already, as the server does. */
+        override fun grantRole(group: DemoAccountGroup, role: DemoProjectRole) {
+            require(group.name in accountGroups) { "Account group ${group.name} does not exist" }
+            val roles = groupRoles[group.name].orEmpty()
+            if (role !in roles) groupRoles[group.name] = roles + role
+        }
 
         /** Whether the not-granted medals were enabled on the project. */
         var notGrantedMedals: Boolean = false

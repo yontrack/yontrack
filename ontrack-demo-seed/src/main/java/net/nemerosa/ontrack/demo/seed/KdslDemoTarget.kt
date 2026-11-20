@@ -13,7 +13,9 @@ import net.nemerosa.ontrack.kdsl.spec.extension.audittrail.attachEvidence
 import net.nemerosa.ontrack.kdsl.spec.extension.audittrail.auditTrailStorageState
 import net.nemerosa.ontrack.kdsl.spec.extension.audittrail.evidence
 import net.nemerosa.ontrack.kdsl.spec.extension.audittrail.trail
+import net.nemerosa.ontrack.kdsl.spec.admin.AccountGroup
 import net.nemerosa.ontrack.kdsl.spec.admin.Agent
+import net.nemerosa.ontrack.kdsl.spec.admin.admin
 import net.nemerosa.ontrack.kdsl.spec.admin.agents
 import net.nemerosa.ontrack.kdsl.spec.extension.agents.assistedBuildsRequire
 import net.nemerosa.ontrack.kdsl.spec.extension.agents.nonAgentEvidence
@@ -145,6 +147,12 @@ class KdslDemoTarget(private val ontrack: Ontrack) : DemoTarget {
         }
         configurations.create(HttpConfiguration(name = name, url = url, authentication = HttpAuthentication.none()))
     }
+
+    override fun accountGroup(spec: AccountGroupSpec): DemoAccountGroup =
+        KdslDemoAccountGroup(
+            ontrack.admin.findAccountGroupByName(spec.name)
+                ?: ontrack.admin.createAccountGroup(spec.name, spec.description)
+        )
 
     override fun unavailable(capability: DemoCapability): String? =
         when (capability) {
@@ -572,12 +580,20 @@ private class KdslDemoDashboardHandle(
     override fun delete() = ontrack.deleteDashboard(uuid)
 }
 
+private class KdslDemoAccountGroup(val group: AccountGroup) : DemoAccountGroup {
+
+    override val name: String get() = group.name
+}
+
 private class KdslDemoProject(
     val ontrack: Ontrack,
     val project: Project,
 ) : DemoProject {
 
     override val name: String get() = project.name
+
+    override fun grantRole(group: DemoAccountGroup, role: DemoProjectRole) =
+        ontrack.admin.grantProjectRoleToAccountGroup(project, (group as KdslDemoAccountGroup).group, role.id)
 
     /**
      * The mock SCM repository this project reads its change logs from, once

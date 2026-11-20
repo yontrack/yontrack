@@ -17,7 +17,8 @@ deleting every project leaves every label behind. The one HTTP configuration of 
 [The HTTP call](#the-http-call).
 
 The token it runs with needs admin-level rights: it deletes projects, manages environments
-and labels (`LabelManagement`) and shares a dashboard (`DashboardSharing`). It also generates a
+and labels (`LabelManagement`), shares a dashboard (`DashboardSharing`), and creates an account
+group (`AccountGroupManagement`) which it grants project roles to. It also generates a
 second token for its own account, `ci-demo`, which the audit trail demo is created through, and
 revokes it at the end of the reset - see [The audit trail](#the-audit-trail) below.
 
@@ -621,6 +622,23 @@ fetched, and a link to a real service would lead nowhere.
 
 `InMemoryDemoTarget` enforces the agent policy, the two gates and the computation of the assisted
 change from the trailers, so that a dataset the server would refuse fails in the unit tests.
+
+### The account group
+
+`petclinic` shows the project permissions page (#2169): the `Release engineers` group holds
+Participant and Auto-versioning controller on it (`ProjectSpec.groupRoles`), and the page lists
+it once, with both roles. `DemoProjectPermissionsSeedTest` pins it.
+
+- **Found or created before the reset, never deleted.** A group belongs to the instance
+  (`DemoDataset.groups`) and may have members mapped to it, so the reset leaves it alone. It is
+  resolved before anything is deleted, so that a token which may not manage groups stops the seed
+  with the demo intact. The roles it holds on a project are deleted with the project, so the
+  second run grants them again - and granting a role the group holds already does nothing.
+- **Roles by their ID, once.** `DemoProjectRole` names the roles the dataset grants, so that a typo
+  is a compile error rather than a refusal after the reset. A role an extension contributes - the
+  Auto-versioning controller - needs that extension on the instance.
+- **No auto-versioning order.** What the second role allows, rescheduling an order, has nothing
+  to act on in the demo.
 
 ## How it is put together
 

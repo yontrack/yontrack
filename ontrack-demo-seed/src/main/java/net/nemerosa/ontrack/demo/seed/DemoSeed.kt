@@ -68,9 +68,16 @@ class DemoSeed(
         } else {
             null
         }
+        // Before the reset as well: a seeding account which may not manage account groups is refused
+        // here, with nothing deleted. Found or created, never reset - see [DemoDataset.groups] - and
+        // the roles they hold go with the projects the reset deletes.
+        val groups = dataset.groups.associate { spec ->
+            log("Finding or creating the account group ${spec.name}")
+            spec.name to target.accountGroup(spec)
+        }
         val now = LocalDateTime.now(clock)
         reset(dataset)
-        create(dataset, now, evidence, httpMockUrl)
+        create(dataset, now, evidence, httpMockUrl, groups)
     }
 
     /**
@@ -186,8 +193,15 @@ class DemoSeed(
     /**
      * @param evidence Whether the instance takes evidence
      * @param httpMockUrl Where the backend reaches its mock deployment API, when the dataset calls it
+     * @param groups The account groups of the dataset, by name, which the projects grant roles to
      */
-    private fun create(dataset: DemoDataset, now: LocalDateTime, evidence: Boolean, httpMockUrl: String?) {
+    private fun create(
+        dataset: DemoDataset,
+        now: LocalDateTime,
+        evidence: Boolean,
+        httpMockUrl: String?,
+        groups: Map<String, DemoAccountGroup>,
+    ) {
         // Before anything is created through them, and revoked whatever happens: they are the tokens
         // of the account the seed runs as, an administrator's
         val tokens = dataset.projects
@@ -198,7 +212,7 @@ class DemoSeed(
                 target.openToken(name)
             }
         try {
-            create(dataset, now, evidence, httpMockUrl, tokens + agentTokens(dataset))
+            create(dataset, now, evidence, httpMockUrl, groups, tokens + agentTokens(dataset))
         } finally {
             tokens.values.forEach { token ->
                 log("Revoking the API token ${token.name}")
@@ -234,6 +248,7 @@ class DemoSeed(
         now: LocalDateTime,
         evidence: Boolean,
         httpMockUrl: String?,
+        groups: Map<String, DemoAccountGroup>,
         tokens: Map<String, DemoToken>,
     ) {
         val projects = mutableMapOf<String, DemoProject>()
@@ -275,6 +290,12 @@ class DemoSeed(
                 project.setLabels(spec.labels.map { labels.getValue(it) })
             }
             if (spec.notGrantedMedals) project.enableNotGrantedMedals()
+            spec.groupRoles.forEach { groupRoles ->
+                groupRoles.roles.forEach { role ->
+                    log("Granting ${role.id} on ${spec.name} to the account group ${groupRoles.group}")
+                    project.grantRole(groups.getValue(groupRoles.group), role)
+                }
+            }
             spec.branches.forEach { branchSpec ->
                 branches[spec.name to branchSpec.name] =
                     createBranch(spec, branchSpec, project, now, builds, tokens, evidence, heldLadders, httpCalls)

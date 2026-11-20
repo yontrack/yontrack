@@ -49,6 +49,16 @@ fun DemoDataset.validate() {
         }
     }
 
+    // Account groups too: a project grants them roles, by name
+    val groupNames = mutableSetOf<String>()
+    groups.forEach { group ->
+        if (group.name.isBlank()) {
+            problems += "An account group needs a name."
+        } else if (!groupNames.add(group.name)) {
+            problems += "The dataset declares the account group ${group.name} twice."
+        }
+    }
+
     // Agents next: builds and deployments name them, by slug
     val agentSlugs = mutableSetOf<String>()
     agents.forEach { agent ->
@@ -113,6 +123,24 @@ fun DemoDataset.validate() {
             .keys
             .forEach { label ->
                 problems += "Project ${project.name} carries the $label label twice."
+            }
+        // A group naming nothing would fail half-way through the reset, as a label would
+        project.groupRoles.forEach { groupRoles ->
+            if (groupRoles.group !in groupNames) {
+                problems += "Project ${project.name} grants roles to the account group ${groupRoles.group}, " +
+                        "which the dataset never creates."
+            }
+            if (groupRoles.roles.isEmpty()) {
+                problems += "Project ${project.name} grants no role to the account group ${groupRoles.group}."
+            }
+        }
+        project.groupRoles
+            .flatMap { groupRoles -> groupRoles.roles.map { groupRoles.group to it } }
+            .groupingBy { it }.eachCount()
+            .filterValues { it > 1 }
+            .keys
+            .forEach { (group, role) ->
+                problems += "Project ${project.name} grants ${role.id} to the account group $group twice."
             }
         project.scm?.issues?.forEach { issue ->
             if (!ISSUE_KEY.matches(issue.key)) {

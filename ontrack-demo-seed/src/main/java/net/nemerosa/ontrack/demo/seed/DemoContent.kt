@@ -118,6 +118,13 @@ object DemoContent {
     const val DEPLOYMENTS_CONFIG = "demo-deployments"
 
     /**
+     * The account group holding two roles on [SERVICE], Participant and Auto-versioning controller, so
+     * that the project permissions page shows a group whose roles add up (#2169). The demo has no
+     * auto-versioning order, so what the second role allows - rescheduling one - is not shown.
+     */
+    const val RELEASE_ENGINEERS = "Release engineers"
+
+    /**
      * How long a deployment the [GOLD] promotions of [SERVICE] start runs on the mock deployment API:
      * long enough for the call to poll it a few times before it is over, short enough for the reset.
      */
@@ -393,6 +400,12 @@ object DemoContent {
         estates = estates(),
         agents = agents(),
         httpConfigurations = listOf(HttpConfigurationSpec(DEPLOYMENTS_CONFIG)),
+        groups = listOf(
+            AccountGroupSpec(
+                name = RELEASE_ENGINEERS,
+                description = "Release engineers of the demo, who take part in its projects and control their auto-versioning.",
+            ),
+        ),
     )
 
     /**
@@ -931,6 +944,13 @@ object DemoContent {
         // In both estates, and the reason they overlap: its scorecard reads it twice, up to GOLD and
         // up to production, and the two columns do not say the same thing.
         labels = listOf(LABEL_TEAM_APPS, LABEL_LANGUAGE_JAVA, LABEL_PORTFOLIO_PRODUCT, LABEL_RUNS_IN_PRODUCTION),
+        // Two roles for one group, which add up: the project permissions page lists the group under both
+        groupRoles = listOf(
+            ProjectGroupRolesSpec(
+                group = RELEASE_ENGINEERS,
+                roles = listOf(DemoProjectRole.PARTICIPANT, DemoProjectRole.AUTO_VERSIONING_CONTROLLER),
+            ),
+        ),
         branches = listOf(
             BranchSpec(
                 name = MAIN,

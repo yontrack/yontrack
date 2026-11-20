@@ -21,6 +21,7 @@ the seed — keep it in sync by hand whenever that file changes.
 | HTTP call starting a deployment, and waiting for it | `petclinic` / `main`, builds `101`, `104`, `107`, `GOLD` promotion run, _Notifications_ | An `http` record: the `POST` to `/deployments` of the mock deployment API, its status URL polled until `SUCCEEDED`, 4 attempts |
 | HTTP call subscription and its configuration | `petclinic` / `main`, `GOLD` promotion level, _Subscriptions_; user menu → _Configurations_ → _HTTP configurations_ | The `deploy` subscription, with its templated body and its success and failure conditions; `demo-deployments`, without authentication |
 | Promoting the dependencies of a build       | `petclinic-suite` / `main`, build `10`, `GOLD` promotion run, _Workflows_ | The `yontrack-dependencies-promotion` node: `petclinic-suite-modules` `1.3` and `1.4` `PROMOTED` through the qualified links `module-billing` and `module-visits`, `petclinic-suite-core` `1.2` `SKIPPED`, already `GOLD` |
+| A group whose roles add up                  | `petclinic` project page, _Permissions_ command                      | The `Release engineers` group with two tags, Participant and Auto-versioning controller; the demo has no auto-versioning order, so there is nothing to reschedule |
 | Build dependency graph                      | `petclinic-ui` / `main`, builds `58` and `59`                        | Links down to `petclinic` builds, which link down to `common-library` builds               |
 | Environments and deployments                | `staging` and `production` environments                              | `petclinic` `105` deployed on staging, `104` deployed on production                        |
 | Shared dashboard                            | Dashboard picker → "Yontrack demo"                                    | Two `BranchStatuses` widgets ("Sample application", "End-to-end suites"), `EnvironmentList`, `LastActiveProjects`, `PromotionFrequencyChart`, `ProjectScorecard`, the two findings widgets (`ProjectFindings`, `BranchFindings`), and `AgentActivity` |
@@ -77,7 +78,7 @@ the seed — keep it in sync by hand whenever that file changes.
 | Project           | Branches                    | Labels                                  | Role                                                                |
 |--------------------|------------------------------|------------------------------------------|----------------------------------------------------------------------|
 | `common-library`   | `main`                       | `team:platform`, `language:java`         | Bottom of the dependency graph; `petclinic` links to its builds       |
-| `petclinic`        | `main`, `release-1.3`        | `team:apps`, `language:java`, `portfolio:product`, `runs-in:production` | The main demo project — full pipeline, both promotion ladders, the only one with an SCM |
+| `petclinic`        | `main`, `release-1.3`        | `team:apps`, `language:java`, `portfolio:product`, `runs-in:production` | The main demo project — full pipeline, both promotion ladders, the only one with an SCM, and the `Release engineers` group's two roles |
 | `petclinic-ui`     | `main`                       | `team:apps`, `language:javascript`, `runs-in:production` | Consumes `petclinic`, so the demo has a dependency graph to walk       |
 | `petclinic-billing` | `release-2.3`, `main`       | `team:apps`, `language:java`, `portfolio:product` | The security findings: two scans per build, one of them in SARIF       |
 | `petclinic-visits` | `main`                       | `team:apps`, `language:kotlin`, `portfolio:product`, `runs-in:production` | The delivery scorecard: 90 days of releases, test runs and production deployments |
@@ -104,6 +105,14 @@ overlap on `petclinic` and `petclinic-visits`, whose scorecards therefore have t
 Labels are global rather than owned by a project, so the reset deletes them all before
 recreating them — the same treatment as environments and dashboards, and for the same reason:
 they outlive the projects it deletes.
+
+## The account group
+
+`Release engineers` holds two project roles on `petclinic`, Participant and Auto-versioning
+controller, which add up: the project permissions page lists the group once, with both roles as
+tags. The group belongs to the instance, not to the project, so the reset never deletes it: the
+seed finds it by name, or creates it, and grants its roles again on the `petclinic` it recreates.
+Its members are whoever the instance maps to it - the demo adds none.
 
 ## The change log
 

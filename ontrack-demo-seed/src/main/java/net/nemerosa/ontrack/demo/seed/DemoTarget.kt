@@ -118,6 +118,13 @@ interface DemoTarget {
     fun saveHttpConfiguration(name: String, url: String)
 
     /**
+     * The account group named in [spec], created when the instance has none of that name. Asked
+     * before the reset, never deleted nor changed: a group outlives the projects the reset deletes, and
+     * may have members the instance maps to it - see [DemoDataset.groups].
+     */
+    fun accountGroup(spec: AccountGroupSpec): DemoAccountGroup
+
+    /**
      * Why the instance cannot offer [capability], or `null` when it can.
      *
      * Asked before the reset, and read-only: unlike [checkScmAvailable], a missing capability does
@@ -234,9 +241,22 @@ interface DemoLabel {
     fun delete()
 }
 
+/**
+ * An account group held by the instance - see [DemoTarget.accountGroup].
+ */
+interface DemoAccountGroup {
+    val name: String
+}
+
 interface DemoProject {
     val name: String
     fun delete()
+
+    /**
+     * Grants [role] on this project to [group], keeping the other roles it holds here. Does nothing
+     * when the group already holds the role.
+     */
+    fun grantRole(group: DemoAccountGroup, role: DemoProjectRole)
     fun createBranch(name: String, description: String): DemoBranch
 
     /**
