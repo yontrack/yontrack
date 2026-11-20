@@ -4,6 +4,8 @@ import net.nemerosa.ontrack.graphql.support.TypedMutationProvider
 import net.nemerosa.ontrack.model.security.AccountService
 import net.nemerosa.ontrack.model.security.PermissionInput
 import net.nemerosa.ontrack.model.security.PermissionTargetType
+import net.nemerosa.ontrack.common.api.APIDescription
+import net.nemerosa.ontrack.model.structure.ID
 import org.springframework.stereotype.Component
 
 @Component
@@ -54,6 +56,54 @@ class AccountPermissionsMutations(
                 input.accountGroupId,
             )
         },
+        unitMutation(
+            name = "grantProjectRoleToAccount",
+            description = "Grants a project role to an account, keeping the other roles it holds on the project. Does nothing when the account already holds the role.",
+            input = GrantProjectRoleToAccountInput::class,
+        ) { input ->
+            accountService.grantProjectPermission(
+                ID.of(input.projectId),
+                PermissionTargetType.ACCOUNT,
+                input.accountId,
+                input.projectRole,
+            )
+        },
+        unitMutation(
+            name = "grantProjectRoleToAccountGroup",
+            description = "Grants a project role to an account group, keeping the other roles it holds on the project. Does nothing when the group already holds the role.",
+            input = GrantProjectRoleToAccountGroupInput::class,
+        ) { input ->
+            accountService.grantProjectPermission(
+                ID.of(input.projectId),
+                PermissionTargetType.GROUP,
+                input.accountGroupId,
+                input.projectRole,
+            )
+        },
+        unitMutation(
+            name = "revokeProjectRoleFromAccount",
+            description = "Revokes one project role from an account, keeping the other roles it holds on the project",
+            input = RevokeProjectRoleFromAccountInput::class,
+        ) { input ->
+            accountService.revokeProjectPermission(
+                ID.of(input.projectId),
+                PermissionTargetType.ACCOUNT,
+                input.accountId,
+                input.projectRole,
+            )
+        },
+        unitMutation(
+            name = "revokeProjectRoleFromAccountGroup",
+            description = "Revokes one project role from an account group, keeping the other roles it holds on the project",
+            input = RevokeProjectRoleFromAccountGroupInput::class,
+        ) { input ->
+            accountService.revokeProjectPermission(
+                ID.of(input.projectId),
+                PermissionTargetType.GROUP,
+                input.accountGroupId,
+                input.projectRole,
+            )
+        },
     )
 }
 
@@ -73,4 +123,40 @@ data class DeleteGlobalRoleFromAccountInput(
 
 data class DeleteGlobalRoleFromAccountGroupInput(
     val accountGroupId: Int,
+)
+
+data class GrantProjectRoleToAccountInput(
+    @APIDescription("ID of the project")
+    val projectId: Int,
+    @APIDescription("ID of the account")
+    val accountId: Int,
+    @APIDescription("ID of the project role to grant")
+    val projectRole: String,
+)
+
+data class GrantProjectRoleToAccountGroupInput(
+    @APIDescription("ID of the project")
+    val projectId: Int,
+    @APIDescription("ID of the account group")
+    val accountGroupId: Int,
+    @APIDescription("ID of the project role to grant")
+    val projectRole: String,
+)
+
+data class RevokeProjectRoleFromAccountInput(
+    @APIDescription("ID of the project")
+    val projectId: Int,
+    @APIDescription("ID of the account")
+    val accountId: Int,
+    @APIDescription("ID of the project role to revoke")
+    val projectRole: String,
+)
+
+data class RevokeProjectRoleFromAccountGroupInput(
+    @APIDescription("ID of the project")
+    val projectId: Int,
+    @APIDescription("ID of the account group")
+    val accountGroupId: Int,
+    @APIDescription("ID of the project role to revoke")
+    val projectRole: String,
 )

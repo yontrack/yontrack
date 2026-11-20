@@ -1,0 +1,15 @@
+mutation CreateAccountGroup(
+    $name: String!,
+    $description: String,
+) {
+    createAccountGroup(input: {
+        name: $name,
+        description: $description,
+    }) {
+        accountGroup {
+            id
+            name
+        }
+        ...PayloadUserErrors
+    }
+}

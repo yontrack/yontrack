@@ -1,0 +1,13 @@
+mutation GrantProjectRoleToAccount(
+    $projectId: Int!,
+    $accountId: Int!,
+    $projectRole: String!,
+) {
+    grantProjectRoleToAccount(input: {
+        projectId: $projectId,
+        accountId: $accountId,
+        projectRole: $projectRole,
+    }) {
+        ...PayloadUserErrors
+    }
+}

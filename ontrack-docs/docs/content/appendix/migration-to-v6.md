@@ -519,6 +519,25 @@ A `yontrack-promotion` notification using `waitForPromotion` now fails when a no
 target promotion level fails. Fix the failing notification, or remove `waitForPromotion` if its
 outcome does not matter.
 
+### Roles add up
+
+In Yontrack 5, an account or a group held at most one role on a project: saving a role replaced the
+one it had. In Yontrack 6, an account or a group may hold **several roles on a project**, and may do
+on it the union of what they allow - as it already could through the several groups it belongs to.
+No role excludes another. See [Roles](../security/roles.md)
+([#2161](https://github.com/yontrack/yontrack/issues/2161)).
+
+#### For API clients
+
+* **New GraphQL mutations** grant one project role, keeping the others, and revoke one project role,
+  keeping the others: `grantProjectRoleToAccount`, `grantProjectRoleToAccountGroup`,
+  `revokeProjectRoleFromAccount` and `revokeProjectRoleFromAccountGroup`. They take the ID of the
+  project, the ID of the account or group, and the ID of the project role, and need the right to
+  manage the permissions of the project. Granting a role the target already holds does nothing.
+* **Reading the project roles**: `Project.projectRoles` lists an account or a group under each of its
+  roles, and `Account.authorizedProjects` and `AccountGroup.authorizedProjects` list one entry per
+  project **and role** - a client expecting one entry per project must expect several.
+
 ## Removed
 
 Yontrack 6 removes what Yontrack 5 deprecated. Each item is listed here with what to use instead,

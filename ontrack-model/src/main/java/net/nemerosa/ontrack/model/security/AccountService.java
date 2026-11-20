@@ -111,7 +111,8 @@ public interface AccountService {
     Ack deleteGlobalPermission(PermissionTargetType type, int id);
 
     /**
-     * Gets the list of permissions for a project.
+     * Gets the list of permissions for a project: one entry per target and role, since a target may
+     * hold several roles on a project.
      *
      * @param projectId ID of the project
      */
@@ -119,12 +120,41 @@ public interface AccountService {
 
     /**
      * Saves the project permission for the {@link net.nemerosa.ontrack.model.security.PermissionTarget} defined
-     * by the <code>type</code> and <code>id</code>.
+     * by the <code>type</code> and <code>id</code>, <b>replacing</b> all the roles the target holds on
+     * the project.
+     *
+     * @see #grantProjectPermission(ID, PermissionTargetType, int, String) to add a role instead
      */
     Ack saveProjectPermission(ID projectId, PermissionTargetType type, int id, PermissionInput input);
 
     /**
-     * Deletes a project permission.
+     * Grants a project role to the {@link net.nemerosa.ontrack.model.security.PermissionTarget} defined
+     * by the <code>type</code> and <code>id</code>, keeping the other roles it holds on the project.
+     * Does nothing when the target already holds the role.
+     *
+     * @param projectId ID of the project
+     * @param type      Group or account
+     * @param id        ID of the group or account
+     * @param role      ID of the project role to grant
+     * @throws net.nemerosa.ontrack.model.exceptions.RoleNotFoundException when the project role does not exist
+     * @throws net.nemerosa.ontrack.model.exceptions.NotFoundException when the project, the account or the group does not exist
+     */
+    Ack grantProjectPermission(ID projectId, PermissionTargetType type, int id, String role);
+
+    /**
+     * Revokes one project role from the {@link net.nemerosa.ontrack.model.security.PermissionTarget} defined
+     * by the <code>type</code> and <code>id</code>, keeping the other roles it holds on the project.
+     *
+     * @param projectId ID of the project
+     * @param type      Group or account
+     * @param id        ID of the group or account
+     * @param role      ID of the project role to revoke
+     * @throws net.nemerosa.ontrack.model.exceptions.RoleNotFoundException when the project role does not exist
+     */
+    Ack revokeProjectPermission(ID projectId, PermissionTargetType type, int id, String role);
+
+    /**
+     * Deletes all the project roles of a target on a project.
      */
     Ack deleteProjectPermission(ID projectId, PermissionTargetType type, int id);
 

@@ -94,6 +94,46 @@ public class RoleJdbcRepository extends AbstractJdbcRepository implements RoleRe
     }
 
     @Override
+    public Ack grantProjectRoleForAccount(int projectId, int accountId, String role) {
+        getNamedParameterJdbcTemplate().update(
+                "INSERT INTO PROJECT_AUTHORIZATIONS (PROJECT, ACCOUNT, ROLE) VALUES (:projectId, :accountId, :role) " +
+                        "ON CONFLICT DO NOTHING",
+                params("accountId", accountId).addValue("role", role).addValue("projectId", projectId)
+        );
+        return Ack.OK;
+    }
+
+    @Override
+    public Ack grantProjectRoleForGroup(int projectId, int groupId, String role) {
+        getNamedParameterJdbcTemplate().update(
+                "INSERT INTO GROUP_PROJECT_AUTHORIZATIONS (PROJECT, ACCOUNTGROUP, ROLE) VALUES (:projectId, :groupId, :role) " +
+                        "ON CONFLICT DO NOTHING",
+                params("groupId", groupId).addValue("role", role).addValue("projectId", projectId)
+        );
+        return Ack.OK;
+    }
+
+    @Override
+    public Ack revokeProjectRoleForAccount(int projectId, int accountId, String role) {
+        return Ack.one(
+                getNamedParameterJdbcTemplate().update(
+                        "DELETE FROM PROJECT_AUTHORIZATIONS WHERE ACCOUNT = :accountId AND PROJECT = :projectId AND ROLE = :role",
+                        params("accountId", accountId).addValue("projectId", projectId).addValue("role", role)
+                )
+        );
+    }
+
+    @Override
+    public Ack revokeProjectRoleForGroup(int projectId, int groupId, String role) {
+        return Ack.one(
+                getNamedParameterJdbcTemplate().update(
+                        "DELETE FROM GROUP_PROJECT_AUTHORIZATIONS WHERE ACCOUNTGROUP = :groupId AND PROJECT = :projectId AND ROLE = :role",
+                        params("groupId", groupId).addValue("projectId", projectId).addValue("role", role)
+                )
+        );
+    }
+
+    @Override
     public Ack deleteProjectRoleForAccount(int projectId, int accountId) {
         return Ack.one(
                 getNamedParameterJdbcTemplate().update(
@@ -186,18 +226,20 @@ public class RoleJdbcRepository extends AbstractJdbcRepository implements RoleRe
     }
 
     @Override
-    public Optional<ProjectRoleAssociation> findProjectRoleAssociationsByAccount(
+    public Collection<ProjectRoleAssociation> findProjectRoleAssociationsByAccount(
             int accountId, int projectId,
             BiFunction<Integer, String, Optional<ProjectRoleAssociation>> projectRoleAssociationMapper) {
-        Optional<ProjectRoleAssociation> value = getFirstItem(
-                "SELECT PROJECT, ROLE FROM PROJECT_AUTHORIZATIONS WHERE ACCOUNT = :accountId AND PROJECT = :projectId",
-                params("accountId", accountId).addValue("projectId", projectId),
-                (rs, rowNum) -> projectRoleAssociationMapper.apply(
-                        rs.getInt("project"),
-                        rs.getString("role")
-                )
-        );
-        return value != null ? value : Optional.empty();
+        return getNamedParameterJdbcTemplate().query(
+                        "SELECT PROJECT, ROLE FROM PROJECT_AUTHORIZATIONS WHERE ACCOUNT = :accountId AND PROJECT = :projectId ORDER BY ROLE",
+                        params("accountId", accountId).addValue("projectId", projectId),
+                        (rs, rowNum) -> projectRoleAssociationMapper.apply(
+                                rs.getInt("project"),
+                                rs.getString("role")
+                        )
+                ).stream()
+                .filter(Optional::isPresent)
+                .map(Optional::get)
+                .collect(Collectors.toList());
     }
 
     @Override
@@ -219,16 +261,20 @@ public class RoleJdbcRepository extends AbstractJdbcRepository implements RoleRe
     }
 
     @Override
-    public Optional<ProjectRoleAssociation> findProjectRoleAssociationsByGroup(int groupId, int projectId, BiFunction<Integer, String, Optional<ProjectRoleAssociation>> projectRoleAssociationMapper) {
-        Optional<ProjectRoleAssociation> firstItem = getFirstItem(
-                "SELECT PROJECT, ROLE FROM GROUP_PROJECT_AUTHORIZATIONS WHERE ACCOUNTGROUP = :groupId AND PROJECT = :projectId",
-                params("groupId", groupId).addValue("projectId", projectId),
-                (rs, rowNum) -> projectRoleAssociationMapper.apply(
-                        rs.getInt("project"),
-                        rs.getString("role")
-                )
-        );
-        return firstItem != null ? firstItem : Optional.empty();
+    public Collection<ProjectRoleAssociation> findProjectRoleAssociationsByGroup(
+            int groupId, int projectId,
+            BiFunction<Integer, String, Optional<ProjectRoleAssociation>> projectRoleAssociationMapper) {
+        return getNamedParameterJdbcTemplate().query(
+                        "SELECT PROJECT, ROLE FROM GROUP_PROJECT_AUTHORIZATIONS WHERE ACCOUNTGROUP = :groupId AND PROJECT = :projectId ORDER BY ROLE",
+                        params("groupId", groupId).addValue("projectId", projectId),
+                        (rs, rowNum) -> projectRoleAssociationMapper.apply(
+                                rs.getInt("project"),
+                                rs.getString("role")
+                        )
+                ).stream()
+                .filter(Optional::isPresent)
+                .map(Optional::get)
+                .collect(Collectors.toList());
     }
 
     @Override

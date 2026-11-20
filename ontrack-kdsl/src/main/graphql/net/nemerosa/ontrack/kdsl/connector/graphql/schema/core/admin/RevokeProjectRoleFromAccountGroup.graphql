@@ -1,0 +1,13 @@
+mutation RevokeProjectRoleFromAccountGroup(
+    $projectId: Int!,
+    $accountGroupId: Int!,
+    $projectRole: String!,
+) {
+    revokeProjectRoleFromAccountGroup(input: {
+        projectId: $projectId,
+        accountGroupId: $accountGroupId,
+        projectRole: $projectRole,
+    }) {
+        ...PayloadUserErrors
+    }
+}

@@ -3389,6 +3389,18 @@ type GrantGlobalRoleToAccountPayload implements Payload {
   errors: [UserError]
 }
 
+"Output type for the grantProjectRoleToAccountGroup mutation."
+type GrantProjectRoleToAccountGroupPayload implements Payload {
+  "List of errors"
+  errors: [UserError]
+}
+
+"Output type for the grantProjectRoleToAccount mutation."
+type GrantProjectRoleToAccountPayload implements Payload {
+  "List of errors"
+  errors: [UserError]
+}
+
 "Mapping between an IdP group and a Yontrack group"
 type GroupMapping {
   "Yontrack group"
@@ -4867,6 +4879,16 @@ type Mutation {
     "Input for the mutation"
     input: GrantGlobalRoleToAccountGroupInput
   ): GrantGlobalRoleToAccountGroupPayload
+  "Grants a project role to an account, keeping the other roles it holds on the project. Does nothing when the account already holds the role."
+  grantProjectRoleToAccount(
+    "Input for the mutation"
+    input: GrantProjectRoleToAccountInput
+  ): GrantProjectRoleToAccountPayload
+  "Grants a project role to an account group, keeping the other roles it holds on the project. Does nothing when the group already holds the role."
+  grantProjectRoleToAccountGroup(
+    "Input for the mutation"
+    input: GrantProjectRoleToAccountGroupInput
+  ): GrantProjectRoleToAccountGroupPayload
   "Launches a job, unless it is already running, on any replica: launchStatus tells which"
   launchJob(id: Int!): JobActionResult!
   "Launches an existing workflow"
@@ -4999,6 +5021,16 @@ type Mutation {
   ): RevokeAllAgentTokensPayload
   "Revokes all tokens"
   revokeAllTokens: RevokeAllTokensPayload
+  "Revokes one project role from an account, keeping the other roles it holds on the project"
+  revokeProjectRoleFromAccount(
+    "Input for the mutation"
+    input: RevokeProjectRoleFromAccountInput
+  ): RevokeProjectRoleFromAccountPayload
+  "Revokes one project role from an account group, keeping the other roles it holds on the project"
+  revokeProjectRoleFromAccountGroup(
+    "Input for the mutation"
+    input: RevokeProjectRoleFromAccountGroupInput
+  ): RevokeProjectRoleFromAccountGroupPayload
   "Revoke the given token"
   revokeToken(
     "Input for the mutation"
@@ -7340,6 +7372,18 @@ type RevokeAllAgentTokensPayload implements Payload {
 
 "Output type for the revokeAllTokens mutation."
 type RevokeAllTokensPayload implements Payload {
+  "List of errors"
+  errors: [UserError]
+}
+
+"Output type for the revokeProjectRoleFromAccountGroup mutation."
+type RevokeProjectRoleFromAccountGroupPayload implements Payload {
+  "List of errors"
+  errors: [UserError]
+}
+
+"Output type for the revokeProjectRoleFromAccount mutation."
+type RevokeProjectRoleFromAccountPayload implements Payload {
   "List of errors"
   errors: [UserError]
 }
@@ -12117,6 +12161,26 @@ input GrantGlobalRoleToAccountInput {
   globalRole: String!
 }
 
+"Input type for the grantProjectRoleToAccountGroup mutation."
+input GrantProjectRoleToAccountGroupInput {
+  "ID of the account group"
+  accountGroupId: Int!
+  "ID of the project"
+  projectId: Int!
+  "ID of the project role to grant"
+  projectRole: String!
+}
+
+"Input type for the grantProjectRoleToAccount mutation."
+input GrantProjectRoleToAccountInput {
+  "ID of the account"
+  accountId: Int!
+  "ID of the project"
+  projectId: Int!
+  "ID of the project role to grant"
+  projectRole: String!
+}
+
 "Recording filter input for hook messages"
 input HookRecordingFilterInput {
   "hook field"
@@ -12469,6 +12533,26 @@ input RevokeAgentTokenInput {
 input RevokeAllAgentTokensInput {
   "ID of the agent"
   id: Int!
+}
+
+"Input type for the revokeProjectRoleFromAccountGroup mutation."
+input RevokeProjectRoleFromAccountGroupInput {
+  "ID of the account group"
+  accountGroupId: Int!
+  "ID of the project"
+  projectId: Int!
+  "ID of the project role to revoke"
+  projectRole: String!
+}
+
+"Input type for the revokeProjectRoleFromAccount mutation."
+input RevokeProjectRoleFromAccountInput {
+  "ID of the account"
+  accountId: Int!
+  "ID of the project"
+  projectId: Int!
+  "ID of the project role to revoke"
+  projectRole: String!
 }
 
 "Input type for the revokeToken mutation."

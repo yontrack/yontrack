@@ -12,6 +12,16 @@ Roles are either scoped:
 * globally - the role is granted throughout the whole of Yontrack
 * to a project - the role is granted for a given project
 
+## Roles add up
+
+An account or a group may hold **several project roles** on the same project. What it may do on a
+project is the **union** of the functions of all the roles it holds - globally, on this project,
+directly or through any of its groups. No role excludes another: holding a role never takes a
+function away.
+
+So a group of release engineers can be both *PARTICIPANT* and *VALIDATION_MANAGER* on a project,
+and gets the functions of both there - and none of them on the projects where it holds no role.
+
 ## Global roles
 
 An **ADMINISTRATOR** has access to all the functions of Ontrack, in all
@@ -108,6 +118,11 @@ Creation:
 4. click on _Add permission_
 
 Project permissions are created or deleted, not updated.
+
+The GraphQL API grants and revokes project roles one at a time, with the `grantProjectRoleToAccount`,
+`grantProjectRoleToAccountGroup`, `revokeProjectRoleFromAccount` and
+`revokeProjectRoleFromAccountGroup` mutations: granting a role keeps the other roles of the account
+or group on the project, and revoking a role removes this role only.
 
 !!! warning
 

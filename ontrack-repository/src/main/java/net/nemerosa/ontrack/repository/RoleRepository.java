@@ -22,7 +22,10 @@ public interface RoleRepository {
             BiFunction<Integer, String, Optional<ProjectRoleAssociation>> projectRoleAssociationMapper
     );
 
-    Optional<ProjectRoleAssociation> findProjectRoleAssociationsByAccount(
+    /**
+     * Gets all the roles of an account on a project - an account may hold several roles on a project.
+     */
+    Collection<ProjectRoleAssociation> findProjectRoleAssociationsByAccount(
             int accountId, int projectId,
             BiFunction<Integer, String, Optional<ProjectRoleAssociation>> projectRoleAssociationMapper);
 
@@ -40,7 +43,10 @@ public interface RoleRepository {
             BiFunction<Integer, String, Optional<ProjectRoleAssociation>> projectRoleAssociationMapper
     );
 
-    Optional<ProjectRoleAssociation> findProjectRoleAssociationsByGroup(
+    /**
+     * Gets all the roles of a group on a project - a group may hold several roles on a project.
+     */
+    Collection<ProjectRoleAssociation> findProjectRoleAssociationsByGroup(
             int groupId, int projectId,
             BiFunction<Integer, String, Optional<ProjectRoleAssociation>> projectRoleAssociationMapper
     );
@@ -49,12 +55,56 @@ public interface RoleRepository {
 
     Ack deleteGlobalRoleForGroup(int groupId);
 
+    /**
+     * Replaces all the roles of the account on the project by the given one.
+     * <p>
+     * Kept for the replace semantics of {@link net.nemerosa.ontrack.model.security.AccountService#saveProjectPermission}
+     * until its callers move to {@link #grantProjectRoleForAccount(int, int, String)}.
+     */
     Ack saveProjectRoleForAccount(int projectId, int accountId, String role);
 
+    /**
+     * Replaces all the roles of the group on the project by the given one.
+     * <p>
+     * Kept for the replace semantics of {@link net.nemerosa.ontrack.model.security.AccountService#saveProjectPermission}
+     * until its callers move to {@link #grantProjectRoleForGroup(int, int, String)}.
+     */
     Ack saveProjectRoleForGroup(int projectId, int accountGroupId, String role);
 
+    /**
+     * Grants a role to an account on a project, keeping the other roles of the account on this project.
+     * Does nothing when the account already holds the role.
+     */
+    Ack grantProjectRoleForAccount(int projectId, int accountId, String role);
+
+    /**
+     * Grants a role to a group on a project, keeping the other roles of the group on this project.
+     * Does nothing when the group already holds the role.
+     */
+    Ack grantProjectRoleForGroup(int projectId, int accountGroupId, String role);
+
+    /**
+     * Revokes one role of an account on a project, keeping its other roles.
+     *
+     * @return OK if the role was held and is now removed
+     */
+    Ack revokeProjectRoleForAccount(int projectId, int accountId, String role);
+
+    /**
+     * Revokes one role of a group on a project, keeping its other roles.
+     *
+     * @return OK if the role was held and is now removed
+     */
+    Ack revokeProjectRoleForGroup(int projectId, int accountGroupId, String role);
+
+    /**
+     * Removes all the roles of the account on the project.
+     */
     Ack deleteProjectRoleForAccount(int projectId, int accountId);
 
+    /**
+     * Removes all the roles of the group on the project.
+     */
     Ack deleteProjectRoleForGroup(int projectId, int accountGroupId);
 
     /**

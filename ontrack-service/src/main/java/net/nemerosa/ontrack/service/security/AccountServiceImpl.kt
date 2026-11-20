@@ -1,6 +1,7 @@
 package net.nemerosa.ontrack.service.security
 
 import net.nemerosa.ontrack.model.Ack
+import net.nemerosa.ontrack.model.exceptions.RoleNotFoundException
 import net.nemerosa.ontrack.model.security.*
 import net.nemerosa.ontrack.model.structure.Entity
 import net.nemerosa.ontrack.model.structure.ID
@@ -8,10 +9,12 @@ import net.nemerosa.ontrack.model.structure.Project
 import net.nemerosa.ontrack.repository.AccountGroupRepository
 import net.nemerosa.ontrack.repository.AccountRepository
 import net.nemerosa.ontrack.repository.RoleRepository
+import net.nemerosa.ontrack.repository.StructureRepository
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.util.*
 import java.util.stream.Collectors
+import kotlin.jvm.optionals.getOrNull
 
 @Service
 @Transactional
@@ -21,6 +24,7 @@ class AccountServiceImpl(
     private val accountRepository: AccountRepository,
     private val accountGroupRepository: AccountGroupRepository,
     private val securityService: SecurityService,
+    private val structureRepository: StructureRepository,
 ) : AccountService {
 
     override fun getAccounts(): List<Account> {
@@ -178,11 +182,11 @@ class AccountServiceImpl(
         val permissions: MutableCollection<ProjectPermission> = ArrayList()
         // Users first
         permissions.addAll(
-            accountRepository.findAll().mapNotNull { getProjectPermission(projectId, it) }
+            accountRepository.findAll().flatMap { getProjectPermissions(projectId, it) }
         )
         // ... then groups
         permissions.addAll(
-            accountGroupRepository.findAll().mapNotNull { getGroupProjectPermission(projectId, it) }
+            accountGroupRepository.findAll().flatMap { getGroupProjectPermissions(projectId, it) }
         )
         // OK
         return permissions
@@ -200,6 +204,38 @@ class AccountServiceImpl(
             PermissionTargetType.GROUP -> roleRepository.saveProjectRoleForGroup(projectId.value, id, input.role)
             else -> Ack.NOK
         }
+    }
+
+    override fun grantProjectPermission(projectId: ID, type: PermissionTargetType, id: Int, role: String): Ack {
+        securityService.checkProjectFunction(projectId.value, ProjectAuthorisationMgt::class.java)
+        checkProjectRole(role)
+        // Not found errors rather than constraint violations
+        structureRepository.getProject(projectId)
+        return when (type) {
+            PermissionTargetType.ACCOUNT -> {
+                accountRepository.getAccount(ID.of(id))
+                roleRepository.grantProjectRoleForAccount(projectId.value, id, role)
+            }
+
+            PermissionTargetType.GROUP -> {
+                accountGroupRepository.getById(ID.of(id))
+                roleRepository.grantProjectRoleForGroup(projectId.value, id, role)
+            }
+        }
+    }
+
+    override fun revokeProjectPermission(projectId: ID, type: PermissionTargetType, id: Int, role: String): Ack {
+        securityService.checkProjectFunction(projectId.value, ProjectAuthorisationMgt::class.java)
+        // A mistyped role is an error, not a silent no-op
+        checkProjectRole(role)
+        return when (type) {
+            PermissionTargetType.ACCOUNT -> roleRepository.revokeProjectRoleForAccount(projectId.value, id, role)
+            PermissionTargetType.GROUP -> roleRepository.revokeProjectRoleForGroup(projectId.value, id, role)
+        }
+    }
+
+    private fun checkProjectRole(role: String) {
+        rolesService.getProjectRole(role).getOrNull() ?: throw RoleNotFoundException(role)
     }
 
     override fun deleteProjectPermission(projectId: ID, type: PermissionTargetType, id: Int): Ack {
@@ -274,37 +310,19 @@ class AccountServiceImpl(
         return roleRepository.findAccountsByProjectRole(project, projectRole) { accountId: ID -> getAccount(accountId) }
     }
 
-    private fun getGroupProjectPermission(projectId: ID, accountGroup: AccountGroup): ProjectPermission? {
-        val roleAssociationOptional = roleRepository.findProjectRoleAssociationsByGroup(
+    private fun getGroupProjectPermissions(projectId: ID, accountGroup: AccountGroup): List<ProjectPermission> =
+        roleRepository.findProjectRoleAssociationsByGroup(
             accountGroup.id(),
             projectId.value
         ) { project: Int, roleId: String -> rolesService.getProjectRoleAssociation(project, roleId) }
-        return if (roleAssociationOptional.isPresent) {
-            ProjectPermission(
-                projectId,
-                accountGroup.asPermissionTarget(),
-                roleAssociationOptional.get().projectRole
-            )
-        } else {
-            null
-        }
-    }
+            .map { ProjectPermission(projectId, accountGroup.asPermissionTarget(), it.projectRole) }
 
-    private fun getProjectPermission(projectId: ID, account: Account): ProjectPermission? {
-        val roleAssociationOptional = roleRepository.findProjectRoleAssociationsByAccount(
+    private fun getProjectPermissions(projectId: ID, account: Account): List<ProjectPermission> =
+        roleRepository.findProjectRoleAssociationsByAccount(
             account.id(),
             projectId.value
         ) { project: Int, roleId: String -> rolesService.getProjectRoleAssociation(project, roleId) }
-        return if (roleAssociationOptional.isPresent) {
-            ProjectPermission(
-                projectId,
-                account.asPermissionTarget(),
-                roleAssociationOptional.get().projectRole
-            )
-        } else {
-            null
-        }
-    }
+            .map { ProjectPermission(projectId, account.asPermissionTarget(), it.projectRole) }
 
     private fun getGroupGlobalPermission(group: AccountGroup): GlobalPermission? {
         val roleId = roleRepository.findGlobalRoleByGroup(group.id())

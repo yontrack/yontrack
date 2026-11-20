@@ -1,0 +1,8 @@
+query AccountGroupByName(
+    $name: String!,
+) {
+    accountGroupByName(name: $name) {
+        id
+        name
+    }
+}
