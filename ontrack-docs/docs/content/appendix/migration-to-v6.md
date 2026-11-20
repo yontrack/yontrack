@@ -610,8 +610,9 @@ The auto-versioning controller roles of this example are new in Yontrack 6: see
 ### Auto-versioning operations require permissions
 
 In Yontrack 5, the auto-versioning operations checked no permission: any authenticated user could,
-for example, reschedule any auto-versioning request, even on a project they could not see. Yontrack 6
-checks the operations below, on the **target** project of the requests, and new roles grant them.
+for example, reschedule any auto-versioning request, even on a project they could not see, or purge
+all the audit entries. Yontrack 6 checks the operations below - the operations on a request on its
+**target** project - and new roles grant the rescheduling.
 See [Permissions](../integrations/auto-versioning/auto-versioning.md#permissions).
 
 * **Rescheduling a request** needs the view of its target project and a new project function,
@@ -627,6 +628,19 @@ See [Permissions](../integrations/auto-versioning/auto-versioning.md#permissions
     It is **not** held by the participants, and never by the agents or the read-only tokens. The
     *Reschedule* button of a request is shown only to the users who may reschedule it.
 
+* **Running an auto-versioning check** on a build - the `checkAutoVersioning` mutation, the
+    `POST /extension/auto-versioning/build/{buildId}/check` endpoint and the `autoVersioningCheck`
+    CI configuration - needs `ValidationRunCreate` on the project of the build, checked before
+    anything else ([#2167](https://github.com/yontrack/yontrack/issues/2167)). In Yontrack 5, only
+    the creation of the validation run checked it, so a check with nothing to validate went through.
+    It is held by the global roles `CONTROLLER` and `AUTOMATION`, the project roles `OWNER`,
+    `PROJECT_MANAGER` and `VALIDATION_MANAGER`, and the administrators.
+* **Scheduling the due requests on demand** (`scheduleAutoVersioning`), **cleaning up the audit
+    entries** (`cleanupAutoVersioningAuditEntries`) and **purging them all**
+    (`purgeAutoVersioningAuditEntries`) need the global `ApplicationManagement` function, that is
+    the administrators ([#2167](https://github.com/yontrack/yontrack/issues/2167)). The background
+    jobs which schedule the due requests and clean up the audit entries run as before.
+
 #### For API clients
 
 The `rescheduleAutoVersioning` mutation is refused to a caller without the function on the target
@@ -635,12 +649,25 @@ project of the request, with the error `Project function 'AutoVersioningReschedu
 `authorizations`, with `auto_versioning_audit_entry` / `reschedule` telling whether the caller may
 reschedule its order.
 
+The `checkAutoVersioning` mutation and `POST /extension/auto-versioning/build/{buildId}/check` are
+refused to a caller without `ValidationRunCreate` on the project of the build, with the error
+`Project function 'ValidationRunCreate' is not granted` (HTTP 403 for the endpoint); the mutation
+still ignores a build the caller cannot see, as in Yontrack 5. The
+`scheduleAutoVersioning`, `cleanupAutoVersioningAuditEntries` and `purgeAutoVersioningAuditEntries`
+mutations are refused to a caller who is not an administrator, with the error
+`Global function 'ApplicationManagement' is not granted.`
+
 #### For administrators and CasC users
 
 A user, a group or a CI account which reschedules auto-versioning requests and is neither an owner
 nor a project manager of their target projects needs one of the new roles: grant
 `AUTO_VERSIONING_CONTROLLER` on the target projects, or `GLOBAL_AUTO_VERSIONING_CONTROLLER`, on top
 of the roles it holds - [roles add up](#roles-add-up).
+
+A CI account which runs the auto-versioning checks needs to create validation runs on the checked
+projects, as it does to record any validation: the `CONTROLLER` or `AUTOMATION` global role, or the
+`VALIDATION_MANAGER` project role. Scheduling, cleaning up or purging the requests on demand is left
+to the administrators.
 
 ## Removed
 

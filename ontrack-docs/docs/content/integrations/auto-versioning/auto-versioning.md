@@ -864,6 +864,9 @@ The name of the validation stamp is defined by the `validationStamp` parameter:
 
 The current version is read from the build links first, then from the source code if no link is available.
 
+Running a check needs the [permission](#permissions) to create validation runs on the project of the build, even when
+the branch has nothing to check.
+
 !!! note
 
     The auto-versioning check can be run automatically after every build using the
@@ -1159,12 +1162,25 @@ list of these metrics.
 
 ## Permissions
 
-Operating the auto-versioning is restricted by [roles](../../security/roles.md), checked on the **target** project of
-the auto-versioning requests. The source project is not checked.
+Operating the auto-versioning is restricted by [roles](../../security/roles.md): an operation on a request is checked
+on its **target** project (the source project is not checked), an [auto-versioning check](#auto-versioning-checks) on
+the project of the build, and an operation on all the requests at once needs a global function.
 
 | Operation | Function | Held by |
 |---|---|---|
 | [Rescheduling](#rescheduling) a request | `AutoVersioningReschedule`, on top of the view of the target project | the _Auto-versioning controllers_ of the target project, the _Global auto-versioning controllers_, the project _Owners_ and _Project managers_, the _Automation_ and the _Administrators_ |
+| Running an [auto-versioning check](#auto-versioning-checks) on a build (`checkAutoVersioning`, `POST /extension/auto-versioning/build/{buildId}/check`, the [CI config injection](../../configuration/ci-config.md#auto-versioning-check)) | `ValidationRunCreate` on the project of the build, checked before anything else | the _Controllers_, the project _Owners_, _Project managers_ and _Validation managers_, the _Automation_ and the _Administrators_ |
+| Scheduling the due requests on demand (`scheduleAutoVersioning`) | the global `ApplicationManagement` | the _Administrators_ |
+| Cleaning up the [audit entries](#audit-cleanup) on demand (`cleanupAutoVersioningAuditEntries`) | the global `ApplicationManagement` | the _Administrators_ |
+| Purging all the audit entries (`purgeAutoVersioningAuditEntries`) | the global `ApplicationManagement` | the _Administrators_ |
+
+The background jobs which [schedule](#scheduling) the due requests and [clean up](#audit-cleanup) the audit entries
+run as administrators, without any user: they need no role.
+
+The GitHub ingestion mutations which queue an auto-versioning check (`gitHubCheckAutoVersioningByRunId`,
+`gitHubCheckAutoVersioningByBuildName` and `gitHubCheckAutoVersioningByBuildLabel`) need, like every GitHub ingestion
+mutation, `ProjectConfig` on the project of the repository: the check then runs in the background, as an
+administrator.
 
 The _Participants_ cannot reschedule a request: a group which must both comment on the validation runs and reschedule
 the auto-versioning requests is granted both roles, which [add up](../../security/roles.md#roles-add-up):
@@ -1182,7 +1198,8 @@ ontrack:
 ```
 
 The [agents](../../agents/index.md) and the [read-only tokens](../../security/tokens.md#read-only-tokens) never reschedule a request, whatever their
-owner may do.
+owner may do, nor schedule, clean up or purge the requests. An agent may run an auto-versioning check when its owner
+may; a read-only token never does.
 
 ## Integrations
 

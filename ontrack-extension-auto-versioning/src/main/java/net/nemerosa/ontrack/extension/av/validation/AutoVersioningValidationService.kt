@@ -14,6 +14,8 @@ interface AutoVersioningValidationService {
      * * we compute the latest version possible for those dependencies
      * * we create a validation stamp based on the mismatch (or not) of versions
      *
+     * Needs `ValidationRunCreate` on the project of the [build], checked before anything else.
+     *
      * @param build Build to check and validate
      * @return List of validations having been applied (validation stamp not included)
      */

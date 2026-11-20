@@ -13,6 +13,8 @@ import net.nemerosa.ontrack.extension.av.queue.AutoVersioningQueueSourceData
 import net.nemerosa.ontrack.extension.av.queue.AutoVersioningQueueSourceExtension
 import net.nemerosa.ontrack.extension.queue.dispatching.QueueDispatcher
 import net.nemerosa.ontrack.extension.queue.source.createQueueSource
+import net.nemerosa.ontrack.model.security.ApplicationManagement
+import net.nemerosa.ontrack.model.security.SecurityService
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
@@ -28,16 +30,29 @@ class AutoVersioningScheduler(
     private val queueProcessor: AutoVersioningQueueProcessor,
     private val queueSourceExtension: AutoVersioningQueueSourceExtension,
     private val metrics: AutoVersioningMetricsService,
+    private val securityService: SecurityService,
 ) {
 
     private val logger: Logger = LoggerFactory.getLogger(AutoVersioningScheduler::class.java)
     private val timeServer: TimeServer = Time
 
+    /**
+     * Schedules the orders ready now.
+     *
+     * Needs the global [ApplicationManagement] function: the `AutoVersioningSchedulerJob` runs it as
+     * an administrator.
+     */
     fun schedule() {
         schedule(timeServer.now)
     }
 
+    /**
+     * Schedules the orders ready at the given [time].
+     *
+     * Needs the global [ApplicationManagement] function.
+     */
     fun schedule(time: LocalDateTime) {
+        securityService.checkGlobalFunction(ApplicationManagement::class.java)
         logger.info("Launching scheduling for time = $time")
         // Gets all the queued orders
         val entries = autoVersioningAuditQueryService.findByReady(time = time)

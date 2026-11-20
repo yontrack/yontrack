@@ -9,6 +9,8 @@ import net.nemerosa.ontrack.extension.av.dispatcher.getBuildWithVersion
 import net.nemerosa.ontrack.extension.av.settings.AutoVersioningSettings
 import net.nemerosa.ontrack.extension.scm.service.SCMDetector
 import net.nemerosa.ontrack.model.buildfilter.BuildFilterService
+import net.nemerosa.ontrack.model.security.SecurityService
+import net.nemerosa.ontrack.model.security.ValidationRunCreate
 import net.nemerosa.ontrack.model.settings.CachedSettingsService
 import net.nemerosa.ontrack.model.structure.*
 import org.springframework.stereotype.Service
@@ -26,9 +28,12 @@ class AutoVersioningValidationServiceImpl(
     private val buildFilterService: BuildFilterService,
     private val cachedSettingsService: CachedSettingsService,
     private val versionSourceFactory: VersionSourceFactory,
+    private val securityService: SecurityService,
 ) : AutoVersioningValidationService {
 
     override fun checkAndValidate(build: Build): List<AutoVersioningValidationData> {
+        // Checking the rights before anything else
+        securityService.checkProjectFunction(build, ValidationRunCreate::class.java)
         val config = autoVersionConfigurationService.getAutoVersioning(build.branch)
         return config?.configurations
             ?.filter { !it.validationStamp.isNullOrBlank() }
