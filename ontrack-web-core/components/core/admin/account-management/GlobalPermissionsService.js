@@ -29,11 +29,16 @@ export const useGlobalPermissions = ({refreshState}) => {
     return {globalPermissions, loading}
 }
 
-export const usePermissionTargets = ({token}) => {
+/**
+ * The accounts and groups whose name contains the token. With a project ID, the ones to grant a
+ * role to on this project: the search then needs the management of the permissions of this
+ * project, instead of the global management of the accounts.
+ */
+export const usePermissionTargets = ({token, projectId = null}) => {
     const {data: permissionTargets, loading} = useQuery(
         gql`
-            query PermissionTargets($token: String = null) {
-                permissionTargets(token: $token) {
+            query PermissionTargets($token: String = null, $projectId: Int = null) {
+                permissionTargets(token: $token, projectId: $projectId) {
                     type
                     id
                     name
@@ -42,8 +47,8 @@ export const usePermissionTargets = ({token}) => {
             }
         `,
         {
-            variables: {token},
-            deps: [token],
+            variables: {token, projectId: projectId !== null && projectId !== undefined ? Number(projectId) : null},
+            deps: [token, projectId],
             initialData: [],
             dataFn: data => data.permissionTargets,
         }

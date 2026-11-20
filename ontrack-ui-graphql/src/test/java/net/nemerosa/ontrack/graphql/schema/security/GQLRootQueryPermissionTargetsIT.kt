@@ -2,6 +2,7 @@ package net.nemerosa.ontrack.graphql.schema.security
 
 import net.nemerosa.ontrack.graphql.AbstractQLKTITSupport
 import net.nemerosa.ontrack.it.AsAdminTest
+import net.nemerosa.ontrack.model.security.Roles
 import net.nemerosa.ontrack.test.TestUtils.uid
 import org.junit.jupiter.api.Test
 import kotlin.test.assertNotNull
@@ -63,6 +64,38 @@ class GQLRootQueryPermissionTargetsIT : AbstractQLKTITSupport() {
                 targets.find { it.path("type").asText() == "GROUP" && it.path("id").asInt() == group.id() },
                 "Account group found"
             )
+        }
+    }
+
+    /**
+     * The project permissions page (#2164) looks for the accounts and groups to grant a role to
+     * on a project, for a project owner, who does not manage the accounts globally.
+     */
+    @Test
+    fun `Searching permission targets to grant a role on a project`() {
+        asAdmin {
+            project {
+                val prefix = uid("p-")
+                val group = doCreateAccountGroup(name = uid("$prefix-"))
+                val query = """
+                    query SearchPermissionTargets(${'$'}token: String!, ${'$'}projectId: Int) {
+                        permissionTargets(token: ${'$'}token, projectId: ${'$'}projectId) {
+                            type
+                            id
+                        }
+                    }
+                """.trimIndent()
+                asAccountWithProjectRole(Roles.PROJECT_OWNER) {
+                    run(query, mapOf("token" to prefix, "projectId" to id())) { data ->
+                        assertNotNull(
+                            data.path("permissionTargets").find {
+                                it.path("type").asText() == "GROUP" && it.path("id").asInt() == group.id()
+                            },
+                            "Account group found"
+                        )
+                    }
+                }
+            }
         }
     }
 

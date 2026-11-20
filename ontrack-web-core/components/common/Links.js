@@ -9,6 +9,10 @@ export function projectUri(project) {
     return `/project/${project.id}`
 }
 
+export function projectPermissionsUri(project) {
+    return `/project/${project.id}/permissions`
+}
+
 export function projectBuildSearchUri(project) {
     return `/project/search/${project.id}`
 }

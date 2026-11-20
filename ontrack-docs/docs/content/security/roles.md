@@ -120,33 +120,42 @@ build filters. He can also assign [labels](../concepts/model/project-labels.md) 
 A project **READ_ONLY** user can view this project, but cannot perform any action on it.
 
 Only project owners, automation users and administrators can grant rights
-in a project.
+in a project: they hold the `ProjectAuthorisationMgt` function on the project.
 
-In the project page, select the _Permissions_ command.
+In the project page, select the _Permissions_ command. It is shown only to the users who may
+manage the permissions of the project, and leads to the _Permissions_ page of the project.
 
 A _project permission_ is created by associating:
 
 * a _permission target_ (an account or a group)
 * a _project role_
 
+The page lists each account and group holding a role on the project once, with all its roles on
+the project as tags.
+
 Creation:
 
 1. type the first letter of the account or the group you want to add a
    permission for
 2. select the account or the group
-3. select the role you want to give
+3. select one or more roles you want to give
 4. click on _Add permission_
 
-Project permissions are created or deleted, not updated.
+Adding roles to an account or a group keeps the roles it already holds on the project. Each role is
+removed on its own, with the remove button next to it. Project permissions are created or deleted,
+not updated.
+
+The page is part of the desktop UI only: on a phone, the [mobile UI](../mobile/index.md) offers to
+open it in the desktop UI.
 
 The GraphQL API grants and revokes project roles one at a time, with the `grantProjectRoleToAccount`,
 `grantProjectRoleToAccountGroup`, `revokeProjectRoleFromAccount` and
 `revokeProjectRoleFromAccountGroup` mutations: granting a role keeps the other roles of the account
-or group on the project, and revoking a role removes this role only.
-
-!!! warning
-
-    As of now, the Yontrack UI does not allow to set the project permissions.
+or group on the project, and revoking a role removes this role only. `Project.projectRoles` lists
+the project roles, each with the groups and the accounts holding it on the project.
+`permissionTargets(token:, projectId:)` looks for the accounts and groups to grant a role to on a
+project: with a `projectId`, it needs the right to manage the permissions of this project rather
+than the global management of the accounts.
 
 By using [Configuration as Code](../configuration/casc.md), you have a better control over the project permissions:
 

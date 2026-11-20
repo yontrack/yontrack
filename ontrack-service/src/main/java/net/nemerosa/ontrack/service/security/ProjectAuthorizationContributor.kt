@@ -34,6 +34,12 @@ class ProjectAuthorizationContributor(
                     Authorization.DELETE,
                     securityService.isProjectFunctionGranted<ProjectDelete>(project)
                 ),
+                // Managing the permissions of the project: the project permissions page (#2164)
+                Authorization(
+                    CoreAuthorizationContributor.PROJECT,
+                    PERMISSIONS,
+                    securityService.isProjectFunctionGranted<ProjectAuthorisationMgt>(project)
+                ),
                 Authorization(
                     CoreAuthorizationContributor.BRANCH,
                     Authorization.CREATE,
@@ -41,4 +47,11 @@ class ProjectAuthorizationContributor(
                 )
             )
         }
+
+    companion object {
+        /**
+         * Action of managing the permissions of a project: granting and revoking its project roles.
+         */
+        const val PERMISSIONS = "permissions"
+    }
 }

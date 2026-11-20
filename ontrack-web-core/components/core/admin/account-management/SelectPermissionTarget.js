@@ -3,9 +3,12 @@ import {useEffect, useState} from "react";
 import {Select} from "antd";
 import PermissionTarget from "@components/core/admin/account-management/PermissionTarget";
 
-export default function SelectPermissionTarget({id, value, onChange}) {
+/**
+ * Picks an account or a group. With a `projectId`, the ones to grant a role to on this project.
+ */
+export default function SelectPermissionTarget({id, value, onChange, projectId}) {
     const [token, setToken] = useState('')
-    const {permissionTargets, loading} = usePermissionTargets({token})
+    const {permissionTargets, loading} = usePermissionTargets({token, projectId})
 
     const [options, setOptions] = useState([])
     useEffect(() => {

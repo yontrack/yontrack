@@ -285,6 +285,8 @@ const DESCRIPTIONS = [
     [/^\/core\/admin\//, 'an administration page'],
     [/^\/core\/config\//, 'a configuration page'],
     [/^\/core\/ref\//, 'a reference page'],
+    // No project permissions in the mobile UI: an admin task, desktop-only (#2164)
+    [/^\/project\/\d+\/permissions$/, "a project's permissions"],
     [/^\/project\//, 'a project'],
     [/^\/branch\//, 'a branch'],
     // No audit trail in the mobile UI in 6.0: an audit tool, not a phone one (#1967)

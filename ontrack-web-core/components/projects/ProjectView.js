@@ -37,6 +37,7 @@ import {useRecordVisit, projectVisit} from "@components/search/palette/recentlyV
 import {useRefresh} from "@components/common/RefreshUtils";
 import ProjectEditCommand from "@components/projects/ProjectEditCommand";
 import ProjectLabelsCommand from "@components/projects/ProjectLabelsCommand";
+import ProjectPermissionsCommand from "@components/projects/permissions/ProjectPermissionsCommand";
 import LabelChip from "@components/labels/LabelChip";
 import ProjectSecuritySection from "@components/extension/findings/project/ProjectSecuritySection";
 import ProjectScorecardSection from "@components/extension/scorecard/project/ProjectScorecardSection";
@@ -173,6 +174,12 @@ export default function ProjectView({id}) {
             if (isAuthorized(project, 'project', 'edit')) {
                 commands.push(
                     <ProjectEditCommand key="edit" project={project}/>
+                )
+            }
+            // Managing the permissions of the project
+            if (isAuthorized(project, 'project', 'permissions')) {
+                commands.push(
+                    <ProjectPermissionsCommand key="permissions" project={project}/>
                 )
             }
             // Deleting the project

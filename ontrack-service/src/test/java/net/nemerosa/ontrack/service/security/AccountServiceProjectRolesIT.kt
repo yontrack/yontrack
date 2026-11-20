@@ -8,6 +8,7 @@ import net.nemerosa.ontrack.model.exceptions.RoleNotFoundException
 import net.nemerosa.ontrack.model.security.*
 import net.nemerosa.ontrack.model.structure.ID
 import net.nemerosa.ontrack.model.structure.Project
+import net.nemerosa.ontrack.test.TestUtils.uid
 import org.junit.jupiter.api.Test
 import org.springframework.security.access.AccessDeniedException
 import kotlin.test.assertEquals
@@ -205,6 +206,59 @@ class AccountServiceProjectRolesIT : AbstractDSLTestSupport() {
                     listOf(Roles.PROJECT_OWNER, Roles.PROJECT_PARTICIPANT),
                     permissionsOf(this, group.asPermissionTarget())
                 )
+            }
+        }
+    }
+
+    /**
+     * The project permissions page (#2164) lists who holds each role on the project for the
+     * holders of `ProjectAuthorisationMgt` there, like a project owner, who hold no global
+     * account management function.
+     */
+    @Test
+    fun `A project owner reads who holds each role on the project`() {
+        asAdmin {
+            project {
+                val group = doCreateAccountGroup()
+                val account = doCreateAccount()
+                accountService.grantProjectPermission(id, PermissionTargetType.GROUP, group.id(), Roles.PROJECT_PARTICIPANT)
+                accountService.grantProjectPermission(id, PermissionTargetType.ACCOUNT, account.id(), Roles.PROJECT_PARTICIPANT)
+                val participant = rolesService.getProjectRole(Roles.PROJECT_PARTICIPANT).get()
+                asAccountWithProjectRole(Roles.PROJECT_OWNER) {
+                    assertEquals(
+                        listOf(group.id()),
+                        accountService.findAccountGroupsByProjectRole(this, participant).map { it.id() }
+                    )
+                    assertEquals(
+                        listOf(account.id()),
+                        accountService.findAccountsByProjectRole(this, participant).map { it.id() }
+                    )
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `A project owner looks for the accounts and groups to grant a role to on the project`() {
+        asAdmin {
+            project {
+                val prefix = uid("pt-")
+                val group = doCreateAccountGroup(name = "$prefix-group")
+                val account = doCreateAccount(email = "$prefix-account@example.com")
+                asAccountWithProjectRole(Roles.PROJECT_OWNER) {
+                    val targets = accountService.searchPermissionTargets(prefix, id)
+                    assertTrue(targets.any { it.type == PermissionTargetType.GROUP && it.id == group.id() })
+                    assertTrue(targets.any { it.type == PermissionTargetType.ACCOUNT && it.id == account.id() })
+                    // ... but not to grant a global role
+                    assertFailsWith<AccessDeniedException> {
+                        accountService.searchPermissionTargets(prefix)
+                    }
+                }
+                asAccountWithProjectRole(Roles.PROJECT_READ_ONLY) {
+                    assertFailsWith<AccessDeniedException> {
+                        accountService.searchPermissionTargets(prefix, id)
+                    }
+                }
             }
         }
     }

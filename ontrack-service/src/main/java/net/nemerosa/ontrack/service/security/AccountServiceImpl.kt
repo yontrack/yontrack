@@ -118,6 +118,15 @@ class AccountServiceImpl(
 
     override fun searchPermissionTargets(token: String): Collection<PermissionTarget> {
         securityService.checkGlobalFunction(AccountManagement::class.java)
+        return findPermissionTargets(token)
+    }
+
+    override fun searchPermissionTargets(token: String, projectId: ID): Collection<PermissionTarget> {
+        securityService.checkProjectFunction(projectId.value, ProjectAuthorisationMgt::class.java)
+        return findPermissionTargets(token)
+    }
+
+    private fun findPermissionTargets(token: String): Collection<PermissionTarget> {
         val targets: MutableList<PermissionTarget> = ArrayList()
         // Users first - agents have no ACL of their own
         targets.addAll(
@@ -344,14 +353,34 @@ class AccountServiceImpl(
         return roleRepository.findAccountsByGlobalRole(globalRole) { accountId: ID -> getAccount(accountId) }
     }
 
+    /**
+     * The holders of `ProjectAuthorisationMgt` on the project - a project owner, for example -
+     * read who holds its roles without managing the accounts globally: they are the ones
+     * granting these roles (#2164). Anybody else still needs the global management functions.
+     */
     override fun findAccountGroupsByProjectRole(project: Project, projectRole: ProjectRole): Collection<AccountGroup> {
+        val projectAuthorisationMgt = securityService.isProjectFunctionGranted(project, ProjectAuthorisationMgt::class.java)
         return roleRepository.findAccountGroupsByProjectRole(project, projectRole) { groupId: ID ->
-            getAccountGroup(groupId)
+            if (projectAuthorisationMgt) {
+                accountGroupRepository.getById(groupId)
+            } else {
+                getAccountGroup(groupId)
+            }
         }
     }
 
+    /**
+     * See [findAccountGroupsByProjectRole] for the security.
+     */
     override fun findAccountsByProjectRole(project: Project, projectRole: ProjectRole): Collection<Account> {
-        return roleRepository.findAccountsByProjectRole(project, projectRole) { accountId: ID -> getAccount(accountId) }
+        val projectAuthorisationMgt = securityService.isProjectFunctionGranted(project, ProjectAuthorisationMgt::class.java)
+        return roleRepository.findAccountsByProjectRole(project, projectRole) { accountId: ID ->
+            if (projectAuthorisationMgt) {
+                accountRepository.getAccount(accountId)
+            } else {
+                getAccount(accountId)
+            }
+        }
     }
 
     private fun getGroupProjectPermissions(projectId: ID, accountGroup: AccountGroup): List<ProjectPermission> =

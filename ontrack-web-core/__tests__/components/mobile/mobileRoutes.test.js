@@ -153,6 +153,15 @@ describe('mobileEquivalent', () => {
         expect(describeDesktopRoute('/build/56/audit-trail')).toEqual("a build's audit trail")
     })
 
+    it('leaves the permissions of a project desktop-only', () => {
+        // #2164: managing the permissions of a project is an admin task, not a phone one. The
+        // sub-page of a project reaches the interstitial, under a name a user can read, rather
+        // than the mobile project screen.
+        expect(mobileEquivalent('/project/12/permissions')).toBeNull()
+        expect(isRedirectExempt('/project/12/permissions')).toBe(false)
+        expect(describeDesktopRoute('/project/12/permissions')).toEqual("a project's permissions")
+    })
+
     it('leaves the estate view desktop-only', () => {
         // #1910: the estate view is desktop-only in 6.x. The list of the
         // scorecards and the page of an estate reach the interstitial, under a

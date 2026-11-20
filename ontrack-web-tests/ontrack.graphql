@@ -6848,6 +6848,8 @@ type Query {
   ): ProjectPaginated
   "List of permission targets"
   permissionTargets(
+    "ID of the project to grant a role on. When set, the search needs the management of the permissions of this project instead of the global management of the accounts."
+    projectId: Int,
     "Part of the name of the permission target to look for"
     token: String
   ): [PermissionTarget!]!

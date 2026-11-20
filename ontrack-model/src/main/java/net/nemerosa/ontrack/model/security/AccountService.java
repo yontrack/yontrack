@@ -90,6 +90,18 @@ public interface AccountService {
     Collection<PermissionTarget> searchPermissionTargets(String token);
 
     /**
+     * Searches for the permission targets to grant a role to on a project, using the
+     * <code>token</code> as a part in the name of the permission target.
+     * <p>
+     * Checked against the management of the permissions of this project
+     * ({@link ProjectAuthorisationMgt}) instead of the global management of the accounts.
+     *
+     * @param token     Part of the name of the permission target
+     * @param projectId ID of the project to grant a role on
+     */
+    Collection<PermissionTarget> searchPermissionTargets(String token, ID projectId);
+
+    /**
      * Saves the global permission for the {@link net.nemerosa.ontrack.model.security.PermissionTarget} defined
      * by the <code>type</code> and <code>id</code>, <b>replacing</b> all the global roles the target holds.
      *
