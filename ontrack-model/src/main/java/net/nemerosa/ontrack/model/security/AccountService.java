@@ -104,6 +104,7 @@ public interface AccountService {
     /**
      * Saves the global permission for the {@link net.nemerosa.ontrack.model.security.PermissionTarget} defined
      * by the <code>type</code> and <code>id</code>, <b>replacing</b> all the global roles the target holds.
+     * An unknown role is refused before anything is removed.
      *
      * @param type  Group or account level permission
      * @param id    ID of the group or account
@@ -138,7 +139,8 @@ public interface AccountService {
 
     /**
      * Gets the list of global permissions: one entry per target and role, since a target may hold
-     * several global roles.
+     * several global roles. The accounts are listed with {@link AccountManagement}, the groups with
+     * {@link AccountGroupManagement}; holding neither is refused.
      */
     Collection<GlobalPermission> getGlobalPermissions();
 
@@ -158,7 +160,7 @@ public interface AccountService {
     /**
      * Saves the project permission for the {@link net.nemerosa.ontrack.model.security.PermissionTarget} defined
      * by the <code>type</code> and <code>id</code>, <b>replacing</b> all the roles the target holds on
-     * the project.
+     * the project. An unknown role is refused before anything is removed.
      *
      * @see #grantProjectPermission(ID, PermissionTargetType, int, String) to add a role instead
      */

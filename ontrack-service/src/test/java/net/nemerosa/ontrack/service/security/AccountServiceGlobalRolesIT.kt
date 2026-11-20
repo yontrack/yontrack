@@ -183,6 +183,69 @@ class AccountServiceGlobalRolesIT : AbstractDSLTestSupport() {
         }
     }
 
+    @Test
+    fun `Listing the global permissions is refused without the management of accounts or of groups`() {
+        asUser().call {
+            assertFailsWith<AccessDeniedException> {
+                accountService.globalPermissions
+            }
+        }
+        asAccountWithGlobalRole(Roles.GLOBAL_PARTICIPANT) {
+            assertFailsWith<AccessDeniedException> {
+                accountService.globalPermissions
+            }
+        }
+    }
+
+    @Test
+    fun `Listing the global permissions shows the part of each management function`() {
+        val group = asAdmin { doCreateAccountGroup() }
+        val account = asAdmin { doCreateAccount() }
+        asAdmin {
+            accountService.grantGlobalPermission(PermissionTargetType.GROUP, group.id(), Roles.GLOBAL_PARTICIPANT)
+            accountService.grantGlobalPermission(PermissionTargetType.ACCOUNT, account.id(), Roles.GLOBAL_READ_ONLY)
+        }
+        // Groups only
+        asUser().with(AccountGroupManagement::class.java).call {
+            val permissions = accountService.globalPermissions
+            assertTrue(permissions.any { it.target.type == PermissionTargetType.GROUP && it.target.id == group.id() })
+            assertTrue(permissions.none { it.target.type == PermissionTargetType.ACCOUNT })
+        }
+        // Accounts only
+        asUser().with(AccountManagement::class.java).call {
+            val permissions = accountService.globalPermissions
+            assertTrue(permissions.any { it.target.type == PermissionTargetType.ACCOUNT && it.target.id == account.id() })
+            assertTrue(permissions.none { it.target.type == PermissionTargetType.GROUP })
+        }
+        // Both
+        asUser().with(AccountManagement::class.java).with(AccountGroupManagement::class.java).call {
+            assertEquals(listOf(Roles.GLOBAL_PARTICIPANT), globalPermissionsOf(group.asPermissionTarget()))
+            assertEquals(listOf(Roles.GLOBAL_READ_ONLY), globalPermissionsOf(account.asPermissionTarget()))
+        }
+    }
+
+    @Test
+    fun `Saving an unknown global role is refused and keeps the current roles`() {
+        asAdmin {
+            val group = doCreateAccountGroup()
+            val account = doCreateAccount()
+            accountService.grantGlobalPermission(PermissionTargetType.GROUP, group.id(), Roles.GLOBAL_CREATOR)
+            accountService.grantGlobalPermission(PermissionTargetType.GROUP, group.id(), Roles.GLOBAL_PARTICIPANT)
+            accountService.grantGlobalPermission(PermissionTargetType.ACCOUNT, account.id(), Roles.GLOBAL_READ_ONLY)
+            assertFailsWith<RoleNotFoundException> {
+                accountService.saveGlobalPermission(PermissionTargetType.GROUP, group.id(), PermissionInput("UNKNOWN_ROLE"))
+            }
+            assertFailsWith<RoleNotFoundException> {
+                accountService.saveGlobalPermission(PermissionTargetType.ACCOUNT, account.id(), PermissionInput("UNKNOWN_ROLE"))
+            }
+            assertEquals(
+                listOf(Roles.GLOBAL_CREATOR, Roles.GLOBAL_PARTICIPANT),
+                globalPermissionsOf(group.asPermissionTarget())
+            )
+            assertEquals(listOf(Roles.GLOBAL_READ_ONLY), globalPermissionsOf(account.asPermissionTarget()))
+        }
+    }
+
     private fun globalPermissionsOf(target: PermissionTarget): List<String> =
         accountService.globalPermissions
             .filter { it.target.type == target.type && it.target.id == target.id }

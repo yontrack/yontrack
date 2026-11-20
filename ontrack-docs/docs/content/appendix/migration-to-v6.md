@@ -547,6 +547,11 @@ role to an account or a group keeps the roles it holds, and each role is removed
 * **Reading the global roles**: `Account.globalRoles` and `AccountGroup.globalRoles` list all the
   global roles, and replace the deprecated `globalRole` fields, which return only the first of them,
   by ID. The `globalPermissions` query lists one entry per account or group **and global role**.
+* **The `globalPermissions` query is restricted**: it lists the accounts to the holders of
+  `AccountManagement` and the groups to the holders of `AccountGroupManagement`, and is refused to
+  anybody holding neither - in Yontrack 5, any signed-in user could list them all. The deprecated
+  `GET /rest/accounts/permissions/globals` follows the same rule
+  ([#2170](https://github.com/yontrack/yontrack/issues/2170)).
 * **New GraphQL mutations** grant one project role, keeping the others, and revoke one project role,
   keeping the others: `grantProjectRoleToAccount`, `grantProjectRoleToAccountGroup`,
   `revokeProjectRoleFromAccount` and `revokeProjectRoleFromAccountGroup`. They take the ID of the
@@ -560,7 +565,8 @@ role to an account or a group keeps the roles it holds, and each role is removed
   Yontrack 5 semantics - saving a global or project permission replaces **all** the roles the
   account or the group held, and deleting one removes all of them - so a client still calling them
   wipes the roles granted through GraphQL, CasC or the UI. Move to the GraphQL queries and mutations
-  above.
+  above. Saving an unknown role is refused and leaves the roles in place
+  ([#2170](https://github.com/yontrack/yontrack/issues/2170)).
 
 #### For configuration as code
 

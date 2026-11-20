@@ -162,6 +162,30 @@ class AccountServiceProjectRolesIT : AbstractDSLTestSupport() {
     }
 
     @Test
+    fun `Saving an unknown project role is refused and keeps the current roles`() {
+        asAdmin {
+            project {
+                val group = doCreateAccountGroup()
+                val account = doCreateAccount()
+                accountService.grantProjectPermission(id, PermissionTargetType.GROUP, group.id(), Roles.PROJECT_OWNER)
+                accountService.grantProjectPermission(id, PermissionTargetType.GROUP, group.id(), Roles.PROJECT_PARTICIPANT)
+                accountService.grantProjectPermission(id, PermissionTargetType.ACCOUNT, account.id(), Roles.PROJECT_READ_ONLY)
+                assertFailsWith<RoleNotFoundException> {
+                    accountService.saveProjectPermission(id, PermissionTargetType.GROUP, group.id(), PermissionInput("UNKNOWN_ROLE"))
+                }
+                assertFailsWith<RoleNotFoundException> {
+                    accountService.saveProjectPermission(id, PermissionTargetType.ACCOUNT, account.id(), PermissionInput("UNKNOWN_ROLE"))
+                }
+                assertEquals(
+                    listOf(Roles.PROJECT_OWNER, Roles.PROJECT_PARTICIPANT),
+                    permissionsOf(this, group.asPermissionTarget())
+                )
+                assertEquals(listOf(Roles.PROJECT_READ_ONLY), permissionsOf(this, account.asPermissionTarget()))
+            }
+        }
+    }
+
+    @Test
     fun `Granting a project role on an unknown project is refused`() {
         asAdmin {
             val group = doCreateAccountGroup()

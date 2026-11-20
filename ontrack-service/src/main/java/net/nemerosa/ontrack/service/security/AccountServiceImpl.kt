@@ -144,11 +144,14 @@ class AccountServiceImpl(
         return when (type) {
             PermissionTargetType.ACCOUNT -> {
                 securityService.checkGlobalFunction(AccountManagement::class.java)
+                // A mistyped role must not wipe the current roles (#2170)
+                checkGlobalRole(input.role)
                 roleRepository.saveGlobalRoleForAccount(id, input.role)
             }
 
             PermissionTargetType.GROUP -> {
                 securityService.checkGlobalFunction(AccountGroupManagement::class.java)
+                checkGlobalRole(input.role)
                 roleRepository.saveGlobalRoleForGroup(id, input.role)
             }
 
@@ -195,19 +198,29 @@ class AccountServiceImpl(
     }
 
     override fun getGlobalPermissions(): Collection<GlobalPermission> {
+        // Each part is shown to the holders of the function which grants its roles (#2170)
+        val accounts = securityService.isGlobalFunctionGranted(AccountManagement::class.java)
+        val groups = securityService.isGlobalFunctionGranted(AccountGroupManagement::class.java)
+        if (!accounts && !groups) {
+            securityService.checkGlobalFunction(AccountManagement::class.java)
+        }
         val permissions: MutableCollection<GlobalPermission> = ArrayList()
         // Users first
-        permissions.addAll(
-            accountRepository.findAll().flatMap { account ->
-                getGlobalRolesForAccount(account).map { GlobalPermission(account.asPermissionTarget(), it) }
-            }
-        )
+        if (accounts) {
+            permissions.addAll(
+                accountRepository.findAll().flatMap { account ->
+                    getGlobalRolesForAccount(account).map { GlobalPermission(account.asPermissionTarget(), it) }
+                }
+            )
+        }
         // ... then groups
-        permissions.addAll(
-            accountGroupRepository.findAll().flatMap { group ->
-                getGlobalRolesForAccountGroup(group).map { GlobalPermission(group.asPermissionTarget(), it) }
-            }
-        )
+        if (groups) {
+            permissions.addAll(
+                accountGroupRepository.findAll().flatMap { group ->
+                    getGlobalRolesForAccountGroup(group).map { GlobalPermission(group.asPermissionTarget(), it) }
+                }
+            )
+        }
         // OK
         return permissions
     }
@@ -250,6 +263,8 @@ class AccountServiceImpl(
         input: PermissionInput,
     ): Ack {
         securityService.checkProjectFunction(projectId.value, ProjectAuthorisationMgt::class.java)
+        // A mistyped role must not wipe the current roles (#2170)
+        checkProjectRole(input.role)
         return when (type) {
             PermissionTargetType.ACCOUNT -> roleRepository.saveProjectRoleForAccount(projectId.value, id, input.role)
             PermissionTargetType.GROUP -> roleRepository.saveProjectRoleForGroup(projectId.value, id, input.role)

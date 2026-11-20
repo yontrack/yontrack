@@ -4,6 +4,7 @@ import net.nemerosa.ontrack.graphql.AbstractQLKTITSupport
 import net.nemerosa.ontrack.it.AsAdminTest
 import net.nemerosa.ontrack.model.security.Roles
 import org.junit.jupiter.api.Test
+import org.springframework.graphql.execution.ErrorType
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 
@@ -77,6 +78,16 @@ class GQLRootQueryGlobalPermissionsIT : AbstractQLKTITSupport() {
                     role.path("name").asText()
                 )
             }
+        }
+    }
+
+    @Test
+    fun `Getting the global permissions is refused without the management of accounts or of groups`() {
+        asAccountWithGlobalRole(Roles.GLOBAL_PARTICIPANT) {
+            runWithMatchingError(
+                "{ globalPermissions { role { id } } }",
+                errorClassification = ErrorType.FORBIDDEN
+            )
         }
     }
 
