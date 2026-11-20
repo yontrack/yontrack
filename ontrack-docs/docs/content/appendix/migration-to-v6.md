@@ -526,7 +526,8 @@ project: saving a role replaced the one it had. In Yontrack 6, an account or a g
 **several global roles** and **several roles on a project**, and may do the union of what they
 allow - as it already could through the several groups it belongs to. No role excludes another. See
 [Roles](../security/roles.md) ([#2161](https://github.com/yontrack/yontrack/issues/2161),
-[#2162](https://github.com/yontrack/yontrack/issues/2162)).
+[#2162](https://github.com/yontrack/yontrack/issues/2162),
+[#2163](https://github.com/yontrack/yontrack/issues/2163)).
 
 The *Global permissions* page lists every account and group with all its global roles: adding a
 role to an account or a group keeps the roles it holds, and each role is removed on its own.
@@ -553,6 +554,48 @@ role to an account or a group keeps the roles it holds, and each role is removed
 * **Reading the project roles**: `Project.projectRoles` lists an account or a group under each of its
   roles, and `Account.authorizedProjects` and `AccountGroup.authorizedProjects` list one entry per
   project **and role** - a client expecting one entry per project must expect several.
+
+#### For configuration as code
+
+The format does not change: two roles for a group, or for a group on a project, are two entries.
+What changes is what an entry does ([#2163](https://github.com/yontrack/yontrack/issues/2163)):
+
+* **`admin.group-permissions`**: every group listed gets **exactly** the listed global roles - the
+  missing ones are granted, the others revoked. In Yontrack 5, a group got the role of its last
+  entry only.
+* **`admin.project-permissions`**: the entries are grouped by group and project, and for every
+  group and project listed, the group gets **exactly** the listed roles on the project. In
+  Yontrack 5, a second entry for the same group and project silently replaced the first.
+* A group, or a group and project, which CasC does not list is left untouched, so roles granted
+  outside CasC survive. Re-applying a CasC export keeps every role.
+
+```yaml
+ontrack:
+  admin:
+    group-permissions:
+      - group: Developers
+        role: PARTICIPANT
+      - group: Developers
+        role: CREATOR
+    project-permissions:
+      - group: Developers
+        role: PARTICIPANT
+        projects: [yontrack, yontrack-cli]
+      - group: Developers
+        role: PROMOTER
+        projects: [yontrack]
+```
+
+| | Yontrack 5 | Yontrack 6 |
+|---|---|---|
+| Developers, global | `CREATOR` only (last entry wins) | `PARTICIPANT` + `CREATOR` |
+| Developers × `yontrack` | `PROMOTER` only (last entry wins) | `PARTICIPANT` + `PROMOTER` |
+| Developers × `yontrack-cli` | `PARTICIPANT` | `PARTICIPANT` |
+| Rerun without the `PROMOTER` entry | - | `yontrack` back to `PARTICIPANT` only |
+| Group, or group and project, absent from CasC | untouched | untouched |
+
+A group, or a group and project, listed with a single entry behaves as in Yontrack 5: it ends up
+with this role only.
 
 ## Removed
 

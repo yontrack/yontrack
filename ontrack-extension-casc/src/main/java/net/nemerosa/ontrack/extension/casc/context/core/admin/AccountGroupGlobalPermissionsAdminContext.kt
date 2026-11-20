@@ -2,7 +2,6 @@ package net.nemerosa.ontrack.extension.casc.context.core.admin
 
 import tools.jackson.databind.JsonNode
 import net.nemerosa.ontrack.common.api.APIDescription
-import net.nemerosa.ontrack.common.syncForward
 import net.nemerosa.ontrack.extension.casc.context.AbstractCascContext
 import net.nemerosa.ontrack.json.JsonParseException
 import net.nemerosa.ontrack.json.asJson
@@ -12,7 +11,6 @@ import net.nemerosa.ontrack.model.json.schema.JsonType
 import net.nemerosa.ontrack.model.json.schema.JsonTypeBuilder
 import net.nemerosa.ontrack.model.json.schema.toType
 import net.nemerosa.ontrack.model.security.*
-import net.nemerosa.ontrack.model.structure.ID
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
@@ -40,7 +38,7 @@ class AccountGroupGlobalPermissionsAdminContext(
     override fun jsonType(jsonTypeBuilder: JsonTypeBuilder): JsonType {
         return JsonArrayType(
             items = jsonTypeBuilder.toType(CascAccountGroupPermission::class),
-            description = "List of account groups global permissions (old permissions are preserved)",
+            description = "List of account groups global permissions. A listed group gets exactly the listed roles, the other groups are left untouched.",
         )
     }
 
@@ -63,39 +61,19 @@ class AccountGroupGlobalPermissionsAdminContext(
                     ?: error("Cannot find role [${input.role}] at ${path(paths + index.toString())}"),
             )
         }
-        // Existing items
-        val existing = accountService.globalPermissions.filter {
-            it.target.type == PermissionTargetType.GROUP
-        }.map {
-            CascAccountGroupPermissionMapping(
-                group = accountService.getAccountGroup(ID.of(it.target.id)),
-                role = it.role,
-            )
-        }
-        // Synchronizing, preserving the existing groups
-        syncForward(
-            from = items,
-            to = existing
-        ) {
-            equality { a, b -> a.group.id == b.group.id }
-            onCreation { item ->
-                logger.info("Creating account group permission: ${item.group.name} --> ${item.role.id}")
-                accountService.saveGlobalPermission(
-                    PermissionTargetType.GROUP,
-                    item.group.id(),
-                    PermissionInput(role = item.role.id),
-                )
+        // For every group listed, its global roles become exactly the listed ones (roles add up,
+        // ADR 0023). The groups which are not listed are left untouched.
+        items.groupBy { it.group.id() }.values.forEach { groupItems ->
+            val group = groupItems.first().group
+            val roles = groupItems.map { it.role.id }.toSet()
+            val existing = accountService.getGlobalRolesForAccountGroup(group).map { it.id }.toSet()
+            (roles - existing).forEach { role ->
+                logger.info("Granting global role to account group: ${group.name} --> $role")
+                accountService.grantGlobalPermission(PermissionTargetType.GROUP, group.id(), role)
             }
-            onModification { item, _ ->
-                logger.info("Updating account group permission: ${item.group.name} --> ${item.role.id}")
-                accountService.saveGlobalPermission(
-                    PermissionTargetType.GROUP,
-                    item.group.id(),
-                    PermissionInput(role = item.role.id),
-                )
-            }
-            onDeletion { existing ->
-                logger.info("Preserving existing group permission: ${existing.group.name} --> ${existing.role.id}")
+            (existing - roles).forEach { role ->
+                logger.info("Revoking global role from account group: ${group.name} --> $role")
+                accountService.revokeGlobalPermission(PermissionTargetType.GROUP, group.id(), role)
             }
         }
     }

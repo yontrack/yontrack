@@ -85,8 +85,16 @@ ontrack:
   admin:
     group-permissions:
       - group: Administrators
-        role: ADMINISTRATOR 
+        role: ADMINISTRATOR
+      - group: Developers
+        role: PARTICIPANT
+      - group: Developers
+        role: CREATOR
 ```
+
+Two roles for a group are two entries. Every group listed in `group-permissions` gets **exactly**
+the listed global roles: the missing ones are granted and the others are revoked, including the
+roles granted outside CasC. A group which is not listed keeps all its global roles.
 
 !!! note
 
@@ -151,8 +159,23 @@ ontrack:
         projects:
           - yontrack
           - yontrack-cli
+      - group: Developers
+        role: PARTICIPANT
+        projects:
+          - yontrack
+          - yontrack-cli
+      - group: Developers
+        role: PROMOTER
+        projects:
+          - yontrack
 ```
+
+The entries are grouped by group and project: for every group and project listed, the group gets
+**exactly** the listed roles on the project - the missing ones are granted and the others are
+revoked, including the roles granted outside CasC. Above, _Developers_ holds `PARTICIPANT` and
+`PROMOTER` on `yontrack`, and `PARTICIPANT` only on `yontrack-cli`. A group and project pair which
+is not listed keeps all its roles.
 
 !!! note
 
-    Casc cannot be used to grant projlect roles to accounts.
+    Casc cannot be used to grant project roles to accounts.

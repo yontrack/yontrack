@@ -3,6 +3,7 @@ package net.nemerosa.ontrack.extension.casc.graphql
 import net.nemerosa.ontrack.extension.casc.CascConfigurationProperties
 import net.nemerosa.ontrack.graphql.AbstractQLKTITSupport
 import net.nemerosa.ontrack.model.security.AccountGroup
+import net.nemerosa.ontrack.model.security.PermissionTargetType
 import net.nemerosa.ontrack.model.security.Roles
 import net.nemerosa.ontrack.model.structure.Project
 import net.nemerosa.ontrack.test.TestUtils.uid
@@ -85,25 +86,58 @@ class CascReloadProjectPermissionsIT : AbstractQLKTITSupport() {
         }
     }
 
+    @Test
+    fun `Reloading the CasC twice with two roles for one group and project keeps both`() {
+        asAdmin {
+            val group = doCreateAccountGroup()
+            val projectName = uid("p")
+            project(projectName)
+            // A role granted outside CasC, on a project CasC does not mention
+            val other = project()
+            accountService.grantProjectPermission(other.id, PermissionTargetType.GROUP, group.id(), Roles.PROJECT_OWNER)
+
+            withCascLocation(group, projectName, listOf(Roles.PROJECT_PARTICIPANT, Roles.PROJECT_PROMOTER)) {
+                reloadCasc()
+                reloadCasc()
+                val roles = accountService.getProjectPermissionsForAccountGroup(group)
+                    .groupBy({ it.projectId }, { it.projectRole.id })
+                assertEquals(
+                    listOf(Roles.PROJECT_PARTICIPANT, Roles.PROJECT_PROMOTER).sorted(),
+                    roles[projectByName(projectName).id()]?.sorted(),
+                    "Both roles after two reloads"
+                )
+                assertEquals(listOf(Roles.PROJECT_OWNER), roles[other.id()], "The unlisted project is untouched")
+            }
+        }
+    }
+
     /**
      * Writes the `project-permissions` fragment to a file and points the CasC locations at it for
      * the duration of [code], restoring them afterwards - the configuration properties are a
      * shared singleton.
      */
-    private fun withCascLocation(group: AccountGroup, projectName: String, code: () -> Unit) {
+    private fun withCascLocation(
+        group: AccountGroup,
+        projectName: String,
+        roles: List<String> = listOf(Roles.PROJECT_PARTICIPANT),
+        code: () -> Unit,
+    ) {
         val file = Files.createTempFile("casc-project-permissions", ".yaml")
         val previousLocations = cascConfigurationProperties.locations
         try {
             file.writeText(
-                """
-                    ontrack:
-                        admin:
-                            project-permissions:
-                                - group: ${group.name}
-                                  role: ${Roles.PROJECT_PARTICIPANT}
-                                  projects:
-                                    - $projectName
-                """.trimIndent()
+                // One entry per role
+                roles.joinToString(
+                    separator = "\n",
+                    prefix = "ontrack:\n    admin:\n        project-permissions:\n",
+                ) { role ->
+                    """
+                    |            - group: ${group.name}
+                    |              role: $role
+                    |              projects:
+                    |                - $projectName
+                    """.trimMargin()
+                }
             )
             cascConfigurationProperties.locations = listOf("file:$file")
             code()

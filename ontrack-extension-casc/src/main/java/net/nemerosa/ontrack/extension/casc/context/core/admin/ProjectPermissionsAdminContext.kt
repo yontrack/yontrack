@@ -12,6 +12,7 @@ import net.nemerosa.ontrack.model.json.schema.JsonTypeBuilder
 import net.nemerosa.ontrack.model.json.schema.toType
 import net.nemerosa.ontrack.model.security.*
 import net.nemerosa.ontrack.model.structure.ID
+import net.nemerosa.ontrack.model.structure.Project
 import net.nemerosa.ontrack.model.structure.StructureService
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
@@ -34,7 +35,7 @@ class ProjectPermissionsAdminContext(
 
     override fun jsonType(jsonTypeBuilder: JsonTypeBuilder): JsonType {
         return JsonArrayType(
-            description = "List of permissions per group",
+            description = "List of permissions per group. A listed group and project pair gets exactly the listed roles, the other pairs are left untouched.",
             items = jsonTypeBuilder.toType(ProjectPermission::class)
         )
     }
@@ -52,7 +53,8 @@ class ProjectPermissionsAdminContext(
         }
         // Indexing all project roles
         val projectRoles = rolesService.projectRoles.associateBy { it.id }
-        // For each permission
+        // Roles to set, per group and per project, indexed by their IDs
+        val listed = mutableMapOf<Int, ListedGroup>()
         permissions.forEach { permission ->
             // Gets the group if it exists
             val group = accountService.findAccountGroupByName(permission.group)
@@ -65,14 +67,9 @@ class ProjectPermissionsAdminContext(
                         // Getting the project
                         val project = structureService.findProjectByName(projectName).getOrNull()
                         if (project != null) {
-                            // Setting the permissions
-                            logger.info("Granting role ${projectRole.id} to group ${group.name} in project ${project.name}.")
-                            accountService.saveProjectPermission(
-                                project.id,
-                                PermissionTargetType.GROUP,
-                                group.id(),
-                                PermissionInput(role = projectRole.id),
-                            )
+                            listed.getOrPut(group.id()) { ListedGroup(group) }
+                                .projects.getOrPut(project.id()) { ListedProject(project) }
+                                .roles += projectRole.id
                         } else {
                             logger.info("Project $projectName in project permissions does not exist (yet). Skipping for now.")
                         }
@@ -82,6 +79,23 @@ class ProjectPermissionsAdminContext(
                 }
             } else {
                 logger.info("Account group ${permission.group} in project permissions does not exist (yet). Skipping for now.")
+            }
+        }
+        // For every (group, project) pair listed, the roles of the group on the project become exactly
+        // the listed ones (roles add up, ADR 0023). The pairs which are not listed are left untouched.
+        listed.values.forEach { (group, projects) ->
+            val existing = accountService.getProjectPermissionsForAccountGroup(group)
+                .groupBy({ it.projectId }, { it.projectRole.id })
+            projects.values.forEach { (project, roles) ->
+                val current = existing[project.id()]?.toSet() ?: emptySet()
+                (roles - current).forEach { role ->
+                    logger.info("Granting role $role to group ${group.name} in project ${project.name}.")
+                    accountService.grantProjectPermission(project.id, PermissionTargetType.GROUP, group.id(), role)
+                }
+                (current - roles).forEach { role ->
+                    logger.info("Revoking role $role from group ${group.name} in project ${project.name}.")
+                    accountService.revokeProjectPermission(project.id, PermissionTargetType.GROUP, group.id(), role)
+                }
             }
         }
     }
@@ -119,6 +133,16 @@ class ProjectPermissionsAdminContext(
         // Conversion to JSON
         return projectPermissions.asJson()
     }
+
+    private data class ListedGroup(
+        val group: AccountGroup,
+        val projects: MutableMap<Int, ListedProject> = mutableMapOf(),
+    )
+
+    private data class ListedProject(
+        val project: Project,
+        val roles: MutableSet<String> = mutableSetOf(),
+    )
 
     data class ProjectPermission(
         @APIDescription("Name of the group")
