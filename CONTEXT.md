@@ -553,6 +553,39 @@ file, or carrying an extra one, cannot be detected from the archive alone.
 trail of changes to the audit feature itself) are reserved for 6.x: do not use
 them for anything else.
 
+### Security
+
+**Function**:
+One kind of operation that security checks before letting it run, such as
+`ProjectView`, `ValidationRunCreate` or `ApplicationManagement`. A *global function*
+applies to Yontrack as a whole; a *project function* applies to one project at a
+time. A function is granted through the roles that carry it, or to every account
+by a security setting (viewing every project, for instance); extensions contribute
+functions of their own.
+_Avoid_: right, permission, privilege
+
+**Global role**:
+A named set of global functions, and of project functions granted on every
+project, such as `ADMINISTRATOR`, `AUTOMATION` or `READ_ONLY`.
+_Avoid_: permission (as a synonym of role), right, profile
+
+**Project role**:
+A named set of project functions, granted on one project at a time, such as
+`OWNER` or `PARTICIPANT`.
+_Avoid_: permission (as a synonym of role), right
+
+**Role assignment**:
+A target - an account or a group - holding a role, either globally (a global role)
+or on one project (a project role). Assignments add up: a target may hold several
+global roles and several roles on each project, and an account may do whatever any
+role it holds allows, directly or through any of its groups. No role excludes
+another: an assignment is granted or revoked on its own, never replaced (ADR 0023).
+An agent, or anyone using a read-only token, gets that union narrowed by the agent
+policy or the read-only token policy.
+_Avoid_: permission, authorisation. Both survive in names - the *Global
+permissions* page, `PermissionTarget`, the `…_AUTHORIZATIONS` tables - for what is
+an assignment, or its target.
+
 ### Agents
 
 **Agent**:
