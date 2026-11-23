@@ -62,6 +62,38 @@ internal class AutoVersioningEventsIT : AbstractDSLTestSupport() {
     }
 
     @Test
+    fun `Rendering the post processing error event without a link`() {
+        withOrder { order, run, target ->
+            val event = autoVersioningEventsFactory.error(
+                order = order,
+                message = "Kubernetes post processing job yontrack/job failed in the `run` step with exit code 2",
+                error = MockPostProcessingFailureException(
+                    message = "Job failed",
+                    link = "",
+                )
+            )
+            assertAuditValues(event, order)
+            assertEquals(auditUrl(order), event.getValue("LINK"))
+            val text = eventTemplatingService.renderEvent(
+                event,
+                context = emptyMap(),
+                renderer = htmlNotificationEventRenderer
+            )
+            assertFalse("href=\"\"" in text, "No empty link: $text")
+            assertEquals(
+                """
+                    Auto versioning post-processing of <a href="http://localhost:3000/project/${target.project.id}">${target.project.name}</a>/<a href="http://localhost:3000/branch/${target.id}">${target.name}</a> for dependency <a href="http://localhost:3000/project/${run.project.id}">${run.project.name}</a> version "1.1.0" has failed.
+
+                    <a href="${auditUrl(order)}">Kubernetes post processing job yontrack/job failed in the `run` step with exit code 2.</a>
+
+                    ${auditLink(order)}
+                """.trimIndent(),
+                text
+            )
+        }
+    }
+
+    @Test
     fun `Rendering the success event`() {
         withOrder { order, run, target ->
             val event = autoVersioningEventsFactory.success(

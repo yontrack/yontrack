@@ -6,6 +6,8 @@ import kotlinx.coroutines.withTimeoutOrNull
 import net.nemerosa.ontrack.extension.git.casc.GitConfigService
 import net.nemerosa.ontrack.extension.git.model.getCommitLink
 import net.nemerosa.ontrack.extension.git.model.gitRepository
+import net.nemerosa.ontrack.extension.git.model.toSCMCloneAccess
+import net.nemerosa.ontrack.extension.scm.service.SCMCloneAccess
 import net.nemerosa.ontrack.extension.git.property.GitBranchConfigurationPropertyType
 import net.nemerosa.ontrack.extension.git.property.GitBranchConfigurationPropertyTypeUtils
 import net.nemerosa.ontrack.extension.git.property.GitCommitPropertyType
@@ -155,6 +157,17 @@ class GitLabSCMExtension(
          */
         override fun getDiffLink(commitFrom: String, commitTo: String): String =
             "$repositoryHtmlURL/-/compare/$commitFrom...$commitTo"
+
+        /**
+         * Same remote and credentials as the local clones: the token under [GitLabGitConfiguration.GIT_USER].
+         * A configuration without a token gives an anonymous access.
+         */
+        override fun getCloneAccess(): SCMCloneAccess =
+            if (configuration.token.isNullOrBlank()) {
+                SCMCloneAccess(url = gitConfiguration.remote, credentials = null)
+            } else {
+                gitConfiguration.toSCMCloneAccess()
+            }
 
         override fun getSCMBranch(branch: Branch): String? =
             propertyService.getPropertyValue(branch, GitBranchConfigurationPropertyType::class.java)?.branch

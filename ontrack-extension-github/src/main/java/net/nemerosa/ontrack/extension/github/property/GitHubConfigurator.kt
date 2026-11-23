@@ -76,7 +76,11 @@ class GitHubConfigurator(
         )
     }
 
-    private fun getAuthenticator(configuration: GitHubEngineConfiguration): GitRepositoryAuthenticator =
+    /**
+     * Git authenticator of a GitHub configuration. For a GitHub App, the installation token is
+     * fetched each time the authenticator is asked for it, not now.
+     */
+    fun getAuthenticator(configuration: GitHubEngineConfiguration): GitRepositoryAuthenticator =
         when (configuration.authenticationType) {
             GitHubAuthenticationType.ANONYMOUS -> AnonymousGitRepositoryAuthenticator.INSTANCE
             GitHubAuthenticationType.PASSWORD -> UsernamePasswordGitRepositoryAuthenticator(

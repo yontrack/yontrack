@@ -108,7 +108,7 @@ object AutoVersioningEvents {
             eventXProject("Source project"),
             eventValue("VERSION", "Version being set"),
             eventValue("MESSAGE", "Auto versioning message"),
-            eventValue("LINK", "Link to the post processing process"),
+            eventValue("LINK", "Link to the post processing process, or to the auto versioning audit entry when the post processing has no page of its own"),
             *auditValues,
         ),
     )

@@ -6,6 +6,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 import net.nemerosa.ontrack.extension.git.casc.GitConfigService
 import net.nemerosa.ontrack.extension.git.model.getCommitLink
 import net.nemerosa.ontrack.extension.git.model.gitRepository
+import net.nemerosa.ontrack.extension.git.model.toSCMCloneAccess
 import net.nemerosa.ontrack.extension.git.property.GitBranchConfigurationProperty
 import net.nemerosa.ontrack.extension.git.property.GitBranchConfigurationPropertyType
 import net.nemerosa.ontrack.extension.git.property.GitBranchConfigurationPropertyTypeUtils
@@ -115,6 +116,11 @@ class BitbucketServerSCMExtension(
         override val repositoryHtmlURL: String = getRepositoryUrl(configuration, project, repositoryName)
 
         override val repository: String = "${project}/${repositoryName}"
+
+        /**
+         * Same remote and credentials as the local clones.
+         */
+        override fun getCloneAccess(): SCMCloneAccess = stashConfiguration.toSCMCloneAccess()
 
         override fun getSCMBranch(branch: Branch): String? {
             val branchProperty: GitBranchConfigurationProperty? =

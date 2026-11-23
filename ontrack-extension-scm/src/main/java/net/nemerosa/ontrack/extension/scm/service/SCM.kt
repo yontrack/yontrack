@@ -156,4 +156,15 @@ interface SCM {
         base: String,
     ): SCMCommit
 
+    /**
+     * Optional capability: what a process outside Yontrack needs to clone this repository with
+     * Git and to push to it - the harness of the Kubernetes post-processing, for instance.
+     *
+     * The credentials are read when this method is called and may be short-lived: call it right
+     * before they are used, and never store its result.
+     *
+     * @return The clone access, or `null` (the default) when this SCM does not support it
+     */
+    fun getCloneAccess(): SCMCloneAccess? = null
+
 }

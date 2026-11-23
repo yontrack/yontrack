@@ -340,6 +340,7 @@ configure(javaProjects) {
     val tomcatVersion = "11.0.26"
     val jackson3Version = "3.1.7"
     val openTelemetryVersion = "1.67.0"
+    val fabric8Version = "7.9.0"
 
     // The BOMs. The Spring Boot one is what io.spring.dependency-management imported; the other two
     // are the BOMs it imports itself, restated at the versions this build wants, in place of the
@@ -376,6 +377,11 @@ configure(javaProjects) {
         // brings protobuf-java and Guava, which nothing else of the build uses; its Guava is the one
         // pinned for the plugin classpath above.
         "dev.cel:cel:0.15.0",
+        // Kubernetes client, for the Jobs of the Kubernetes extension (#2171). Not managed by the
+        // Spring Boot BOM. The mock server is for its tests only.
+        "io.fabric8:kubernetes-client:$fabric8Version",
+        "io.fabric8:kubernetes-httpclient-jdk:$fabric8Version",
+        "io.fabric8:kubernetes-server-mock:$fabric8Version",
 
         "io.jsonwebtoken:jjwt-api:$jjwtVersion",
         "io.jsonwebtoken:jjwt-impl:$jjwtVersion",

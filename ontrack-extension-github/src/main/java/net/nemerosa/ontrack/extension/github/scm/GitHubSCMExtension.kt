@@ -7,6 +7,8 @@ import net.nemerosa.ontrack.common.BaseException
 import net.nemerosa.ontrack.extension.git.casc.GitConfigService
 import net.nemerosa.ontrack.extension.git.model.getCommitLink
 import net.nemerosa.ontrack.extension.git.model.gitRepository
+import net.nemerosa.ontrack.extension.git.model.toSCMCloneAccess
+import net.nemerosa.ontrack.extension.github.property.GitHubGitConfiguration
 import net.nemerosa.ontrack.extension.git.property.GitBranchConfigurationProperty
 import net.nemerosa.ontrack.extension.git.property.GitBranchConfigurationPropertyType
 import net.nemerosa.ontrack.extension.git.property.GitBranchConfigurationPropertyTypeUtils
@@ -113,6 +115,21 @@ class GitHubSCMExtension(
         override fun getDiffLink(commitFrom: String, commitTo: String): String {
             return "${repositoryHtmlURL}/compare/${commitFrom}...${commitTo}"
         }
+
+        /**
+         * Same remote and credentials as the local clones. A GitHub App token is fetched now.
+         */
+        override fun getCloneAccess(): SCMCloneAccess =
+            GitHubGitConfiguration(
+                property = GitHubProjectConfigurationProperty(
+                    configuration = configuration,
+                    repository = repository,
+                    indexationInterval = 0, // Not needed in this context
+                    issueServiceConfigurationIdentifier = issueServiceConfigurationIdentifier,
+                ),
+                configuredIssueService = null, // Not needed in this context
+                authenticator = gitHubConfigurator.getAuthenticator(configuration),
+            ).toSCMCloneAccess()
 
         override fun getSCMBranch(branch: Branch): String? {
             val branchProperty: GitBranchConfigurationProperty? =

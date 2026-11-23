@@ -374,6 +374,32 @@ executable nodes. A workflow is a *kind of* notification, so a count of an
 entity's notifications is never a count of its workflows.
 _Avoid_: pipeline, automation
 
+### Auto-versioning
+
+**Post-processing**:
+What runs on the upgrade branch after auto-versioning has committed the version
+bump and before the pull request is created or the branch merged: regenerating a
+lock file, running a formatter. One of five, chosen by id in the auto-versioning
+configuration - four launch a remote pipeline (`github`, `jenkins`, `gitlab`,
+`bitbucket-cloud`), and `kubernetes` runs a Job in Yontrack's own cluster.
+_Avoid_: post-build step, hook, pipeline. A *hook* is an inbound call, a
+*pipeline* belongs to the CI.
+
+**Harness**:
+What Yontrack supplies around the user's image in a `kubernetes`
+post-processing, doing what a CI used to do: a stock Git image and a script, which
+clone the upgrade branch and later commit and push the result. The harness alone
+holds the SCM credentials and the Git directory, and it alone commits.
+_Avoid_: runner, wrapper, sidecar, agent
+
+**Step**:
+One of the three containers of a `kubernetes` post-processing Job, run in
+sequence on a shared working copy: **`clone`** (harness), **`run`** (the user's
+image and command, on the work tree only - no `git` command works there) and
+**`push`** (harness: one commit of every change, or none when nothing changed). A
+failure always names its step.
+_Avoid_: stage, phase, task, container
+
 ### Filtering
 
 **Build filter**:

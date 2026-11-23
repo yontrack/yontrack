@@ -51,7 +51,9 @@ class AutoVersioningEventsFactoryImpl(
             .with("VERSION", order.targetVersion)
             .with("PROMOTION", order.sourcePromotion)
             .with("MESSAGE", close(message))
-            .with("LINK", error.link)
+            // A post-processing without a page of its own (Kubernetes Job) has an empty link:
+            // the audit entry, which carries the failure, stands in for it rather than a broken link
+            .with("LINK", error.link.takeIf { it.isNotBlank() } ?: auditLink(order))
             .withAudit(order)
             .build()
     } else {
@@ -95,7 +97,10 @@ class AutoVersioningEventsFactoryImpl(
 
     private fun Event.EventBuilder.withAudit(order: AutoVersioningOrder) =
         with("AUDIT_NAME", "Auto-versioning audit")
-            .with("AUDIT_LINK", uiLocations.page("/extension/auto-versioning/audit/detail/${order.uuid}"))
+            .with("AUDIT_LINK", auditLink(order))
+
+    private fun auditLink(order: AutoVersioningOrder) =
+        uiLocations.page("/extension/auto-versioning/audit/detail/${order.uuid}")
 
     private fun Event.EventBuilder.withSourcePromotionRun(order: AutoVersioningOrder) =
         sourcePromotionRun(order)?.let {

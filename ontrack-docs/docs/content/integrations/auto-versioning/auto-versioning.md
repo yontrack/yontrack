@@ -644,12 +644,13 @@ The auto-versioning feature allows you to configure this post-processing using t
 * `postProcessing` — ID of the post-processing mechanism
 * `postProcessingConfig` — configuration for the post-processing mechanism
 
-Three post-processing mechanisms are supported:
+Five post-processing mechanisms are supported:
 
 * [Jenkins pipeline](jenkins.md) — `postProcessing: jenkins`
 * [GitHub Actions workflow](github.md) — `postProcessing: github`
 * [Bitbucket pipeline](bitbucket-cloud.md) — `postProcessing: bitbucket-cloud`
 * [GitLab pipeline](gitlab.md) — `postProcessing: gitlab`
+* [Kubernetes job](kubernetes.md) — `postProcessing: kubernetes`
 
 Post-processing runs on the [upgrade branch](#the-upgrade-branch), after all paths (default & additional) have been
 updated, and before the change lands on the target branch.

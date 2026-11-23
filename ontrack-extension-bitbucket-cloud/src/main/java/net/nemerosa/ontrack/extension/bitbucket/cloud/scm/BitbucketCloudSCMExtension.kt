@@ -18,6 +18,7 @@ import net.nemerosa.ontrack.extension.bitbucket.cloud.settings.BitbucketCloudSet
 import net.nemerosa.ontrack.extension.git.casc.GitConfigService
 import net.nemerosa.ontrack.extension.git.model.getCommitLink
 import net.nemerosa.ontrack.extension.git.model.gitRepository
+import net.nemerosa.ontrack.extension.git.model.toSCMCloneAccess
 import net.nemerosa.ontrack.extension.git.property.GitBranchConfigurationPropertyType
 import net.nemerosa.ontrack.extension.git.property.GitBranchConfigurationPropertyTypeUtils
 import net.nemerosa.ontrack.extension.git.property.GitCommitPropertyType
@@ -113,6 +114,11 @@ class BitbucketCloudSCMExtension(
         override val repositoryHtmlURL: String = property.repositoryUrl
 
         override val repository: String = property.fullName
+
+        /**
+         * Same remote and credentials as the local clones.
+         */
+        override fun getCloneAccess(): SCMCloneAccess = gitConfiguration.toSCMCloneAccess()
 
         /**
          * Bitbucket Cloud compares a source with a destination: what is on [commitTo] and not on [commitFrom].

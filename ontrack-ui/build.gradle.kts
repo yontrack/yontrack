@@ -81,6 +81,7 @@ dependencies {
     runtimeOnly(project(":ontrack-extension-workflows"))
     runtimeOnly(project(":ontrack-extension-environments"))
     runtimeOnly(project(":ontrack-extension-config"))
+    runtimeOnly(project(":ontrack-extension-kubernetes"))
     runtimeOnly(project(":ontrack-extension-findings"))
     runtimeOnly(project(":ontrack-extension-scorecard"))
     runtimeOnly(project(":ontrack-extension-audit-trail"))
