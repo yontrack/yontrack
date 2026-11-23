@@ -13,8 +13,10 @@ class ProjectSlotGraphServiceImpl(
 ) : ProjectSlotGraphService {
 
     override fun slotGraph(project: Project, qualifier: String): SlotGraph {
-        // Gets the list of all slots for this project and qualifier
-        val slots = slotService.findSlotsByProject(project, qualifier)
+        // Gets the list of all slots for this project and qualifier, in a deterministic order:
+        // the set comes from the database without any order, and several environments may share
+        // the same order.
+        val slots = slotService.findSlotsByProject(project, qualifier).sortedWith(slotOrder)
 
         // List of nodes
         val slotNodes = slots.map {
@@ -22,7 +24,7 @@ class ProjectSlotGraphServiceImpl(
                 slot = it,
                 parents = getParents(slots, it),
             )
-        }.sortedBy { it.slot.environment.order }
+        }
 
         // Graph
         return SlotGraph(
@@ -30,7 +32,10 @@ class ProjectSlotGraphServiceImpl(
         )
     }
 
-    private fun getParents(slots: Set<Slot>, slot: Slot): List<Slot> {
+    /**
+     * Gets the parents of a slot, in the order of the given (sorted) slots.
+     */
+    private fun getParents(slots: List<Slot>, slot: Slot): List<Slot> {
         val lowerSlots = slots.filter { it.environment.order < slot.environment.order }
         return if (lowerSlots.isEmpty()) {
             emptyList()
@@ -38,6 +43,19 @@ class ProjectSlotGraphServiceImpl(
             val immediateLowerOrder = lowerSlots.maxOf { it.environment.order }
             lowerSlots.filter { it.environment.order == immediateLowerOrder }
         }
+    }
+
+    companion object {
+        /**
+         * Environment order first, then the environment name, the way users see the environments.
+         * The slot ID is only a safety net: within a project and qualifier, a slot is unique per
+         * environment.
+         */
+        private val slotOrder: Comparator<Slot> = compareBy<Slot>(
+            { it.environment.order },
+            { it.environment.name },
+            { it.id },
+        )
     }
 
 }
