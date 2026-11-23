@@ -15,16 +15,11 @@ buildscript {
     dependencyLocking {
         lockMode.set(LockMode.STRICT)
     }
-    // Jackson 3 of the plugin classpath (3.1.5 via the Spring Boot plugin) pinned past
-    // GHSA-7hhh-6rmp-j9qf, GHSA-p6pp-m3f8-5c89, GHSA-cxp5-3px4-pw24, GHSA-wv8q-qhhj-9h54 and
-    // GHSA-q4xh-88c3-wmh7 (fixed in 3.1.7), like the application's own pin further down. Never
-    // shipped, but in the dependency graph. Remove once the Spring Boot plugin brings >= 3.1.7.
     // Guava of the plugin classpath (32.1.2-jre via Jib) pinned past CVE-2026-102554 (fixed in
-    // 33.7.2) for the same reason. Remove once the Jib plugin brings >= 33.7.2.
+    // 33.7.2). Never shipped, but in the dependency graph. Remove once the Jib plugin brings
+    // >= 33.7.2.
     dependencies {
         constraints {
-            classpath("tools.jackson.core:jackson-core:3.1.7")
-            classpath("tools.jackson.core:jackson-databind:3.1.7")
             classpath("com.google.guava:guava:33.7.2-jre")
         }
     }
@@ -33,7 +28,7 @@ buildscript {
 plugins {
     kotlin("jvm") version "2.3.21"
     kotlin("plugin.spring") version "2.3.21"
-    id("org.springframework.boot") version "4.1.1" apply false
+    id("org.springframework.boot") version "4.1.3" apply false
     id("com.avast.gradle.docker-compose") version "0.17.12"
     id("com.google.cloud.tools.jib") version "3.5.1" apply false
     id("com.github.node-gradle.node") version "7.1.0" apply false
@@ -313,7 +308,7 @@ configure(javaProjects) {
     //
     // `platform`, not `enforcedPlatform`: an enforced platform would force org.jetbrains.kotlin:*
     // to the Kotlin the BOM pins with nothing able to lift it again, and this build has compiled
-    // with a newer Kotlin than the BOM's before (Boot 3.5 pinned 1.9.25). Boot 4.1.1 pins 2.3.21,
+    // with a newer Kotlin than the BOM's before (Boot 3.5 pinned 1.9.25). Boot 4.1.3 pins 2.3.21,
     // the version below, so for now the two agree.
     //
     // The BOM property overrides that went with the plugin -- `extra["kotlin.version"]` and
@@ -334,11 +329,8 @@ configure(javaProjects) {
     val greenMailVersion = "1.6.15"
     val mockkVersion = "1.14.11"
     val jgitVersion = "6.10.1.202505221210-r"
-    val amqpClientVersion = "5.37.0"
     val msgpackCoreVersion = "0.9.12"
     val commonsBeanutilsVersion = "1.11.0"
-    val tomcatVersion = "11.0.26"
-    val jackson3Version = "3.1.7"
     val openTelemetryVersion = "1.67.0"
     val fabric8Version = "7.9.0"
 
@@ -349,11 +341,7 @@ configure(javaProjects) {
         SpringBootPlugin.BOM_COORDINATES,
         "org.jetbrains.kotlin:kotlin-bom:$kotlinVersion",
         "org.jetbrains.kotlinx:kotlinx-coroutines-bom:$kotlinCoroutinesVersion",
-        // Jackson 3 pinned past the Spring Boot BOM (4.1.1 manages 3.1.5) to clear the HIGHs of the
-        // backend image scan: CVE-2026-68497, CVE-2026-89407, CVE-2026-89425, CVE-2026-91776,
-        // CVE-2026-91777 (fixed in 3.1.7). Remove once the Spring Boot BOM manages >= 3.1.7.
-        "tools.jackson:jackson-bom:$jackson3Version",
-        // OpenTelemetry pinned past the Spring Boot BOM (4.1.1 manages 1.62.0, elasticsearch-java
+        // OpenTelemetry pinned past the Spring Boot BOM (4.1.3 manages 1.62.0, elasticsearch-java
         // brings 1.63.0) to clear CVE-2026-118259 of the backend image scan (fixed in 1.67.0).
         // Remove once the Spring Boot BOM manages >= 1.67.0.
         "io.opentelemetry:opentelemetry-bom:$openTelemetryVersion",
@@ -403,21 +391,16 @@ configure(javaProjects) {
 
         // Transitive libraries pinned past their managed versions to clear the HIGHs of the backend
         // image scan. Each pin goes once its source brings a fixed version by itself.
-        // - amqp-client (Boot BOM manages 5.30.0): CVE-2026-63337, CVE-2026-69219, CVE-2026-69220,
-        //   CVE-2026-75516 (fixed in 5.34.0). Remove once the Spring Boot BOM manages >= 5.34.0.
-        "com.rabbitmq:amqp-client:$amqpClientVersion",
         // - msgpack-core (0.9.8 via influxdb-java 2.25): CVE-2026-21452 (fixed in 0.9.11).
         //   Remove once influxdb-java brings msgpack-core >= 0.9.11.
         "org.msgpack:msgpack-core:$msgpackCoreVersion",
         // - commons-beanutils (1.10.0 via opencsv 5.10): CVE-2025-48734 (fixed in 1.11.0).
         //   Remove once opencsv brings commons-beanutils >= 1.11.0.
         "commons-beanutils:commons-beanutils:$commonsBeanutilsVersion",
-        // - tomcat-embed-* (Boot BOM 4.1.1 manages 11.0.24): CVE-2026-65182, CVE-2026-65905,
-        //   CVE-2026-68525, all CRITICAL (fixed in 11.0.25). All three modules, to keep Tomcat aligned.
-        //   Remove once the Spring Boot BOM manages >= 11.0.25.
-        "org.apache.tomcat.embed:tomcat-embed-core:$tomcatVersion",
-        "org.apache.tomcat.embed:tomcat-embed-el:$tomcatVersion",
-        "org.apache.tomcat.embed:tomcat-embed-websocket:$tomcatVersion",
+        // - graphql-java (Boot BOM 4.1.3 manages 25.1): CVE-2026-102554 in the Guava it shades
+        //   (32.1.2-jre), fixed in 25.2 which shades Guava 33.8.0-jre (graphql-java#4554).
+        //   Remove once the Spring Boot BOM manages >= 25.2.
+        "com.graphql-java:graphql-java:25.2",
     )
 
     // Declared on every dependency bucket of every source set -- main, test, and the testFixtures
@@ -453,9 +436,10 @@ configure(javaProjects) {
     }
 
     // No Jackson 2 (#1843, ADR 0016). The Elasticsearch client, used by the metrics export of
-    // ontrack-extension-elastic only (#1882), is the last library to bring it, for its
-    // `JacksonJsonpMapper` only: Yontrack gives the client the `Jackson3JsonpMapper`. The rule
-    // removes it wherever the client comes from.
+    // ontrack-extension-elastic only (#1882), brings it for its `JacksonJsonpMapper` only:
+    // Yontrack gives the client the `Jackson3JsonpMapper`. The rule removes it wherever the client
+    // comes from. The fabric8 Kubernetes client 7.x needs it for real and keeps it, at the version
+    // the Spring Boot BOM manages (ADR 0016, amendment of #2174).
     dependencies.components.withModule("co.elastic.clients:elasticsearch-java") {
         allVariants {
             withDependencies {

@@ -76,3 +76,20 @@ Most of the move is a rename the compiler checks. Two changes of meaning are not
   a node of another type, `asText()` throws on an object or an array where it returned `""`, and
   gives `""` for a JSON `null` where it gave `"null"`. Where the lenient result was relied upon,
   the call says so (`stringValueOpt().orElse(null)`, `isValueNode` checks).
+
+## Amendment, 2026-11-23: the Kubernetes client brings Jackson 2 back (#2174)
+
+*No Jackson 2 left* no longer holds for the runtime. The Kubernetes extension (#2171) uses the
+fabric8 `kubernetes-client` 7.x, which is built on Jackson 2. It brings `jackson-core`,
+`jackson-databind`, `jackson-dataformat-yaml` and `jackson-datatype-jsr310`. Unlike the
+Elasticsearch client, it cannot have them removed: its model classes are serialized with Jackson 2.
+Yontrack's own sources are still free of Jackson 2, and `NoJackson2GuardTest` still checks them.
+That test does not look at the classpath.
+
+The Jackson 2 that comes along is the version the Spring Boot BOM manages (`jackson-2-bom`). So
+it follows Boot's patch releases, and its CVEs show up in the backend image scan like any other.
+#2174 cleared five of them by moving to Boot 4.1.3, which manages 2.21.8.
+
+fabric8 8.0 is on Jackson 3, but it is built against Jackson 3.2. Taking it would lift the whole of
+Yontrack's Jackson 3 past the 3.1 line that the Spring Boot BOM manages. The move to fabric8 8,
+which takes Jackson 2 out again, waits until the Boot BOM manages Jackson 3.2.
