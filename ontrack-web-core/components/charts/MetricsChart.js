@@ -62,16 +62,17 @@ export default function MetricsChart({query, variables}) {
                     <Tooltip {...chartTooltipProps}/>
                     <Legend formatter={legendFormatter} onClick={legendClick} style={{cursor: 'pointer'}} {...chartLegendProps}/>
                     {
+                        // Each `Line` is a direct child of the chart: recharts finds its series among
+                        // the children, and does not look inside a Fragment under React 19 (#2175)
                         chart && chart.metricNames &&
                         chart.metricNames.map((metricName, metricIndex) => (
-                            <>
-                                <Line type="monotone"
-                                      connectNulls={true}
-                                      dataKey={metricName}
-                                      stroke={chart.metricColors && chart.metricColors[metricIndex]}
-                                      hide={inactiveSeries.includes(metricName)}
-                                />
-                            </>
+                            <Line key={metricName}
+                                  type="monotone"
+                                  connectNulls={true}
+                                  dataKey={metricName}
+                                  stroke={chart.metricColors && chart.metricColors[metricIndex]}
+                                  hide={inactiveSeries.includes(metricName)}
+                            />
                         ))
                     }
                 </ComposedChart>

@@ -4,6 +4,8 @@ const {generate} = require("@ontrack/utils");
 const {ValidationStampPage} = require("./validationStamp");
 const {test} = require("../../fixtures/connection");
 const {ChartOptionsDialog} = require("../charts/ChartOptionsDialog");
+const {graphQLCallMutation} = require("@ontrack/graphql");
+const {gql} = require("graphql-request");
 
 test('display last status description in validation stamp page', async ({page, ontrack}) => {
     // Provisioning
@@ -102,3 +104,51 @@ test('filtering the validation history on the last status of the runs', async ({
     // No error along the way
     await expect(vsPage.history().locator('.ant-alert-error')).toHaveCount(0)
 })
+
+test('the metrics chart of a CHML validation stamp draws its four series', async ({page, ontrack}) => {
+    // Provisioning: a CHML stamp, validated on two builds (#2175)
+    const project = await ontrack.createProject()
+    const branch = await project.createBranch()
+    const validationStamp = await branch.createValidationStamp(null, {
+        dataType: "net.nemerosa.ontrack.extension.general.validation.CHMLValidationDataType",
+        dataTypeConfig: {failedLevel: "CRITICAL", failedValue: 1, warningLevel: "HIGH", warningValue: 1},
+    })
+    for (const counts of [{high: 5, medium: 2}, {high: 1, low: 3}]) {
+        const build = await branch.createBuild()
+        await validateWithCHML(build, validationStamp, counts)
+    }
+    // Login
+    await login(page, ontrack)
+    // Navigating to the validation stamp
+    const vsPage = new ValidationStampPage(page, validationStamp)
+    await vsPage.goTo()
+    // The metrics chart has its four series, named in its legend
+    const metricsChart = page.getByTestId("chart-metrics")
+    for (const name of ["critical", "high", "medium", "low"]) {
+        await expect(metricsChart.locator('.recharts-legend-item-text', {hasText: name})).toBeVisible()
+    }
+    await expect(metricsChart.locator('.recharts-line')).toHaveCount(4)
+})
+
+const validateWithCHML = async (build, validationStamp, {critical = 0, high = 0, medium = 0, low = 0}) =>
+    graphQLCallMutation(
+        build.ontrack.connection,
+        'validateBuildByIdWithCHML',
+        gql`
+            mutation ValidateWithCHML($id: Int!, $validation: String!, $critical: Int, $high: Int, $medium: Int, $low: Int) {
+                validateBuildByIdWithCHML(input: {
+                    id: $id,
+                    validation: $validation,
+                    critical: $critical,
+                    high: $high,
+                    medium: $medium,
+                    low: $low,
+                }) {
+                    errors {
+                        message
+                    }
+                }
+            }
+        `,
+        {id: Number(build.id), validation: validationStamp.name, critical, high, medium, low}
+    )
