@@ -91,7 +91,8 @@ Here, `eclipse-temurin:21` and `registry.example.com/build-tools/node:20` are al
 or `docker.io/eclipse-temurin:21` are not.
 
 As environment variables, the same settings are for example `ONTRACK_EXTENSION_KUBERNETES_ALLOWED_IMAGES` and
-`ONTRACK_EXTENSION_KUBERNETES_JOB_MAX_TIMEOUT`.
+`ONTRACK_EXTENSION_KUBERNETES_JOB_MAXTIMEOUT`: following Spring Boot's rule, the dots become underscores, and the
+dashes are removed.
 
 ## Auto-versioning configuration
 
@@ -242,9 +243,14 @@ Before creating a Job, Yontrack deletes any leftover Job carrying the same order
 
 ## RBAC
 
-The Helm chart does not grant these permissions yet. The service account Yontrack runs as needs the following `Role`,
-in the namespace where the Jobs are created (`namespace`, or Yontrack's own namespace if not set). In this example,
-the namespace is `yontrack-jobs` and the service account `yontrack` of the `yontrack` namespace:
+From version 6.1.0, the [Helm chart](https://github.com/yontrack/yontrack-chart/blob/main/docs/auto-versioning-kubernetes.md#permissions) grants these permissions.
+With `autoVersioning.kubernetes.enabled: true`, it renders the `Role` and the `RoleBinding` below, in the namespace of
+the Jobs, for the service account of the chart. It also mounts the token of this service account in the backend pod,
+and only there. Set `autoVersioning.kubernetes.rbac.create: false` to manage RBAC yourself.
+
+Without the chart, or with `rbac.create: false`, the service account Yontrack runs as needs the following `Role`, in
+the namespace where the Jobs are created (`namespace`, or Yontrack's own namespace if not set). In this example, the
+namespace is `yontrack-jobs` and the service account `yontrack` of the `yontrack` namespace:
 
 ```yaml
 apiVersion: rbac.authorization.k8s.io/v1
@@ -297,4 +303,7 @@ kubelet resolves them.
   shell) rather than from the `${VERSION}` template, so that a crafted version in the source project cannot run commands
   next to your Secrets.
 * Use a dedicated namespace for the Jobs, holding only the Secrets listed in `allowed.secrets`.
-* Restrict what the Jobs can reach with a `NetworkPolicy` on that namespace. Yontrack does not create one.
+* Restrict what the Jobs can reach with a `NetworkPolicy` on that namespace. Yontrack does not create one, but from
+  version 6.1.0, the [Helm chart](https://github.com/yontrack/yontrack-chart/blob/main/docs/auto-versioning-kubernetes.md#networkpolicy) can render it
+  (`autoVersioning.kubernetes.networkPolicy.enabled: true`): no ingress, and egress to the DNS and to the TCP ports 443
+  and 22 only.
