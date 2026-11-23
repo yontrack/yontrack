@@ -87,6 +87,7 @@ class KdslStackTest {
         assertEquals("yontrack-kdsl-ldap-feature-a", names.ldapProjectName)
         assertEquals("yontrack-kdsl-oidc-feature-a", names.oidcProjectName)
         assertEquals("yontrack-kdsl-ha-feature-a", names.haProjectName)
+        assertEquals("yontrack-kdsl-kubernetes-feature-a", names.kubernetesProjectName)
     }
 
     @Test
@@ -99,18 +100,20 @@ class KdslStackTest {
         assertEquals(names.ldapProjectName, instance.ldapProjectName)
         assertEquals(names.oidcProjectName, instance.oidcProjectName)
         assertEquals(names.haProjectName, instance.haProjectName)
+        assertEquals(names.kubernetesProjectName, instance.kubernetesProjectName)
     }
 
     @Test
-    fun `the four variants get four different compose projects`() {
+    fun `the five variants get five different compose projects`() {
         val instance = KdslStackInstance(slug = "feature-a", slot = 1)
         val projects = setOf(
             instance.projectName,
             instance.ldapProjectName,
             instance.oidcProjectName,
             instance.haProjectName,
+            instance.kubernetesProjectName,
         )
-        assertEquals(4, projects.size, "the four variants must not share a Compose project")
+        assertEquals(5, projects.size, "the five variants must not share a Compose project")
     }
 
     @Test
@@ -162,6 +165,40 @@ class KdslStackTest {
                 "ontrack.acceptance.ha.project" to "yontrack-kdsl-ha-feature-a",
             ),
             instance.haSystemProperties,
+        )
+    }
+
+    @Test
+    fun `slot zero gives the Kubernetes stack its base ports`() {
+        val instance = KdslStackInstance(slug = "yontrack", slot = 0)
+        assertEquals(16443, instance.kubernetesApiPort)
+        assertEquals(17080, instance.kubernetesGitPort)
+        assertEquals("https://localhost:16443", instance.kubernetesApiUrl)
+        assertEquals("http://localhost:17080", instance.kubernetesGitUrl)
+    }
+
+    @Test
+    fun `the Kubernetes ports are offset per slot, probed and passed to compose`() {
+        val instance = KdslStackInstance(slug = "feature-a", slot = 2)
+        assertEquals(16643, instance.kubernetesApiPort)
+        assertEquals(17280, instance.kubernetesGitPort)
+        assertEquals("yontrack-kdsl-kubernetes-feature-a", instance.kubernetesProjectName)
+        assertTrue(KdslStack.BASE_KUBERNETES_API in KdslStack.BASE_PORTS, "the API port must be probed too")
+        assertTrue(KdslStack.BASE_KUBERNETES_GIT in KdslStack.BASE_PORTS, "the Git port must be probed too")
+        assertEquals("16643", instance.composeEnvironment["YONTRACK_KDSL_KUBERNETES_API_PORT"])
+        assertEquals("17280", instance.composeEnvironment["YONTRACK_KDSL_KUBERNETES_GIT_PORT"])
+    }
+
+    @Test
+    fun `the Kubernetes tests are pointed at the single backend and the Git server`() {
+        val instance = KdslStackInstance(slug = "feature-a", slot = 2)
+        assertEquals(
+            mapOf(
+                "ontrack.acceptance.connection.url" to "http://localhost:8280",
+                "ontrack.acceptance.connection.mgt.url" to "http://localhost:9000/manage",
+                "ontrack.acceptance.kubernetes.git.url" to "http://localhost:17280",
+            ),
+            instance.kubernetesSystemProperties,
         )
     }
 
@@ -256,6 +293,12 @@ class KdslStackTest {
             assertTrue(text.contains("YONTRACK_KDSL_HA_B_MGMT_PORT=19181"), text)
             assertTrue(text.contains("YONTRACK_KDSL_HA_A_URL=http://localhost:18380"), text)
             assertTrue(text.contains("YONTRACK_KDSL_HA_B_URL=http://localhost:18381"), text)
+            assertTrue(text.contains("KDSL_KUBERNETES_PROJECT=yontrack-kdsl-kubernetes-feature-a"), text)
+            assertTrue(text.contains("YONTRACK_KDSL_KUBERNETES_API_PORT=16743"), text)
+            assertTrue(text.contains("YONTRACK_KDSL_KUBERNETES_GIT_PORT=17380"), text)
+            assertTrue(text.contains("YONTRACK_KDSL_KUBERNETES_API_URL=https://localhost:16743"), text)
+            assertTrue(text.contains("YONTRACK_KDSL_KUBERNETES_GIT_URL=http://localhost:17380"), text)
+            assertTrue(text.contains("ontrack.acceptance.kubernetes.git.url=http://localhost:17380"), text)
         } finally {
             dir.deleteRecursively()
         }

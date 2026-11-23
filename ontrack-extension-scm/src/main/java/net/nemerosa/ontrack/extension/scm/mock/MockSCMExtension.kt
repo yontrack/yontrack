@@ -6,6 +6,7 @@ import net.nemerosa.ontrack.extension.issues.IssueServiceRegistry
 import net.nemerosa.ontrack.extension.issues.model.ConfiguredIssueService
 import net.nemerosa.ontrack.extension.issues.model.Issue
 import net.nemerosa.ontrack.extension.issues.model.IssueServiceConfiguration
+import net.nemerosa.ontrack.extension.scm.SCMExtensionConfigProperties
 import net.nemerosa.ontrack.extension.scm.SCMExtensionFeature
 import net.nemerosa.ontrack.extension.scm.changelog.SCMChangeLogEnabled
 import net.nemerosa.ontrack.extension.scm.changelog.SCMCommit
@@ -35,6 +36,7 @@ class MockSCMExtension(
     private val structureService: StructureService,
     private val issueServiceRegistry: IssueServiceRegistry,
     private val mockSCMStore: MockSCMStore,
+    private val config: SCMExtensionConfigProperties,
 ) : AbstractExtension(extensionFeature), SCMExtension {
 
     override fun getSCM(project: Project): SCM? =
@@ -517,6 +519,16 @@ class MockSCMExtension(
 
         override fun getSCMBranch(branch: Branch): String? =
             propertyService.getPropertyValue(branch, MockSCMBranchPropertyType::class.java)?.name
+
+        /**
+         * Dev/test fixture only (#2172): publishes the repository to the Git server configured
+         * under `ontrack.config.extension.scm.mock.git`, `null` when there is none.
+         */
+        override fun getCloneAccess(): SCMCloneAccess? =
+            MockSCMGitMirror(config.mock.git)
+                // Not configured: nothing is read from the store, as before the mirror existed
+                .takeIf { it.configured }
+                ?.publish(repository(mockScmProjectProperty.name).toData())
 
         override fun getBranchLastCommit(branch: String): String? =
             repository(mockScmProjectProperty.name).getBranch(branch)?.lastCommit?.id

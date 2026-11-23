@@ -1,0 +1,233 @@
+# Middleware, one backend and a k3s cluster, for the KDSL acceptance tests of the `kubernetes`
+# package (#2172): the auto-versioning post-processing that runs as a Kubernetes Job (#2171),
+# against a real cluster.
+#
+# A single-node k3s runs in the `k3s` service -- the only privileged container of the KDSL stacks,
+# which is why it lives in this variant and not in the main one. `k3s-bootstrap` prepares it (see
+# compose/kubernetes/bootstrap.sh): the namespace `yontrack`, the RBAC of the user documentation,
+# the Secret a post-processing may reference, and a Git server (Gitea) in the namespace `git`.
+#
+# Yontrack is made to look as if it ran in the cluster: it is not a pod, but the files and the
+# variables a pod gets are given to it -- the token, CA and namespace of the service account
+# `yontrack` mounted where Kubernetes would, and KUBERNETES_SERVICE_HOST/PORT pointing at k3s.
+# The namespace is not configured: it is read from the mounted file, as in a real deployment.
+#
+# The Git server is reached two ways: by Yontrack from outside the cluster, on the NodePort 30080
+# of the k3s container (`http://k3s:30080`), and by the Jobs from inside it, through its Service
+# (`http://git.git.svc.cluster.local:3000`). The host gets both ports published, for the tests.
+#
+# No UI, no Keycloak, no InfluxDB: the tests authenticate with a token. A test fixture only.
+#
+# Every published port is parameterised so that several checkouts can run the acceptance tests
+# side by side: the backend takes the slot's Yontrack and management ports, k3s the API server's
+# and the Git server's.
+#
+# Started and stopped by the Gradle Docker Compose plugin (`kdslKubernetesTest`), which is given
+# the project name and the ports by `KdslStack` in buildSrc -- see
+# docs/adr/0013-parallel-kdsl-acceptance-stacks.md. An admin kubeconfig for debugging is written
+# to .yontrack-kdsl/kubeconfig.yaml.
+
+services:
+
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: ontrack
+      POSTGRES_USER: ontrack
+      POSTGRES_PASSWORD: ontrack
+    ports:
+      - "${YONTRACK_KDSL_POSTGRES_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ontrack -d ontrack"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  rabbitmq:
+    image: rabbitmq:4.1.3-management
+    hostname: rabbit
+    environment:
+      RABBITMQ_DEFAULT_USER: ontrack
+      RABBITMQ_DEFAULT_PASS: ontrack
+    ports:
+      - "${YONTRACK_KDSL_RABBIT_MGMT_PORT:-15672}:15672"
+      - "${YONTRACK_KDSL_RABBIT_PORT:-5672}:5672"
+
+  # S3-compatible storage for the evidence of the audit trail (#1962).
+  # pgsty/silo is the community fork of MinIO -- the upstream image is no
+  # longer published -- pinned by release and digest. Its bucket is created at
+  # start by minio/start.sh, and the service is healthy once it exists.
+  # buildSrc's `Minio` holds the image, bucket and credentials, and `MinioTest`
+  # keeps this file in step with it.
+  minio:
+    image: "pgsty/silo:RELEASE.2026-09-16T00-00-00Z@sha256:635197cb9f36d01bee221d34d1c7d7960f6a95c48b0b6c01d99cd13bdae51a46"
+    entrypoint: [ "/bin/sh", "/yontrack/start.sh" ]
+    environment:
+      MINIO_ROOT_USER: yontrack-minio
+      MINIO_ROOT_PASSWORD: yontrack-minio-secret
+      YONTRACK_MINIO_BUCKET: yontrack-audit-trail
+    ports:
+      - "${YONTRACK_KDSL_MINIO_PORT:-19000}:9000"
+    volumes:
+      - ./minio/start.sh:/yontrack/start.sh:ro
+    # Nothing to keep between runs: the data lives in memory.
+    tmpfs:
+      - /data
+    healthcheck:
+      test: [ "CMD-SHELL", "test -f /tmp/yontrack-bucket-ready && silo healthcheck --quiet" ]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 10s
+
+  # The cluster: one k3s node, which is server and agent. The packaged add-ons the tests have no
+  # use for are off, so that it starts sooner and has less to pull.
+  k3s:
+    image: "rancher/k3s:v1.33.5-k3s1"
+    command:
+      - server
+      # The names the API server's certificate is valid for: `k3s` for the containers of the
+      # network (Yontrack, the bootstrap), `localhost` for the host (the debugging kubeconfig)
+      - --tls-san=k3s
+      - --tls-san=localhost
+      - --disable=traefik
+      - --disable=metrics-server
+      - --disable=servicelb
+      # The admin kubeconfig is read by the bootstrap container, whichever user it runs as
+      - --write-kubeconfig-mode=644
+    # k3s runs a container runtime, which needs to be privileged
+    privileged: true
+    tmpfs:
+      - /run
+      - /var/run
+    ports:
+      # The API server
+      - "${YONTRACK_KDSL_KUBERNETES_API_PORT:-16443}:6443"
+      # The Git server of the cluster, on its NodePort
+      - "${YONTRACK_KDSL_KUBERNETES_GIT_PORT:-17080}:30080"
+    volumes:
+      # Where k3s writes its admin kubeconfig, for the bootstrap
+      - k3s-config:/etc/rancher/k3s
+
+  # Prepares the cluster, then exits: the backend starts once it has completed successfully, and the
+  # stack is up once it has -- a failure of the script fails the `ComposeUp`.
+  k3s-bootstrap:
+    image: "alpine/k8s:1.33.4"
+    depends_on:
+      - k3s
+    entrypoint: [ "/bin/bash", "/bootstrap/bootstrap.sh" ]
+    environment:
+      # The port the API server is published on, for the kubeconfig written for the host
+      HOST_API_PORT: "${YONTRACK_KDSL_KUBERNETES_API_PORT:-16443}"
+    volumes:
+      - k3s-config:/k3s-config:ro
+      - ./kubernetes/bootstrap.sh:/bootstrap/bootstrap.sh:ro
+      - ./kubernetes/manifests:/manifests:ro
+      # Token, CA and namespace of the service account, for the backend
+      - k3s-sa:/sa
+      # .yontrack-kdsl/ at the root of the checkout, git-ignored and created by `kdslStackSlot`
+      # before the stack starts: the debugging kubeconfig of the host goes there
+      - ../.yontrack-kdsl:/out
+
+  ontrack:
+    image: "nemerosa/ontrack:${ONTRACK_VERSION:-latest}"
+    hostname: ontrack
+    ports:
+      - "${YONTRACK_KDSL_ONTRACK_PORT:-8080}:8080"
+      - "${YONTRACK_KDSL_ONTRACK_MGMT_PORT:-8800}:8800"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_started
+      minio:
+        condition: service_healthy
+      # The cluster is ready, and the files of the service account are written
+      k3s-bootstrap:
+        condition: service_completed_successfully
+    volumes:
+      # The service account, where Kubernetes mounts it in a pod: the Kubernetes client finds the
+      # token, the CA and the namespace there. The bootstrap makes them readable by any user.
+      - k3s-sa:/var/run/secrets/kubernetes.io/serviceaccount:ro
+    environment:
+      # Development configuration
+      SPRING_PROFILES_ACTIVE: dev
+      # The development key (#2107): without it, the "dev" profile enables no licensed feature.
+      ONTRACK_CONFIG_LICENSE_KEY: "${YONTRACK_DEV_LICENSE_KEY:-}"
+
+      ############################################################
+      # Configuration of Ontrack
+      ############################################################
+
+      # General configuration -- one backend, and a small package of tests
+      JAVA_OPTIONS: "-Xmx1024m -Xms1024m"
+
+      # Database
+      SPRING_DATASOURCE_URL: "jdbc:postgresql://postgres/ontrack"
+
+      # RabbitMQ
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_USERNAME: ontrack
+      SPRING_RABBITMQ_PASSWORD: ontrack
+
+      # Authentication -- there is no Keycloak in this stack: the tests send a token, and these are
+      # never used to validate a JWT
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI: "http://localhost:${YONTRACK_KDSL_KEYCLOAK_PORT:-8008}/realms/ontrack"
+      # We need to skip the host verification (keycloak vs. localhost)
+      # DO NOT USE IN PRODUCTION
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI: http://keycloak:8080/realms/ontrack/protocol/openid-connect/certs
+
+      ############################################################
+      # Configuration for the tests
+      ############################################################
+
+      # ... the management endpoints the tests use (prometheus for the metrics, account for
+      # the tokens) - the default exposure is narrower, see #1772
+      MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: "health,info,prometheus,account"
+      # ... account tokens can be provisioned
+      MANAGEMENT_ENDPOINT_ACCOUNT_ACCESS: unrestricted
+      # ... configurations are not tested
+      ONTRACK_CONFIG_CONFIGURATION_TEST: "false"
+      # ... Jira in mock mode
+      ONTRACK_EXTENSION_JIRA_CLIENT_TYPE: mock
+      # ... audit trail evidence in the stack's MinIO (#1962), reached inside the network
+      ONTRACK_EXTENSION_AUDITTRAIL_STORAGE_ENDPOINT: http://minio:9000
+      ONTRACK_EXTENSION_AUDITTRAIL_STORAGE_BUCKET: yontrack-audit-trail
+      ONTRACK_EXTENSION_AUDITTRAIL_STORAGE_REGION: us-east-1
+      ONTRACK_EXTENSION_AUDITTRAIL_STORAGE_PATHSTYLE: "true"
+      ONTRACK_EXTENSION_AUDITTRAIL_STORAGE_ACCESSKEY: yontrack-minio
+      ONTRACK_EXTENSION_AUDITTRAIL_STORAGE_SECRETKEY: yontrack-minio-secret
+
+      ############################################################
+      # In the cluster, but not in a pod
+      ############################################################
+
+      # ... where the API server is: a pod gets these two from the kubelet, Yontrack is given them
+      # here, with the service account files mounted above
+      KUBERNETES_SERVICE_HOST: k3s
+      KUBERNETES_SERVICE_PORT: "6443"
+      # ... the Kubernetes extension (#2171), off by default
+      ONTRACK_EXTENSION_KUBERNETES_ENABLED: "true"
+      # ... the only image and the only Secret a post-processing may use. The namespace is not set:
+      # it is the one of the service account, `yontrack`
+      ONTRACK_EXTENSION_KUBERNETES_ALLOWED_IMAGES: "busybox:1.37.0"
+      ONTRACK_EXTENSION_KUBERNETES_ALLOWED_SECRETS: "post-processing-secret"
+      # ... the status of a running Job is read every 2 seconds rather than 5
+      ONTRACK_EXTENSION_KUBERNETES_JOB_POLLINTERVAL: "2s"
+      # ... the mock SCM keeps its repositories on the Git server of the cluster (#2172): Yontrack
+      # pushes through the NodePort of the k3s container, the Jobs clone through the Service
+      ONTRACK_CONFIG_EXTENSION_SCM_MOCK_GIT_PUSHURL: "http://k3s:30080/yontrack"
+      ONTRACK_CONFIG_EXTENSION_SCM_MOCK_GIT_CLONEURL: "http://git.git.svc.cluster.local:3000/yontrack"
+      ONTRACK_CONFIG_EXTENSION_SCM_MOCK_GIT_USERNAME: yontrack
+      ONTRACK_CONFIG_EXTENSION_SCM_MOCK_GIT_PASSWORD: yontrack-git-secret
+    healthcheck:
+      test: [ "CMD-SHELL", "wget -q -O /dev/null http://localhost:8800/manage/health || exit 1" ]
+      interval: 5s
+      timeout: 5s
+      retries: 60
+      start_period: 30s
+
+volumes:
+  k3s-config:
+  # token, ca.crt and namespace of the service account, written by the bootstrap
+  k3s-sa:

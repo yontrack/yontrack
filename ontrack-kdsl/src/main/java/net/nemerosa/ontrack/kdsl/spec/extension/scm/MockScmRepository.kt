@@ -53,7 +53,8 @@ fun <T> withMockScmRepository(
 
 class MockScmRepositoryContext(
     private val ontrack: Ontrack,
-    private val repository: String,
+    /** Name of the mock repository (also its name on a Git server it is published to, #2172) */
+    val repository: String,
 ) {
 
     fun repositoryFile(

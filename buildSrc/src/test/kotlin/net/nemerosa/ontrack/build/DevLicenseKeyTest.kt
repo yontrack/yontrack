@@ -79,6 +79,7 @@ class DevLicenseKeyTest {
             "compose/docker-compose-kdsl-ldap.yml",
             "compose/docker-compose-kdsl-oidc.yml",
             "compose/docker-compose-kdsl-ha.yml",
+            "compose/docker-compose-kdsl-kubernetes.yml",
             "security/dast/compose/docker-compose-dast.yml",
         ).forEach { path ->
             val text = File(root, path).readText()

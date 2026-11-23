@@ -1,0 +1,36 @@
+# The Role and RoleBinding of the user documentation (integrations/auto-versioning/kubernetes.md,
+# section "RBAC"), unchanged except for the namespace, `yontrack` instead of `yontrack-jobs`: in this
+# stack the Jobs run in the namespace of Yontrack itself. KubernetesRbacTest (buildSrc) keeps the two
+# in step -- the acceptance test then proves that the documented permissions are enough.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: yontrack-post-processing
+  namespace: yontrack
+rules:
+  - apiGroups: ["batch"]
+    resources: ["jobs"]
+    verbs: ["create", "get", "list", "delete"]
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list"]
+  - apiGroups: [""]
+    resources: ["pods/log"]
+    verbs: ["get"]
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["create", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: yontrack-post-processing
+  namespace: yontrack
+subjects:
+  - kind: ServiceAccount
+    name: yontrack
+    namespace: yontrack
+roleRef:
+  kind: Role
+  name: yontrack-post-processing
+  apiGroup: rbac.authorization.k8s.io

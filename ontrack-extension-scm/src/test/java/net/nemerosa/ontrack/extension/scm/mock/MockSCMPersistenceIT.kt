@@ -1,6 +1,7 @@
 package net.nemerosa.ontrack.extension.scm.mock
 
 import net.nemerosa.ontrack.extension.issues.IssueServiceRegistry
+import net.nemerosa.ontrack.extension.scm.SCMExtensionConfigProperties
 import net.nemerosa.ontrack.extension.scm.SCMExtensionFeature
 import net.nemerosa.ontrack.it.AbstractDSLTestSupport
 import net.nemerosa.ontrack.json.asJson
@@ -240,6 +241,7 @@ class MockSCMPersistenceIT : AbstractDSLTestSupport() {
         structureService = structureService,
         issueServiceRegistry = issueServiceRegistry,
         mockSCMStore = store,
+        config = SCMExtensionConfigProperties(),
     )
 
 }

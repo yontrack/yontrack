@@ -15,6 +15,8 @@ dependencies {
     implementation(project(":ontrack-extension-queue"))
     implementation("io.micrometer:micrometer-core")
     implementation("com.opencsv:opencsv")
+    // Publishes the mock SCM to a Git server (#2172)
+    implementation("org.eclipse.jgit:org.eclipse.jgit")
 
     testImplementation(testFixtures(project(":ontrack-it-utils")))
     testImplementation(testFixtures(project(":ontrack-model")))

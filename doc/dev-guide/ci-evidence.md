@@ -30,6 +30,7 @@ the way the CLI does.
 | `INTEGRATION` | `ci.yml`, `integration-report` | `INTEGRATION-junit.zip` | `INTEGRATION-report.html` |
 | `KDSL.ACCEPTANCE` | `ci.yml`, `kdsl-report` | `KDSL.ACCEPTANCE-junit.zip` | `KDSL.ACCEPTANCE-report.html` |
 | `KDSL.HA` | `ci.yml`, `kdsl-ha` | `KDSL.HA-junit.zip` | `KDSL.HA-report.html` |
+| `KDSL.KUBERNETES` | `ci.yml`, `kdsl-kubernetes` | `KDSL.KUBERNETES-junit.zip` | `KDSL.KUBERNETES-report.html` |
 | `PLAYWRIGHT` | `ci.yml`, `ui-tests-report` | `PLAYWRIGHT-junit.zip` | `PLAYWRIGHT-report.html` |
 | `GITLAB.REAL` | `gitlab-real.yml` | `GITLAB.REAL-junit.zip` | `GITLAB.REAL-report.html` |
 | `BITBUCKET.REAL` | `bitbucket-real.yml` | `BITBUCKET.REAL-junit.zip` | `BITBUCKET.REAL-report.html` |

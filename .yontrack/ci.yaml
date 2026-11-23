@@ -17,6 +17,10 @@ configuration:
         # the `kdsl-ha` job in ci.yml on every full run (#2076).
         KDSL.HA:
           tests: {}
+        # The Kubernetes post-processing against a real cluster: the `kubernetes` package against a
+        # k3s cluster, reported by the `kdsl-kubernetes` job in ci.yml on every full run (#2172).
+        KDSL.KUBERNETES:
+          tests: {}
         PLAYWRIGHT:
           tests: {}
         # How long the development key of the KDSL and Playwright stacks is still valid (#2107),
@@ -248,6 +252,7 @@ configuration:
             - INTEGRATION
             - KDSL.ACCEPTANCE
             - KDSL.HA
+            - KDSL.KUBERNETES
             - PLAYWRIGHT
             - DOCS
         # No workflow node of its own: BRONZE is what admits a build to the demo slot, the

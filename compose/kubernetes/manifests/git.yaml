@@ -1,0 +1,65 @@
+# The Git server of the Kubernetes acceptance stack (#2172): Gitea, rootless, in its own namespace.
+#
+# The post-processing Jobs clone from and push to it inside the cluster, as
+# http://git.git.svc.cluster.local:3000/<repository>.git; Yontrack pushes the repositories to it from
+# outside the cluster, through the NodePort 30080 of the k3s container (published on the host too).
+# Push-to-create is on, so that the first push of a repository creates it; sign-in is required to read,
+# so that a Job is given credentials as it would be with a private repository.
+# The `yontrack` user is created by the bootstrap script, not here.
+#
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: git
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: git
+  namespace: git
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: git}
+  template:
+    metadata:
+      labels: {app: git}
+    spec:
+      securityContext:
+        fsGroup: 1000
+      containers:
+        - name: gitea
+          image: gitea/gitea:1.24.5-rootless
+          env:
+            - {name: GITEA__database__DB_TYPE, value: sqlite3}
+            - {name: GITEA__security__INSTALL_LOCK, value: "true"}
+            - {name: GITEA__server__HTTP_PORT, value: "3000"}
+            - {name: GITEA__server__DISABLE_SSH, value: "true"}
+            - {name: GITEA__server__ROOT_URL, value: "http://git.git.svc.cluster.local:3000/"}
+            - {name: GITEA__repository__ENABLE_PUSH_CREATE_USER, value: "true"}
+            - {name: GITEA__service__REQUIRE_SIGNIN_VIEW, value: "true"}
+            - {name: GITEA__service__DISABLE_REGISTRATION, value: "true"}
+            - {name: GITEA__openid__ENABLE_OPENID_SIGNIN, value: "false"}
+            - {name: GITEA__log__LEVEL, value: warn}
+          ports:
+            - containerPort: 3000
+          readinessProbe:
+            httpGet: {path: /api/healthz, port: 3000}
+            periodSeconds: 2
+          volumeMounts:
+            - {name: data, mountPath: /var/lib/gitea}
+            - {name: config, mountPath: /etc/gitea}
+      volumes:
+        - {name: data, emptyDir: {}}
+        - {name: config, emptyDir: {}}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: git
+  namespace: git
+spec:
+  type: NodePort
+  selector: {app: git}
+  ports:
+    - {name: http, port: 3000, targetPort: 3000, nodePort: 30080}

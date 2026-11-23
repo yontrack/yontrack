@@ -24,6 +24,7 @@ class MinioTest {
         "compose/docker-compose-it.yml",
         "compose/docker-compose-kdsl.yml",
         "compose/docker-compose-kdsl-ha.yml",
+        "compose/docker-compose-kdsl-kubernetes.yml",
     )
 
     private fun text(path: String): String = File(root, path).readText()

@@ -4,6 +4,7 @@ import io.mockk.mockk
 import net.nemerosa.ontrack.extension.scm.SCMExtensionConfigProperties
 import net.nemerosa.ontrack.model.support.StorageService
 import org.junit.jupiter.api.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertIs
 
 class MockSCMStoreConfigTest {
@@ -21,6 +22,15 @@ class MockSCMStoreConfigTest {
         val properties = SCMExtensionConfigProperties()
         properties.mock.persistent = true
         assertIs<StorageMockSCMStore>(store(properties))
+    }
+
+    @Test
+    fun `The Git mirror of the mock SCM is off by default`() {
+        val git = SCMExtensionConfigProperties().mock.git
+        assertEquals("", git.pushUrl)
+        assertEquals("", git.cloneUrl)
+        assertEquals("", git.username)
+        assertEquals("", git.password)
     }
 
     private fun store(properties: SCMExtensionConfigProperties): MockSCMStore =

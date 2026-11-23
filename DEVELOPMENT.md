@@ -351,9 +351,10 @@ the tests needs no configuration. Passing one of those properties explicitly
 still wins, which is how you point the suite at an instance you started
 yourself.
 
-The `-ldap` and `-oidc` variants share the same slot: they are sequenced never
-to be up at the same time. They have no MinIO -- they test authentication --
-but the slot reserves its port for them all the same.
+The `-ldap`, `-oidc`, `-ha` and `-kubernetes` variants share the same slot:
+they are sequenced never to be up at the same time. The `-ldap` and `-oidc`
+ones have no MinIO -- they test authentication -- but the slot reserves its
+port for them all the same.
 
 A slot is claimed by the `kdslStackSlot` task, which every acceptance task
 runs first -- never while Gradle is configuring the build. A `./gradlew` that
@@ -403,3 +404,59 @@ A and B start together, on an empty database, with the same configuration as
 code (`compose/casc/kdsl-ha.yaml`): their startup tasks run one backend at a
 time (#2087), which `ACCHAStartup` checks. The `kdsl-ha` CI job runs the task
 on every full run, next to `kdsl`.
+
+### Kubernetes tests (k3s cluster)
+
+```bash
+./gradlew :ontrack-kdsl-acceptance:kdslKubernetesTest
+```
+
+The tests of the `net.nemerosa.ontrack.kdsl.acceptance.tests.kubernetes`
+package -- the `ACC*` classes -- check the auto-versioning post-processing that
+runs as a Kubernetes Job (#2171), against a real cluster (#2172). The task
+brings up `compose/docker-compose-kdsl-kubernetes.yml`, runs that package only,
+then tears the stack down. There is no flag to opt in, and neither
+`kdslAcceptanceTest` nor `kdslHaTest` starts the cluster or runs the package.
+
+The stack holds one backend, Postgres, RabbitMQ, MinIO and a single-node k3s
+(`rancher/k3s`). k3s runs in one privileged container, the only privileged one
+of the KDSL stacks, which is why this variant has a stack of its own. The
+`k3s-bootstrap` service prepares the cluster (`compose/kubernetes/bootstrap.sh`):
+the namespace `yontrack`, the RBAC of the user documentation, the Secret a
+post-processing may reference, and a Gitea server in the namespace `git`.
+
+Yontrack is not a pod, but it is made to look as if it ran in the cluster:
+`KUBERNETES_SERVICE_HOST` and `KUBERNETES_SERVICE_PORT` point at the `k3s`
+service, and the `token`, `ca.crt` and `namespace` of the service account
+`yontrack` are mounted at `/var/run/secrets/kubernetes.io/serviceaccount`. The
+namespace is not configured: it is read from the mounted file.
+
+The RBAC is `compose/kubernetes/manifests/rbac.yaml`, the Role and RoleBinding
+of `ontrack-docs/docs/content/integrations/auto-versioning/kubernetes.md` with
+only the namespace changed. `KubernetesRbacTest` in `buildSrc` keeps the two
+identical, so change both together.
+
+The mock SCM pushes its repositories to that Git server when a clone access is
+requested. This is off by default and set only in this variant, through
+`ontrack.config.extension.scm.mock.git.{push-url,clone-url,username,password}`:
+Yontrack pushes through the NodePort of the k3s container, the Jobs clone
+through the cluster Service, and the tests reach the server on the slot's host
+port, passed as `ontrack.acceptance.kubernetes.git.url`.
+
+The stack is the fifth variant of the KDSL slot, sequenced after the `-ha` one:
+`kdslKubernetesComposeUp` waits for `kdslHaComposeDown`. Its Compose project is
+`yontrack-kdsl-kubernetes-<slug>`. The API server and the Git NodePort have
+their own base ports, offset by `slot * 100` like the others:
+
+| Service        | Slot 0 | Slot 1 |
+|----------------|--------|--------|
+| k3s API        | 16443  | 16543  |
+| Git NodePort   | 17080  | 17180  |
+
+Both are recorded in `.yontrack-kdsl/instance.env`. A debugging admin kubeconfig
+is written to `.yontrack-kdsl/kubeconfig.yaml`; the tests themselves use no
+Kubernetes client.
+
+The `kdsl-kubernetes` CI job runs the task on every full run and reports the
+`KDSL.KUBERNETES` validation, which `BRONZE` requires. k3s pulls the Job images (`alpine/git`,
+`busybox`) and Gitea from Docker Hub, so the stack needs network access.

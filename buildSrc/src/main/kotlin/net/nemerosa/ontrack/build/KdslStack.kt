@@ -4,15 +4,16 @@ import java.io.File
 
 /**
  * Port allocation for the KDSL acceptance Compose stacks
- * (`compose/docker-compose-kdsl.yml` and its `-ldap`, `-oidc` and `-ha`
+ * (`compose/docker-compose-kdsl.yml` and its `-ldap`, `-oidc`, `-ha` and `-kubernetes`
  * variants), on top of [StackSlots].
  *
- * The four stacks share one slot. They are sequenced so that they are never
+ * The five stacks share one slot. They are sequenced so that they are never
  * up at the same time -- `kdslLdapComposeUp` waits for
  * `kdslAcceptanceTestComposeDown`, `kdslOidcComposeUp` for
- * `kdslLdapComposeDown`, and `kdslHaComposeUp` for `kdslOidcComposeDown` --
- * so one set of ports serves all four, and a checkout has one set of
- * acceptance ports to remember rather than four.
+ * `kdslLdapComposeDown`, `kdslHaComposeUp` for `kdslOidcComposeDown`, and
+ * `kdslKubernetesComposeUp` for `kdslHaComposeDown` -- so one set of ports
+ * serves all five, and a checkout has one set of acceptance ports to
+ * remember rather than five.
  *
  * See `docs/adr/0013-parallel-kdsl-acceptance-stacks.md`.
  */
@@ -77,6 +78,19 @@ object KdslStack {
     const val BASE_HA_A_MGMT = 18880
     const val BASE_HA_B_MGMT = 18881
 
+    /**
+     * The `-kubernetes` variant (#2172), which runs a k3s cluster in a Compose service. Only that
+     * variant publishes these two, but the five share the slot, so they are probed for all five.
+     *
+     * [BASE_KUBERNETES_API] is the k3s API server as the host sees it (the default 6443 is
+     * Kubernetes' own, and 16443 keeps clear of the 6300 JaCoCo range); [BASE_KUBERNETES_GIT] is
+     * the NodePort of the Git server running in the cluster. Over four slots they span
+     * 16443-16743 and 17080-17380, clear of every other port, [BASE_HA_A] (18080) included:
+     * `no two base ports collide over the slot range` keeps it that way.
+     */
+    const val BASE_KUBERNETES_API = 16443
+    const val BASE_KUBERNETES_GIT = 17080
+
     val BASE_PORTS = listOf(
         BASE_UI,
         BASE_LDAP,
@@ -94,6 +108,8 @@ object KdslStack {
         BASE_HA_B,
         BASE_HA_A_MGMT,
         BASE_HA_B_MGMT,
+        BASE_KUBERNETES_API,
+        BASE_KUBERNETES_GIT,
     )
 
     const val INSTANCE_ENV_PATH = ".yontrack-kdsl/instance.env"
@@ -127,7 +143,7 @@ object KdslStack {
             slotMax = SLOT_MAX,
             basePorts = BASE_PORTS,
             stackName = "KDSL acceptance",
-            stackUp = { StackSlots.composeProjectsUp(names(rootDir).let { listOf(it.projectName, it.ldapProjectName, it.oidcProjectName, it.haProjectName) }) },
+            stackUp = { StackSlots.composeProjectsUp(names(rootDir).let { listOf(it.projectName, it.ldapProjectName, it.oidcProjectName, it.haProjectName, it.kubernetesProjectName) }) },
             portFree = StackSlots::portFree,
             log = ::println,
         )
@@ -136,7 +152,7 @@ object KdslStack {
 }
 
 /**
- * The Compose project name of each of the four acceptance variants.
+ * The Compose project name of each of the five acceptance variants.
  *
  * Split out of [KdslStackInstance] because it is the half that needs no slot:
  * a project is named after the checkout, not after the ports it publishes.
@@ -148,11 +164,12 @@ data class KdslStackNames(val slug: String) {
     val ldapProjectName: String = "yontrack-kdsl-ldap-$slug"
     val oidcProjectName: String = "yontrack-kdsl-oidc-$slug"
     val haProjectName: String = "yontrack-kdsl-ha-$slug"
+    val kubernetesProjectName: String = "yontrack-kdsl-kubernetes-$slug"
 }
 
 /**
  * The resolved KDSL acceptance stack for one checkout: the Compose project
- * name of each of the four variants, and the host ports they publish.
+ * name of each of the five variants, and the host ports they publish.
  */
 data class KdslStackInstance(
     val slug: String,
@@ -165,6 +182,7 @@ data class KdslStackInstance(
     val ldapProjectName: String get() = names.ldapProjectName
     val oidcProjectName: String get() = names.oidcProjectName
     val haProjectName: String get() = names.haProjectName
+    val kubernetesProjectName: String get() = names.kubernetesProjectName
 
     val uiPort: Int = StackSlots.port(KdslStack.BASE_UI, slot)
     val ldapPort: Int = StackSlots.port(KdslStack.BASE_LDAP, slot)
@@ -182,6 +200,8 @@ data class KdslStackInstance(
     val haBPort: Int = StackSlots.port(KdslStack.BASE_HA_B, slot)
     val haAManagementPort: Int = StackSlots.port(KdslStack.BASE_HA_A_MGMT, slot)
     val haBManagementPort: Int = StackSlots.port(KdslStack.BASE_HA_B_MGMT, slot)
+    val kubernetesApiPort: Int = StackSlots.port(KdslStack.BASE_KUBERNETES_API, slot)
+    val kubernetesGitPort: Int = StackSlots.port(KdslStack.BASE_KUBERNETES_GIT, slot)
 
     val ontrackUrl: String = "http://localhost:$ontrackPort"
     val ontrackManagementUrl: String = "http://localhost:$ontrackManagementPort/manage"
@@ -203,7 +223,13 @@ data class KdslStackInstance(
     val haBUrl: String = "http://localhost:$haBPort"
     val haBManagementUrl: String = "http://localhost:$haBManagementPort/manage"
 
-    /** Passed to `docker compose`, and read by the four `docker-compose-kdsl*.yml` files. */
+    /** The k3s API server of the `-kubernetes` variant, as seen from the host (#2172). */
+    val kubernetesApiUrl: String = "https://localhost:$kubernetesApiPort"
+
+    /** The Git server running in the cluster of the `-kubernetes` variant, on its NodePort. */
+    val kubernetesGitUrl: String = "http://localhost:$kubernetesGitPort"
+
+    /** Passed to `docker compose`, and read by the five `docker-compose-kdsl*.yml` files. */
     val composeEnvironment: Map<String, String> = mapOf(
         "YONTRACK_KDSL_UI_PORT" to uiPort.toString(),
         "YONTRACK_KDSL_LDAP_PORT" to ldapPort.toString(),
@@ -221,6 +247,8 @@ data class KdslStackInstance(
         "YONTRACK_KDSL_HA_B_PORT" to haBPort.toString(),
         "YONTRACK_KDSL_HA_A_MGMT_PORT" to haAManagementPort.toString(),
         "YONTRACK_KDSL_HA_B_MGMT_PORT" to haBManagementPort.toString(),
+        "YONTRACK_KDSL_KUBERNETES_API_PORT" to kubernetesApiPort.toString(),
+        "YONTRACK_KDSL_KUBERNETES_GIT_PORT" to kubernetesGitPort.toString(),
     )
 
     /**
@@ -250,6 +278,23 @@ data class KdslStackInstance(
             "ontrack.acceptance.connection.url" to ontrackUrl,
             "ontrack.acceptance.connection.mgt.url" to haAManagementUrl,
         ) + haBackendSystemProperties
+
+    /**
+     * The `ACCProperties` knobs of `kdslKubernetesTest`, which runs the `kubernetes` package
+     * against the `-kubernetes` variant (#2172): one backend, on the slot's usual Yontrack and
+     * management ports, and no InfluxDB -- plus the Git server of the cluster. The credentials of
+     * that server are constants of the tests, not set here.
+     */
+    val kubernetesSystemProperties: Map<String, String>
+        get() = mapOf(
+            "ontrack.acceptance.connection.url" to ontrackUrl,
+            "ontrack.acceptance.connection.mgt.url" to ontrackManagementUrl,
+        ) + kubernetesGitSystemProperties
+
+    /** The property only the `kubernetes` package reads: the Git server of the cluster. */
+    private val kubernetesGitSystemProperties: Map<String, String> = mapOf(
+        "ontrack.acceptance.kubernetes.git.url" to kubernetesGitUrl,
+    )
 
     /**
      * The properties only the `ha` package reads: each backend, bypassing the proxy, and the Compose
@@ -288,14 +333,17 @@ data class KdslStackInstance(
                 "KDSL_LDAP_PROJECT" to ldapProjectName,
                 "KDSL_OIDC_PROJECT" to oidcProjectName,
                 "KDSL_HA_PROJECT" to haProjectName,
+                "KDSL_KUBERNETES_PROJECT" to kubernetesProjectName,
                 "YONTRACK_KDSL_UI_URL" to uiUrl,
                 "YONTRACK_KDSL_ONTRACK_URL" to ontrackUrl,
                 "YONTRACK_KDSL_KEYCLOAK_URL" to keycloakUrl,
                 "YONTRACK_KDSL_MINIO_URL" to minioUrl,
                 "YONTRACK_KDSL_HA_A_URL" to haAUrl,
                 "YONTRACK_KDSL_HA_B_URL" to haBUrl,
+                "YONTRACK_KDSL_KUBERNETES_API_URL" to kubernetesApiUrl,
+                "YONTRACK_KDSL_KUBERNETES_GIT_URL" to kubernetesGitUrl,
             ) + composeEnvironment,
-            systemProperties = systemProperties + haBackendSystemProperties,
+            systemProperties = systemProperties + haBackendSystemProperties + kubernetesGitSystemProperties,
         )
     }
 

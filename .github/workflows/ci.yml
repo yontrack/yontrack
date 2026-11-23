@@ -1585,6 +1585,142 @@ jobs:
           retention-days: 7
 
   # ---------------------------------------------------------------------------------------------
+  # Kubernetes acceptance tests (#2172): the `kubernetes` package of the KDSL suite, run by
+  # `kdslKubernetesTest` against a k3s cluster in a privileged container
+  # (compose/docker-compose-kdsl-kubernetes.yml). On its own runner, in parallel with `kdsl` and
+  # `kdsl-ha`: the stacks share the KDSL ports. It needs the backend image only, not the UI's, and
+  # it runs on every full CI run.
+  #
+  # A red job fails the run, which keeps the commit from `status:ready`, and records KDSL.KUBERNETES
+  # as FAILED, which keeps the build from BRONZE. One job, no shards: it validates itself, without
+  # the report job `kdsl` needs.
+  # ---------------------------------------------------------------------------------------------
+
+  kdsl-kubernetes:
+    name: KDSL Kubernetes tests
+    needs: [setup, yontrack, build]
+    if: >-
+      ${{ !cancelled()
+        && needs.build.result == 'success'
+        && needs.setup.outputs.full_run == 'true'
+        && needs.setup.outputs.skip_kdsl_acceptance != 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      BASE_VERSION: ${{ needs.setup.outputs.base_version }}
+      # The compose files resolve the images as nemerosa/ontrack:${ONTRACK_VERSION:-latest}.
+      ONTRACK_VERSION: ${{ needs.setup.outputs.base_version }}
+    steps:
+      # The run time of KDSL.KUBERNETES is measured from here, as for KDSL.ACCEPTANCE: restoring the image
+      # and bringing the stack up are part of what the tests cost.
+      - name: Record the job start
+        id: job_start
+        run: echo "started=$(date +%s)" >> "$GITHUB_OUTPUT"
+
+      # The stack runs the `dev` profile, which enables no licensed feature without the development
+      # key (#2107). A run without the secret stops here, saying why, rather than failing every
+      # licensed test one by one.
+      - name: Check the development key
+        env:
+          YONTRACK_DEV_LICENSE_KEY: ${{ secrets.YONTRACK_DEV_LICENSE_KEY }}
+        run: |
+          if [ -z "${YONTRACK_DEV_LICENSE_KEY:-}" ]; then
+            echo "::error::YONTRACK_DEV_LICENSE_KEY is not available"
+            exit 1
+          fi
+
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: zulu
+          java-version: "25"
+
+      - uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-read-only: true  # `build` is the one job that writes, see `setup`
+
+      - name: Link to the Yontrack build
+        uses: nemerosa/ontrack-github-actions-cli-library/ontrack-cli-workflow-build@v1.0.3
+        with:
+          project: ${{ needs.yontrack.outputs.project }}
+          yontrack-url: ${{ vars.YONTRACK_URL }}
+          yontrack-token: ${{ secrets.YONTRACK_TOKEN }}
+          version: ${{ env.YONTRACK_CLI_VERSION }}
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Restore the Docker image
+        id: restore
+        run: |
+          set -euo pipefail
+          docker pull "$GHCR_ONTRACK:$RUN_TAG"
+          docker tag "$GHCR_ONTRACK:$RUN_TAG" "nemerosa/ontrack:$BASE_VERSION"
+
+      # As in `kdsl`: under CI=true the Gradle build leaves bringing the stack up to the workflow.
+      - name: Start the environment
+        env:
+          YONTRACK_DEV_LICENSE_KEY: ${{ secrets.YONTRACK_DEV_LICENSE_KEY }}
+        run: |
+          ./gradlew :ontrack-kdsl-acceptance:kdslKubernetesComposeUp --stacktrace --console plain
+
+      - name: KDSL Kubernetes tests
+        id: test
+        env:
+          YONTRACK_DEV_LICENSE_KEY: ${{ secrets.YONTRACK_DEV_LICENSE_KEY }}
+        run: |
+          ./gradlew :ontrack-kdsl-acceptance:kdslKubernetesTest --stacktrace --console plain
+
+      # Whatever failed -- the image, the stack, the tests -- the stamp says so, rather than
+      # KDSL.KUBERNETES being absent from the build. Only a green test step reads the JUnit reports.
+      - name: Validate KDSL.KUBERNETES
+        if: ${{ !cancelled() && steps.restore.outcome != '' }}
+        env:
+          STARTED: ${{ steps.job_start.outputs.started }}
+          TEST_OUTCOME: ${{ steps.test.outcome }}
+        run: |
+          run_time_flag=""
+          if [ -n "${STARTED:-}" ]; then
+            run_time_flag="--run-time $(( $(date +%s) - STARTED ))"
+          fi
+          if [ "$TEST_OUTCOME" != "success" ]; then
+            # shellcheck disable=SC2086  # deliberate: see YONTRACK_RUN_INFO
+            scripts/ci-evidence.sh junit KDSL.KUBERNETES "ontrack-kdsl-acceptance/build/test-results/kdslKubernetesTest/*.xml" --tool gradle -- \
+              validate --validation KDSL.KUBERNETES --status FAILED \
+              $run_time_flag $YONTRACK_RUN_INFO
+          else
+            # shellcheck disable=SC2086  # deliberate: see YONTRACK_RUN_INFO
+            scripts/ci-evidence.sh junit KDSL.KUBERNETES "ontrack-kdsl-acceptance/build/test-results/kdslKubernetesTest/*.xml" --tool gradle -- \
+              validate --validation KDSL.KUBERNETES \
+              junit --pattern "ontrack-kdsl-acceptance/build/test-results/kdslKubernetesTest/*.xml" \
+              --fail-when-no-results \
+              $run_time_flag $YONTRACK_RUN_INFO
+          fi
+
+      - name: Upload the test results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: kdsl-kubernetes-results
+          path: ontrack-kdsl-acceptance/build/test-results/kdslKubernetesTest/**/*.xml
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Upload the KDSL logs
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: kdsl-kubernetes-logs
+          path: ontrack-kdsl-acceptance/build/logs/**
+          if-no-files-found: ignore
+          retention-days: 7
+
+  # ---------------------------------------------------------------------------------------------
   # Playwright UI tests, one runner per authentication variant, and per shard of the main suite.
   # ---------------------------------------------------------------------------------------------
 

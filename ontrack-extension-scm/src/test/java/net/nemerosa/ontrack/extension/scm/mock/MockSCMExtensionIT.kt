@@ -8,6 +8,7 @@ import net.nemerosa.ontrack.model.structure.Build
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.test.fail
 
@@ -132,6 +133,24 @@ class MockSCMExtensionIT : AbstractDSLTestSupport() {
                             commits.map { it.message }
                         )
                     }
+                }
+            }
+        }
+    }
+
+    /**
+     * Without the `mock.git` properties (#2172), the mock SCM has no clone access, as before.
+     */
+    @Test
+    fun `No clone access without a Git server`() {
+        asAdmin {
+            mockSCMTester.withMockSCMRepository {
+                project {
+                    branch {
+                        configureMockSCMBranch("main")
+                    }
+                    val scm = scmDetector.getSCM(this) ?: fail("Cannot find the SCM for the project")
+                    assertNull(scm.getCloneAccess(), "No clone access by default")
                 }
             }
         }

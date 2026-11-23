@@ -145,3 +145,13 @@ fourth variant of the same slot, sequenced after the others: `kdslHaComposeUp` w
 The proxy takes the slot's Yontrack port. Each backend has an app and a management port of its
 own, on new base ports: 18080 and 18880 for A, 18081 and 18881 for B. They are offset by
 `slot * 100` like every other port, and are probed for all four variants.
+
+## Amendment, 2026-11-23: a fifth variant with a k3s cluster (#2172)
+
+`compose/docker-compose-kdsl-kubernetes.yml` runs a single-node k3s cluster beside one backend,
+for the `kubernetes` package (`kdslKubernetesTest`). It is a fifth variant of the same slot,
+sequenced after the others: `kdslKubernetesComposeUp` waits for `kdslHaComposeDown`. Its Compose
+project is `yontrack-kdsl-kubernetes-<slug>`.
+
+The k3s API server and the Git NodePort of the cluster take two new base ports: 16443 and 17080.
+They are offset by `slot * 100` like every other port, and are probed for all five variants.

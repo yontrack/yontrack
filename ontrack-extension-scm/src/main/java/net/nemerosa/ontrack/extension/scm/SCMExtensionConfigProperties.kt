@@ -51,6 +51,35 @@ class SCMExtensionConfigProperties {
                     "no effect unless `enabled` is set."
         )
         var persistent: Boolean = false
+
+        @APIDescription(
+            "Git server the mock SCM publishes its repositories to, for a process outside Yontrack " +
+                    "(the Kubernetes post-processing jobs) to clone and push to them. Development and test " +
+                    "fixture only (#2172), off by default."
+        )
+        var git = MockSCMGitConfigProperties()
+    }
+
+    class MockSCMGitConfigProperties {
+        @APIDescription(
+            "Base URL Yontrack pushes the mock repositories to, as `<push-url>/<repository>.git`. " +
+                    "The server creates the repository on the first push. Blank by default: the mock SCM " +
+                    "then has no clone access. Needs `clone-url` too."
+        )
+        var pushUrl: String = ""
+
+        @APIDescription(
+            "Base URL handed out in the clone access of the mock SCM, as `<clone-url>/<repository>.git`. " +
+                    "It may differ from `push-url` when the Git server is reached differently by the " +
+                    "jobs than by Yontrack. Blank by default."
+        )
+        var cloneUrl: String = ""
+
+        @APIDescription("Username for the Git server, for the push and in the clone access. Blank for an anonymous access.")
+        var username: String = ""
+
+        @APIDescription("Password for the Git server, for the push and in the clone access.")
+        var password: String = ""
     }
 
     class SCMCatalogConfigProperties {

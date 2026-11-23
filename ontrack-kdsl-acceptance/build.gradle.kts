@@ -146,6 +146,18 @@ configure<ComposeExtension> {
         composeLogToFile.set(file("build/logs/kdsl-ha/compose"))
         retainContainersOnStartupFailure.set(true)
     }
+    // A k3s cluster and one backend, for the `kubernetes` package (#2172). Never with the coverage
+    // override either: there is a single backend, but the variant stays plain, like `-ha`.
+    createNested("kdslKubernetes").apply {
+        useComposeFiles.add("${rootDir}/compose/docker-compose-kdsl-kubernetes.yml")
+        setProjectName(kdslNames.kubernetesProjectName)
+        environment.put("ONTRACK_VERSION", ontrackVersion)
+        environment.putAll(kdslComposeEnvironment)
+        captureContainersOutput.set(true)
+        captureContainersOutputToFiles.set(file("build/logs/kdsl-kubernetes/containers"))
+        composeLogToFile.set(file("build/logs/kdsl-kubernetes/compose"))
+        retainContainersOnStartupFailure.set(true)
+    }
 }
 
 val isCI = System.getenv("CI") == "true"
@@ -169,7 +181,7 @@ val kdslStackSlot = tasks.register("kdslStackSlot") {
 
 // Both the build and the up task of each variant read the ports, and Compose
 // builds before it starts, so the claim has to come before the earliest of them.
-listOf("kdslAcceptanceTest", "kdslLdap", "kdslOidc", "kdslHa").forEach { variant ->
+listOf("kdslAcceptanceTest", "kdslLdap", "kdslOidc", "kdslHa", "kdslKubernetes").forEach { variant ->
     listOf("ComposeBuild", "ComposeUp").forEach { phase ->
         tasks.named("$variant$phase") {
             dependsOn(kdslStackSlot)
@@ -195,6 +207,13 @@ tasks.named("kdslHaComposeUp") {
     }
     doFirst {
         kdslHaGitDir.mkdirs()
+    }
+}
+
+// The `-kubernetes` variant runs no UI either.
+tasks.named("kdslKubernetesComposeUp") {
+    if (!isCI) {
+        dependsOn(":ontrack-ui:dockerBuild")
     }
 }
 
@@ -325,6 +344,12 @@ tasks.named("kdslHaComposeUp") {
     mustRunAfter(kdslAcceptanceTestComposeDown, "kdslLdapComposeDown")
 }
 
+tasks.named("kdslKubernetesComposeUp") {
+    dependsOn("kdslHaComposeDown")
+    // Same slot, same ports: the other stacks are down before this one comes up.
+    mustRunAfter(kdslAcceptanceTestComposeDown, "kdslLdapComposeDown", "kdslOidcComposeDown")
+}
+
 // Restricting unit tests
 
 tasks.named<Test>("test") {
@@ -337,6 +362,9 @@ tasks.named<Test>("test") {
 // The cross-replica tests (#2076): their own package, their own stack, their own task.
 val haTests = "net/nemerosa/ontrack/kdsl/acceptance/tests/ha/**"
 
+// The tests against a k3s cluster (#2172): their own package, their own stack, their own task.
+val kubernetesTests = "net/nemerosa/ontrack/kdsl/acceptance/tests/kubernetes/**"
+
 val kdslAcceptanceTest = tasks.register<Test>("kdslAcceptanceTest") {
     useJUnitPlatform()
     mustRunAfter("test")
@@ -346,6 +374,8 @@ val kdslAcceptanceTest = tasks.register<Test>("kdslAcceptanceTest") {
     include("**/ACC*.class")
     // The `ha` package needs two backends, and runs under `kdslHaTest`
     exclude(haTests)
+    // The `kubernetes` package needs a k3s cluster, and runs under `kdslKubernetesTest`
+    exclude(kubernetesTests)
     // Gradle 9 no longer gives a registered Test task the test source set by convention: without
     // these two the task is silently NO-SOURCE.
     testClassesDirs = sourceSets["test"].output.classesDirs
@@ -426,5 +456,43 @@ tasks.register<Test>("kdslHaTest") {
     dependsOn(kdslHaComposeUp)
     if (!isCI) {
         finalizedBy(kdslHaComposeDown)
+    }
+}
+
+// Running the Kubernetes tests (#2172)
+//
+// The `kubernetes` package only, against `compose/docker-compose-kdsl-kubernetes.yml`: a k3s
+// cluster and one backend, on the checkout's KDSL slot.
+
+val kdslKubernetesComposeUp = tasks.named("kdslKubernetesComposeUp")
+val kdslKubernetesComposeDown = tasks.named("kdslKubernetesComposeDown")
+
+tasks.register<Test>("kdslKubernetesTest") {
+    group = "verification"
+    description = "Runs the Kubernetes acceptance tests against a k3s cluster and one backend"
+    useJUnitPlatform()
+    mustRunAfter("test", kdslAcceptanceTest, "kdslHaTest")
+    outputs.cacheIf("acceptance tests run against a live instance") { false }
+    // Nor skipped as up-to-date: the stack it runs against is started anew by every run, and a
+    // second run with unchanged sources would start k3s, run nothing and report success.
+    outputs.upToDateWhen { false }
+    include("$kubernetesTests/ACC*.class")
+    testClassesDirs = sourceSets["test"].output.classesDirs
+    classpath = sourceSets["test"].runtimeClasspath
+    val testFilter = System.getProperty("test.filter")
+    if (testFilter != null) {
+        filter {
+            includeTestsMatching(testFilter)
+        }
+    }
+    // The backend and the Git server of the cluster -- an explicit -D wins, as for kdslAcceptanceTest.
+    jvmArgumentProviders.add(CommandLineArgumentProvider {
+        kdslStack.kubernetesSystemProperties.map { (key, value) ->
+            "-D$key=${System.getProperty(key) ?: value}"
+        }
+    })
+    dependsOn(kdslKubernetesComposeUp)
+    if (!isCI) {
+        finalizedBy(kdslKubernetesComposeDown)
     }
 }

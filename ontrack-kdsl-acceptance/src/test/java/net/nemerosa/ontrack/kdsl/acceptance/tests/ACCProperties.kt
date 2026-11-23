@@ -98,6 +98,22 @@ object ACCProperties {
         }
     }
 
+    /**
+     * The Git server of the cluster of the `kubernetes` package (#2172), as published on the host by
+     * `compose/docker-compose-kdsl-kubernetes.yml`. Read by that package only.
+     */
+    object Kubernetes {
+
+        object Git {
+            /**
+             * Base URL of the Git server, without the organisation path: the repositories are at
+             * `<url>/yontrack/<name>.git`. Set by `kdslKubernetesTest` from the port of the stack.
+             */
+            @DefaultValue("http://localhost:17080")
+            val url: String by fromEnv()
+        }
+    }
+
     @Target(AnnotationTarget.PROPERTY)
     @Retention(AnnotationRetention.RUNTIME)
     annotation class DefaultValue(
