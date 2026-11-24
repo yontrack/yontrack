@@ -41,6 +41,7 @@ the way the CLI does.
 | `SECURITY.SECRETS` | `security-rescan.yml` | `SECURITY.SECRETS-findings.json` | `SECURITY.SECRETS-report.html` |
 | `SECURITY.DAST` | `dast-passive.yml` | `SECURITY.DAST-findings.json`, `SECURITY.DAST-manifest.json` | `SECURITY.DAST-report.html` |
 | `SECURITY.DAST.ACTIVE` | `dast-active.yml` | `SECURITY.DAST.ACTIVE-findings.json`, `SECURITY.DAST.ACTIVE-manifest.json` | `SECURITY.DAST.ACTIVE-report.html` |
+| `SBOM` | `ci.yml`, `sbom` | `SBOM-backend.cdx.json`, `SBOM-frontend.cdx.json` | `SBOM-report.html` |
 
 - **`<STAMP>-junit.zip`** holds the JUnit XML files unmodified, one zip per stamp: attaching each
   XML would mean hundreds of evidences and trail entries per run. A stamp with several shards or
@@ -48,10 +49,15 @@ the way the CLI does.
 - The Trivy, findings and search performance files are the ones the validation already sends or
   reads, under a stable name.
 - **A FAILED stamp attaches what exists**: it is the run whose evidence is most worth having.
+- **The SBOMs** (#2179) are CycloneDX, as generated: the backend's by the `org.cyclonedx.bom`
+  Gradle plugin on the runtime classpath of `ontrack-ui`, the UI's by `npm sbom --omit dev` in
+  `ontrack-web-core` - so test, build and lint tooling stays out, as long as the UI keeps it in
+  `devDependencies`. The same three files are the run's `sbom` artefact. The stamp records only: no
+  license policy yet.
 
 Out of scope, deliberately: `COVERAGE.*` (`coverage-reports` is over the 50 MB limit, and these are
 figures rather than outcomes), `DOCS`, `LICENSE.DEV`, the release receipts, CodeQL's SARIF (the
-alerts API is what `SECURITY.CODE` counts), an SBOM, and the native Gradle, Playwright and Jest HTML
+alerts API is what `SECURITY.CODE` counts), and the native Gradle, Playwright and Jest HTML
 reports. `release/5.5` keeps its own workflows and CLI pin; its released builds still get evidence
 through the rescan, which runs from `main`.
 
@@ -73,6 +79,9 @@ shard; Playwright's come per matrix leg and traces can push them past the size l
   and `FindingsConsolidation` (one ID on one location is one finding, an expired acceptance counts
   again). If those change, so does this.
 - **Search performance:** a table of the figures, and the failures.
+- **SBOM:** per SBOM, the number of third-party libraries and of those with no license, then each
+  library with its version, its licenses as the SBOM gives them, and its package URL. Yontrack's own
+  modules are left out.
 
 It loads nothing, and every value is escaped: test names and finding titles are untrusted, and the
 file is opened locally. HTML evidence is download only, which the evidence UI already enforces.
@@ -90,6 +99,7 @@ of the tool that produced its raw file. A version is never written a second time
 | `gradle` | `gradle/wrapper/gradle-wrapper.properties` |
 | `jest`, `playwright` | the lock file of `ontrack-web-core`, `ontrack-web-tests` |
 | `trivy` | `trivy version` |
+| `cyclonedx` | the pins of the Gradle plugin in `build.gradle.kts` and of npm in `ontrack-web-core/build.gradle.kts` |
 | `codeql` | the `codeql-version` output of `github/codeql-action/init` |
 | `github-secret-scanning` | the version of the GitHub API that answers, as it has none of its own |
 | `yontrack-dast` | the scanners' own reports: `scripts/security-dast.sh tool-versions` |

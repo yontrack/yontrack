@@ -32,6 +32,8 @@ plugins {
     id("com.avast.gradle.docker-compose") version "0.17.12"
     id("com.google.cloud.tools.jib") version "3.5.1" apply false
     id("com.github.node-gradle.node") version "7.1.0" apply false
+    // The SBOM of the application (#2179), applied by ontrack-ui only
+    id("org.cyclonedx.bom") version "3.6.1" apply false
     // Versioning logic moved into buildSrc plugin
     id("net.nemerosa.ontrack.versioning")
 }

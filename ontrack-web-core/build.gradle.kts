@@ -55,6 +55,38 @@ val testCoverage = tasks.register<NpmTask>("testCoverage") {
     onlyIf("-P${Coverage.GRADLE_PROPERTY} is set") { coverageEnabled }
 }
 
+// ===================================================================================================================
+// SBOM of the UI (#2179)
+//
+// The packages the UI ships, in CycloneDX, written to the same place as the backend's
+// (`ontrack-ui/build/reports/cyclonedx/application.cdx.json`). `--omit dev`: the production
+// dependencies only - which is only true as long as anything used to build, lint or test the UI sits
+// in `devDependencies`.
+//
+// Read from `node_modules`, which `npmInstall` fills: the lock file alone lacks the license of
+// some packages.
+// ===================================================================================================================
+
+val sbomFile = layout.buildDirectory.file("reports/cyclonedx/application.cdx.json")
+
+tasks.register<NpmTask>("sbom") {
+    group = "reporting"
+    description = "Writes the CycloneDX SBOM of the UI's production dependencies to build/reports/cyclonedx/."
+    dependsOn("npmInstall")
+    inputs.files("package.json", "package-lock.json")
+    outputs.file(sbomFile)
+    args.set(listOf("sbom", "--sbom-format", "cyclonedx", "--sbom-type", "application", "--omit", "dev"))
+    // `npm sbom` only prints to the standard output.
+    val output = java.io.ByteArrayOutputStream()
+    execOverrides.set { standardOutput = output }
+    doLast {
+        sbomFile.get().asFile.apply {
+            parentFile.mkdirs()
+            writeBytes(output.toByteArray())
+        }
+    }
+}
+
 // Docker image
 
 val dockerBuild = tasks.register<Exec>("dockerBuild") {

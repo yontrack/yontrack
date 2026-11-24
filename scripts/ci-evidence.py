@@ -42,7 +42,7 @@ pre { background: #f6f6f6; border: 1px solid #ddd; padding: .5em; overflow-x: au
 summary { cursor: pointer; margin: .25em 0; }
 .failed, .critical, .high { color: #a40000; font-weight: 600; }
 .skipped, .accepted { color: #595959; }
-.medium { color: #8a4b00; font-weight: 600; }
+.medium, .missing { color: #8a4b00; font-weight: 600; }
 """
 
 
@@ -506,11 +506,78 @@ def render_search_perf(path: Path, header: Header) -> str:
 
 
 # ---------------------------------------------------------------------------------------------
+# SBOM (#2179)
+# ---------------------------------------------------------------------------------------------
+
+
+def license_of(component: dict) -> str:
+    """Every license of a component as CycloneDX lists it - an SPDX ID, a name or an expression.
+    Several entries are kept as they are: a POM listing two does not say whether it means AND or OR."""
+    names = []
+    for choice in component.get("licenses") or []:
+        if not isinstance(choice, dict):
+            continue
+        license = choice.get("license") if isinstance(choice.get("license"), dict) else {}
+        name = choice.get("expression") or license.get("id") or license.get("name")
+        if name:
+            names.append(str(name))
+    return ", ".join(names)
+
+
+def component_name(component: dict) -> str:
+    group = component.get("group")
+    return f"{group}:{component.get('name')}" if group else str(component.get("name"))
+
+
+def render_sbom_part(label: str, path: Path | None) -> tuple[str, str]:
+    """The totals and the table of one SBOM. Yontrack's own modules - the components of the
+    application's own group - are not third-party libraries: they are left out."""
+    if path is None:
+        return "", f"<h2>{e(label.capitalize())}</h2><p>No {e(label)} SBOM.</p>"
+    document = read_json(path)
+    application = document.get("metadata", {}).get("component", {}) or {}
+    own_group = application.get("group")
+    libraries = [
+        component
+        for component in document.get("components") or []
+        if isinstance(component, dict) and not (own_group and component.get("group") == own_group)
+    ]
+    libraries.sort(key=lambda component: (component_name(component), str(component.get("version"))))
+    unlicensed = sum(1 for component in libraries if not license_of(component))
+    totals = total(f"{label}-libraries", len(libraries)) + total(f"{label}-without-license", unlicensed)
+    rows = "".join(
+        f"<tr><td>{e(component_name(component))}</td><td>{e(component.get('version'))}</td>"
+        + (f"<td>{e(license_of(component))}</td>" if license_of(component) else '<td class="missing">none</td>')
+        + f"<td>{e(component.get('purl'))}</td></tr>"
+        for component in libraries
+    )
+    table = (
+        f"<h2>{e(label.capitalize())}: {e(application.get('name'))} {e(application.get('version'))}</h2>"
+        f"<p>CycloneDX {e(document.get('specVersion'))}.</p>"
+        f"<table><tr><th>Library</th><th>Version</th><th>License</th><th>Package URL</th></tr>{rows}</table>"
+    )
+    return totals, table
+
+
+def render_sbom(parts: list[str], header: Header) -> str:
+    totals, tables = "", ""
+    for part in parts:
+        label, _, path = part.partition("=")
+        part_totals, part_table = render_sbom_part(label, Path(path) if path else None)
+        totals += part_totals
+        tables += part_table
+    return page(header, "open source libraries", f"<h2>Totals</h2><table>{totals}</table>{tables}")
+
+
+# ---------------------------------------------------------------------------------------------
 # The command line
 # ---------------------------------------------------------------------------------------------
 
 
-def render(kind: str, source: str, manifest: Path | None, header: Header) -> str:
+def render(kind: str, sources: list[str], manifest: Path | None, header: Header) -> str:
+    if kind == "sbom":
+        return render_sbom(sources, header)
+    source = sources[0]
     if kind == "junit":
         return render_junit(source, header)
     if kind == "trivy":
@@ -534,8 +601,12 @@ def main(argv: list[str]) -> int:
     zipping.add_argument("--output", type=Path, required=True)
 
     rendering = commands.add_parser("render", help="renders one HTML report")
-    rendering.add_argument("kind", choices=["junit", "trivy", "findings", "dast", "search-perf"])
-    rendering.add_argument("input", help="pattern of the JUnit reports, or the path of the report")
+    rendering.add_argument("kind", choices=["junit", "trivy", "findings", "dast", "search-perf", "sbom"])
+    rendering.add_argument(
+        "input",
+        nargs="+",
+        help="pattern of the JUnit reports, the path of the report, or for sbom LABEL=PATH for each SBOM (LABEL= when missing)",
+    )
     rendering.add_argument("--manifest", type=Path, help="dast: the manifest of the private report")
     rendering.add_argument("--stamp", required=True)
     rendering.add_argument("--build", required=True)

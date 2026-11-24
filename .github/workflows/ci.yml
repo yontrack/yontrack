@@ -2595,3 +2595,113 @@ jobs:
           # shellcheck disable=SC2086  # deliberate: see YONTRACK_RUN_INFO
           yontrack validate --validation DOCS --status "$status" \
             $run_time_flag $YONTRACK_RUN_INFO
+
+  # ---------------------------------------------------------------------------------------------
+  # Inventory of the open source libraries Yontrack ships (#2179): one CycloneDX SBOM for the
+  # backend (the runtime classpath of ontrack-ui) and one for the UI (the production dependencies
+  # of ontrack-web-core), kept as evidence on the SBOM stamp and as the `sbom` artefact of the run.
+  #
+  # A job of its own, beside `build`: neither SBOM needs anything compiled, only resolved, so it
+  # costs a Gradle configuration and an npm install, and keeps `build` - which every test job waits
+  # on - as long as it was. doc/dev-guide/ci-evidence.md lists what the stamp attaches.
+  # ---------------------------------------------------------------------------------------------
+
+  sbom:
+    name: SBOM
+    needs: [setup, yontrack]
+    if: >-
+      ${{ !cancelled()
+        && needs.setup.result == 'success'
+        && needs.yontrack.result != 'failure'
+        && needs.setup.outputs.full_run == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      BACKEND_SBOM: ontrack-ui/build/reports/cyclonedx/application.cdx.json
+      FRONTEND_SBOM: ontrack-web-core/build/reports/cyclonedx/application.cdx.json
+    steps:
+      # The run time reported for this job's validations is measured from here. A `run:` step is
+      # the earliest point a workflow can observe: the runner's own "Set up job" precedes every
+      # step and is not visible to any of them. Everything after this — checkout, toolchain setup,
+      # cache restore — is part of what the job costs and is counted.
+      - name: Record the job start
+        id: job_start
+        run: echo "started=$(date +%s)" >> "$GITHUB_OUTPUT"
+
+      # The full history for the same reason as everywhere else: Gradle configures the versioning
+      # plugin, which computes the project version from the tags - the version of the SBOMs.
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: zulu
+          java-version: "25"
+
+      - uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-read-only: true  # `build` is the one job that writes, see `setup`
+
+      # No actions/setup-node, as in `ui-unit`: the Gradle node plugin downloads its own Node and
+      # npm, and `npm sbom` is that npm's.
+      - name: Cache the npm downloads
+        uses: actions/cache@v6
+        with:
+          path: ~/.npm
+          key: npm-${{ runner.os }}-${{ hashFiles('ontrack-web-core/package-lock.json') }}
+          restore-keys: npm-${{ runner.os }}-
+
+      # Before the generation, not after: a generation that fails must still be able to report a
+      # FAILED `SBOM` stamp, and `yontrack validate` needs the build to have been resolved.
+      - name: Link to the Yontrack build
+        uses: nemerosa/ontrack-github-actions-cli-library/ontrack-cli-workflow-build@v1.0.3
+        with:
+          project: ${{ needs.yontrack.outputs.project }}
+          yontrack-url: ${{ vars.YONTRACK_URL }}
+          yontrack-token: ${{ secrets.YONTRACK_TOKEN }}
+          version: ${{ env.YONTRACK_CLI_VERSION }}
+
+      - name: Generate the SBOMs
+        id: generate
+        run: |
+          ./gradlew :ontrack-ui:cyclonedxBom :ontrack-web-core:sbom \
+            --stacktrace \
+            --console plain
+
+      # Recording only: PASSED when both SBOMs were generated, FAILED otherwise. Neither a missing
+      # license nor any particular license changes it - there is no license policy yet.
+      - name: Validate SBOM
+        if: ${{ !cancelled() && steps.generate.outcome != '' }}
+        env:
+          OUTCOME: ${{ steps.generate.outcome }}
+          STARTED: ${{ steps.job_start.outputs.started }}
+        run: |
+          run_time_flag=""
+          if [ -n "${STARTED:-}" ]; then
+            run_time_flag="--run-time $(( $(date +%s) - STARTED ))"
+          fi
+          if [ "$OUTCOME" = "success" ] && [ -s "$BACKEND_SBOM" ] && [ -s "$FRONTEND_SBOM" ]; then
+            status=PASSED
+          else
+            status=FAILED
+          fi
+          # shellcheck disable=SC2086  # deliberate: see YONTRACK_RUN_INFO
+          scripts/ci-evidence.sh sbom SBOM "$BACKEND_SBOM" "$FRONTEND_SBOM" -- \
+            validate --validation SBOM --status "$status" \
+            $run_time_flag $YONTRACK_RUN_INFO
+
+      # The same three files as the evidence of the stamp, under the same names. `!cancelled()`:
+      # the stamp being refused by Yontrack is no reason to lose the inventory here as well.
+      #
+      # 90 days is a request, not a guarantee - GitHub clamps it to the repository's own artefact
+      # retention setting. The evidence in Yontrack is what is kept for good.
+      - name: Archive the SBOMs
+        if: ${{ !cancelled() && steps.generate.outcome != '' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: sbom
+          path: ${{ runner.temp }}/ci-evidence/SBOM
+          if-no-files-found: error
+          overwrite: true
+          retention-days: 90

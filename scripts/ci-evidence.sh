@@ -16,11 +16,13 @@
 #   findings STAMP REPORT        <STAMP>-findings.json and <STAMP>-report.html
 #   dast STAMP FINDINGS MANIFEST <STAMP>-findings.json, <STAMP>-manifest.json and <STAMP>-report.html
 #   search-perf STAMP REPORT     <STAMP>-report.json and <STAMP>-report.html
+#   sbom STAMP BACKEND FRONTEND  <STAMP>-backend.cdx.json, <STAMP>-frontend.cdx.json and
+#                                <STAMP>-report.html, from the two CycloneDX SBOMs (#2179)
 #
 # CLI_ARGS is the `yontrack` call, from `validate` on. The evidence flags are added after it.
 #
-# `trivy` implies --tool trivy. --tool-version is for a pin held by the caller. Without it, the version of a known tool is read
-# from where it is pinned, or from the tool: gradle, jest, playwright, trivy.
+# `trivy` implies --tool trivy, `sbom` --tool cyclonedx. --tool-version is for a pin held by the caller. Without it, the version of a known tool is read
+# from where it is pinned, or from the tool: cyclonedx, gradle, jest, playwright, trivy.
 #
 # Environment:
 #   CI_EVIDENCE_DIR      where the evidence is written (default: $RUNNER_TEMP/ci-evidence), one
@@ -47,6 +49,15 @@ ce_run_url() {
 
 ce_tool_version() {
     case "$1" in
+        cyclonedx)
+            # Two generators, both pinned in the build: the Gradle plugin and npm.
+            local plugin npm
+            plugin="$(sed -n 's/.*id("org.cyclonedx.bom") version "\(.*\)".*/\1/p' "$CE_REPO_ROOT/build.gradle.kts" 2>/dev/null)"
+            npm="$(sed -n 's/.*npmVersion.set("\(.*\)").*/\1/p' "$CE_REPO_ROOT/ontrack-web-core/build.gradle.kts" 2>/dev/null)"
+            if [ -n "$plugin" ] && [ -n "$npm" ]; then
+                echo "gradle-plugin-$plugin,npm-$npm"
+            fi
+            ;;
         gradle)
             sed -n 's/^distributionUrl=.*gradle-\(.*\)-[a-z]*\.zip$/\1/p' \
                 "$CE_REPO_ROOT/gradle/wrapper/gradle-wrapper.properties" 2>/dev/null
@@ -180,6 +191,35 @@ ce_prepare_dast() {
     ce_keep "$html"
 }
 
+# The two SBOMs under their stable names, and one HTML for both. Either may be missing - the
+# validation then says FAILED - and the other one still goes; that gap is what turns the step red.
+ce_prepare_sbom() {
+    local dir="$3" html="$3/$CE_STAMP-report.html" label input raw found=false missing=false
+    local -a parts=() raws=()
+    for label in backend frontend; do
+        if [ "$label" = "backend" ]; then input="$1"; else input="$2"; fi
+        raw="$dir/$CE_STAMP-$label.cdx.json"
+        if [ -z "$input" ] || [ ! -e "$input" ]; then
+            missing=true
+            parts+=("$label=")
+            continue
+        fi
+        found=true
+        cp "$input" "$raw" || ce_gap "Could not copy $input."
+        ce_keep "$raw"
+        if [ -s "$raw" ]; then
+            parts+=("$label=$raw")
+            raws+=(--raw "$raw")
+        fi
+    done
+    shift 3
+    [ "$found" = "true" ] || return 0
+    [ "$missing" = "true" ] && ce_gap "An SBOM is missing."
+    ce_py render sbom "${parts[@]+"${parts[@]}"}" "$@" "${raws[@]+"${raws[@]}"}" --output "$html" \
+        || ce_gap "Could not render the SBOMs."
+    ce_keep "$html"
+}
+
 # Only a file that exists and is not empty reaches the CLI: it checks them all before it creates
 # the validation run, so any other would lose the stamp altogether.
 ce_keep() {
@@ -227,6 +267,7 @@ ce_run() {
         findings) ce_prepare_report findings "${inputs[0]:-}" findings.json "$dir" "${header[@]}" ;;
         dast) ce_prepare_dast "${inputs[0]:-}" "${inputs[1]:-}" "$dir" "${header[@]}" ;;
         search-perf) ce_prepare_report search-perf "${inputs[0]:-}" report.json "$dir" "${header[@]}" ;;
+        sbom) tool="${tool:-cyclonedx}"; ce_prepare_sbom "${inputs[0]:-}" "${inputs[1]:-}" "$dir" "${header[@]}" ;;
     esac
 
     local -a flags=()
@@ -260,8 +301,8 @@ ce_run() {
 ce_main() {
     local kind="${1:-}" stamp="${2:-}"
     case "$kind" in
-        junit|trivy|findings|dast|search-perf) ;;
-        *) ce_fail "Usage: $0 junit|trivy|findings|dast|search-perf STAMP INPUT... [--tool T] [--tool-version V] -- CLI_ARGS..."; return 1 ;;
+        junit|trivy|findings|dast|search-perf|sbom) ;;
+        *) ce_fail "Usage: $0 junit|trivy|findings|dast|search-perf|sbom STAMP INPUT... [--tool T] [--tool-version V] -- CLI_ARGS..."; return 1 ;;
     esac
     [ -n "$stamp" ] || { ce_fail "No stamp"; return 1; }
     ce_run "$@"

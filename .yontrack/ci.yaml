@@ -196,6 +196,12 @@ configuration:
         # and keeps that name because every past release's history hangs off it. BRONZE
         # requires it since #1669.
         DOCS: {}
+        # The inventory of the open source libraries Yontrack ships, reported by the `sbom` job in
+        # ci.yml on every full run (#2179): the CycloneDX SBOMs of the backend and of the UI, and a
+        # table of every library with its version and license, attached as evidence. Recording
+        # only: PASSED when both SBOMs were generated, FAILED otherwise, in no promotion. No license
+        # policy yet.
+        SBOM: {}
         # Reported by .github/workflows/demo-smoke.yml, which the demo slot dispatches once
         # it has marked the deployment done. SILVER, below, requires it.
         DEMO.SMOKE: {}

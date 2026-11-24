@@ -386,4 +386,70 @@ assert_not_contains "$report" "not a figure" "search-perf: only the figures"
 assert_contains "$report" "p95 &lt;over&gt; its ceiling" "search-perf: the failures, escaped"
 assert_not_contains "$report" "<b>hostile" "search-perf: a hostile key stays text"
 
+# ===============================================================================================
+# SBOM: the two CycloneDX files as they were generated, and a table of their components (#2179)
+# ===============================================================================================
+
+cat > "$REPO/backend.cdx.json" <<'JSON'
+{"bomFormat": "CycloneDX", "specVersion": "1.6",
+ "metadata": {"component": {"type": "application", "group": "ontrack", "name": "ontrack-ui", "version": "6.0.0"}},
+ "components": [
+  {"type": "library", "group": "ontrack", "name": "ontrack-model", "version": "6.0.0"},
+  {"type": "library", "group": "org.springframework", "name": "spring-core", "version": "7.0.1",
+   "purl": "pkg:maven/org.springframework/spring-core@7.0.1?type=jar", "licenses": [{"license": {"id": "Apache-2.0"}}]},
+  {"type": "library", "group": "ch.qos.logback", "name": "logback-core", "version": "1.5.38",
+   "licenses": [{"license": {"id": "EPL-2.0"}}, {"license": {"id": "LGPL-2.1-only"}}]},
+  {"type": "library", "group": "org.example", "name": "unlicensed", "version": "0.1"},
+  {"type": "library", "group": "org.example", "name": "<img src=x onerror=alert(1)>", "version": "1",
+   "licenses": [{"license": {"name": "<b>Custom</b> licence"}}]}
+ ]}
+JSON
+cat > "$REPO/frontend.cdx.json" <<'JSON'
+{"bomFormat": "CycloneDX", "specVersion": "1.5",
+ "metadata": {"component": {"type": "application", "name": "ontrack-web-core", "version": "6.0.0"}},
+ "components": [
+  {"type": "library", "name": "@ant-design/colors", "version": "8.0.1", "licenses": [{"license": {"id": "MIT"}}]},
+  {"type": "library", "name": "dompurify", "version": "3.2.0", "licenses": [{"expression": "(MPL-2.0 OR Apache-2.0)"}]}
+ ]}
+JSON
+evidence sbom SBOM "$REPO/backend.cdx.json" "$REPO/frontend.cdx.json" -- validate --validation SBOM --status PASSED
+assert_eq 0 "$?" "sbom: the step succeeds"
+BACKEND="$EVIDENCE/SBOM/SBOM-backend.cdx.json"
+FRONTEND="$EVIDENCE/SBOM/SBOM-frontend.cdx.json"
+HTML="$EVIDENCE/SBOM/SBOM-report.html"
+assert_eq "$BACKEND
+$FRONTEND
+$HTML" "$(cli_flag --evidence)" "sbom: the three evidences are passed, under their stable names"
+assert_eq "$(sha256 "$REPO/backend.cdx.json")" "$(sha256 "$BACKEND")" "sbom: the backend SBOM is the generated one"
+assert_eq "$(sha256 "$REPO/frontend.cdx.json")" "$(sha256 "$FRONTEND")" "sbom: the frontend SBOM is the generated one"
+assert_eq cyclonedx "$(cli_flag --evidence-tool)" "sbom: the tool is CycloneDX"
+assert_eq "gradle-plugin-$(sed -n 's/.*id("org.cyclonedx.bom") version "\(.*\)".*/\1/p' "$SCRIPT_DIR/../build.gradle.kts"),npm-$(sed -n 's/.*npmVersion.set("\(.*\)").*/\1/p' "$SCRIPT_DIR/../ontrack-web-core/build.gradle.kts")" \
+    "$(cli_flag --evidence-tool-version)" "sbom: the versions are the pins of the Gradle plugin and of npm"
+
+report="$(cat "$HTML")"
+assert_contains "$report" "$(sha256 "$BACKEND")" "sbom: the header carries the SHA-256 of the backend SBOM"
+assert_contains "$report" "$(sha256 "$FRONTEND")" "sbom: and of the frontend one"
+assert_contains "$report" 'data-total="backend-libraries">4<' "sbom: Yontrack's own modules are not third-party libraries"
+assert_contains "$report" 'data-total="backend-without-license">1<' "sbom: a library without a license is counted"
+assert_contains "$report" 'data-total="frontend-libraries">2<' "sbom: the frontend libraries are counted"
+assert_contains "$report" 'data-total="frontend-without-license">0<' "sbom: and those without a license"
+assert_contains "$report" "<td>org.springframework:spring-core</td><td>7.0.1</td><td>Apache-2.0</td>" "sbom: a Maven library is group:name, version, license"
+assert_contains "$report" "<td>EPL-2.0, LGPL-2.1-only</td>" "sbom: several licenses are all listed"
+assert_contains "$report" "<td>(MPL-2.0 OR Apache-2.0)</td>" "sbom: a license expression is shown as is"
+assert_contains "$report" "<td>@ant-design/colors</td><td>8.0.1</td><td>MIT</td>" "sbom: an npm package is its name"
+assert_contains "$report" '<td class="missing">none</td>' "sbom: a missing license stands out"
+assert_not_contains "$report" "ontrack:ontrack-model" "sbom: Yontrack's own modules are not listed"
+assert_not_contains "$report" "<img" "sbom: markup in a component name stays text"
+assert_not_contains "$report" "<b>Custom" "sbom: markup in a license name stays text"
+
+evidence sbom SBOM "$REPO/backend.cdx.json" "$REPO/not-here.json" -- validate --validation SBOM --status FAILED
+assert_eq 1 "$?" "sbom, one SBOM missing: the step is red"
+assert_eq "$BACKEND
+$HTML" "$(cli_flag --evidence)" "sbom, one SBOM missing: what exists still goes"
+assert_contains "$(cat "$HTML")" "No frontend SBOM" "sbom, one SBOM missing: the report says so"
+
+evidence sbom SBOM "$REPO/not-here.json" "" -- validate --validation SBOM --status FAILED
+assert_eq 0 "$?" "sbom, nothing generated: the step does not add a failure of its own"
+assert_not_contains "$(cli_args)" "--evidence" "sbom, nothing generated: a bare FAILED"
+
 report_tests

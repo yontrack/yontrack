@@ -23,8 +23,6 @@
     "dayjs": "^1.11.13",
     "dompurify": "3.4.17",
     "elkjs": "^0.10.0",
-    "eslint": "^9.39.5",
-    "eslint-config-next": "16.4.2",
     "graphiql": "^4.1.1",
     "graphql": "16.10.0",
     "graphql-request": "^6.1.0",
@@ -48,12 +46,17 @@
   "devDependencies": {
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.2.0",
+    "eslint": "^9.39.5",
+    "eslint-config-next": "16.4.2",
     "jest": "^29.7.0",
     "jest-environment-jsdom": "^29.7.0",
     "jest-junit": "^16.0.0"
   },
   "overrides": {
     "recharts": {
+      "react-is": "$react"
+    },
+    "prop-types": {
       "react-is": "$react"
     }
   }

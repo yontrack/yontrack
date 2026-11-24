@@ -1,9 +1,11 @@
 import net.nemerosa.ontrack.build.BuildInfoVersion
+import org.cyclonedx.gradle.CyclonedxDirectTask
 import org.springframework.boot.gradle.dsl.SpringBootExtension
 
 plugins {
     `java-library`
     id("com.google.cloud.tools.jib")
+    id("org.cyclonedx.bom")
 }
 
 apply(plugin = "org.springframework.boot")
@@ -116,6 +118,16 @@ configure<SpringBootExtension> {
             additional.putAll(buildInfoVersion.additional)
         }
     }
+}
+
+// The SBOM of the application (#2179): what it ships, so its runtime classpath only - no test, build
+// or development-only library. The Spring Boot plugin writes it to
+// build/reports/cyclonedx/application.cdx.json and embeds it in the boot jar. The `sbom` actuator
+// endpoint is not exposed: library versions are no business of an anonymous caller.
+tasks.named<CyclonedxDirectTask>("cyclonedxDirectBom") {
+    includeConfigs = listOf("runtimeClasspath")
+    // Every library has to be in the inventory: an unresolved one is a gap, not a detail.
+    failOnUnresolvedDependencies = true
 }
 
 val isMacOS = System.getProperty("os.name").lowercase().contains("mac")
