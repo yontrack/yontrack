@@ -36,6 +36,22 @@ const nextConfig = {
         unoptimized: true,
     },
     /*
+     * ... and so `sharp`, the image library of the optimizer, stays out of
+     * the standalone output, hence out of the image. Next traces it in
+     * whenever it is installed - npm installs it as an optional dependency of
+     * `next` - while the server never loads it with the optimizer off. Its
+     * native build, `@img/sharp-libvips-*`, is LGPL-3.0: the UI image ships
+     * no LGPL-3.0 code, and the SBOM of the UI leaves `sharp` out as well
+     * (`ontrack-web-core/build.gradle.kts`). Turning the optimizer back on
+     * means removing this exclusion, and accepting that license.
+     */
+    outputFileTracingExcludes: {
+        '*': [
+            '**/node_modules/sharp/**/*',
+            '**/node_modules/@img/**/*',
+        ],
+    },
+    /*
      * Security headers on every route - pages, `/mobile`, `/api/*` and static
      * assets alike (#1770). Evaluated at build time: the one value a running
      * container can change, who may frame the pages, is applied by

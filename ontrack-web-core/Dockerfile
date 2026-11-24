@@ -69,6 +69,12 @@ RUN chown nextjs:nodejs .next
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
+# `sharp` and its LGPL-3.0 native build stay out of the image, and out of its SBOM - see the
+# `outputFileTracingExcludes` of next.config.js.
+RUN if [ -e node_modules/sharp ] || [ -e node_modules/@img ]; then \
+      echo "The standalone output ships sharp - see next.config.js" >&2; exit 1; \
+    fi
+
 USER nextjs
 
 EXPOSE 3000

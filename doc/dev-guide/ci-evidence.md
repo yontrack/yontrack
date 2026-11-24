@@ -50,9 +50,11 @@ the way the CLI does.
   reads, under a stable name.
 - **A FAILED stamp attaches what exists**: it is the run whose evidence is most worth having.
 - **The SBOMs** (#2179) are CycloneDX, as generated: the backend's by the `org.cyclonedx.bom`
-  Gradle plugin on the runtime classpath of `ontrack-ui`, the UI's by `npm sbom --omit dev` in
-  `ontrack-web-core` - so test, build and lint tooling stays out, as long as the UI keeps it in
-  `devDependencies`. The same three files are the run's `sbom` artefact. The stamp records only: no
+  Gradle plugin on the runtime classpath of `ontrack-ui`, the UI's by `npm sbom --omit dev --omit
+  optional` in `ontrack-web-core` - so test, build and lint tooling stays out, as long as the UI
+  keeps it in `devDependencies`, and so do the optional dependencies, none of which the image ships:
+  `sharp` and its LGPL-3.0 native build are kept out of the standalone output by `next.config.js`,
+  and the `sbom` task fails if the SBOM lists them. The same three files are the run's `sbom` artefact. The stamp records only: no
   license policy yet.
 
 Out of scope, deliberately: `COVERAGE.*` (`coverage-reports` is over the 50 MB limit, and these are

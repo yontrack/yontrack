@@ -65,6 +65,12 @@ val testCoverage = tasks.register<NpmTask>("testCoverage") {
 //
 // Read from `node_modules`, which `npmInstall` fills: the lock file alone lacks the license of
 // some packages.
+//
+// `--omit optional`: none of the optional dependencies is in the image. They are the native
+// builds of the Next.js compiler (`@next/swc-*`), used by `next build` only; `sharp` and its
+// native builds (`@img/*`), which `next.config.js` keeps out of the standalone output; and the
+// TypeScript types of `dompurify`. The task fails if the SBOM still lists `sharp`: its native
+// build is LGPL-3.0, and the image is not meant to ship it - see `next.config.js`.
 // ===================================================================================================================
 
 val sbomFile = layout.buildDirectory.file("reports/cyclonedx/application.cdx.json")
@@ -75,14 +81,31 @@ tasks.register<NpmTask>("sbom") {
     dependsOn("npmInstall")
     inputs.files("package.json", "package-lock.json")
     outputs.file(sbomFile)
-    args.set(listOf("sbom", "--sbom-format", "cyclonedx", "--sbom-type", "application", "--omit", "dev"))
+    args.set(
+        listOf(
+            "sbom", "--sbom-format", "cyclonedx", "--sbom-type", "application",
+            "--omit", "dev", "--omit", "optional",
+        )
+    )
     // `npm sbom` only prints to the standard output.
     val output = java.io.ByteArrayOutputStream()
     execOverrides.set { standardOutput = output }
     doLast {
+        val sbom = output.toByteArray()
+        @Suppress("UNCHECKED_CAST")
+        val components = (groovy.json.JsonSlurper().parse(sbom) as Map<String, Any?>)["components"]
+                as List<Map<String, Any?>>
+        val excluded = components
+            .map { listOfNotNull(it["group"]?.toString()?.takeIf(String::isNotEmpty), it["name"]).joinToString("/") }
+            .filter { it == "sharp" || it.startsWith("@img/") }
+        if (excluded.isNotEmpty()) {
+            throw GradleException(
+                "The SBOM of the UI lists $excluded, which the image does not ship - see next.config.js"
+            )
+        }
         sbomFile.get().asFile.apply {
             parentFile.mkdirs()
-            writeBytes(output.toByteArray())
+            writeBytes(sbom)
         }
     }
 }
