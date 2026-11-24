@@ -37,6 +37,7 @@ const NOT_PRODUCTION = {
     'build': 'Gradle output',
     'coverage': 'the coverage report this very configuration writes',
     'node_modules': 'dependencies',
+    'notices': 'build tooling: the third-party notices generator the Dockerfile runs, not shipped',
     'public': 'static assets',
     'reports': 'JUnit output for CI',
     'styles': 'CSS only',
