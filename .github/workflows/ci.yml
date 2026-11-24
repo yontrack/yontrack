@@ -758,6 +758,8 @@ jobs:
           pull: true
           load: true
           tags: nemerosa/ontrack-ui:${{ env.BASE_VERSION }}
+          # The version named by the third-party notices of the image (#2182)
+          build-args: VERSION=${{ env.BASE_VERSION }}
 
       - name: Log in to GHCR
         if: env.FULL_RUN == 'true'

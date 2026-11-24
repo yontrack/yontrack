@@ -1,5 +1,7 @@
 import net.nemerosa.ontrack.build.BuildInfoVersion
+import net.nemerosa.ontrack.build.notices.ThirdPartyNoticesTask
 import org.cyclonedx.gradle.CyclonedxDirectTask
+import org.gradle.api.artifacts.component.ModuleComponentIdentifier
 import org.springframework.boot.gradle.dsl.SpringBootExtension
 
 plugins {
@@ -130,6 +132,28 @@ tasks.named<CyclonedxDirectTask>("cyclonedxDirectBom") {
     failOnUnresolvedDependencies = true
 }
 
+// The third-party notices of the image (#2182): every external module of the runtime classpath - the
+// SBOM above, less the Yontrack modules - with the license, notice and copying files its jars
+// package, verbatim, and the standard text of the licenses of those which package none, from
+// src/notices/licenses. Shipped by Jib as /app/THIRD-PARTY-NOTICES.txt.
+val thirdPartyNoticesDir = layout.buildDirectory.dir("notices")
+
+val thirdPartyNotices = tasks.register<ThirdPartyNoticesTask>("thirdPartyNotices") {
+    group = "reporting"
+    description = "Writes the THIRD-PARTY-NOTICES.txt of the backend image to build/notices/."
+    // The external modules only: without the filter, the task would build every Yontrack module
+    // only to leave its jar out.
+    val runtimeArtifacts = configurations.runtimeClasspath.get().incoming
+        .artifactView { componentFilter { it is ModuleComponentIdentifier } }
+        .artifacts
+    artifacts.set(runtimeArtifacts.resolvedArtifacts)
+    classpath.from(runtimeArtifacts.artifactFiles)
+    sbom.set(tasks.named<CyclonedxDirectTask>("cyclonedxDirectBom").flatMap { it.jsonOutput })
+    licenseTexts.set(layout.projectDirectory.dir("src/notices/licenses"))
+    title.set(provider { "Yontrack ${project.version} - backend image" })
+    output.set(thirdPartyNoticesDir.map { it.file("THIRD-PARTY-NOTICES.txt") })
+}
+
 val isMacOS = System.getProperty("os.name").lowercase().contains("mac")
 
 jib {
@@ -153,6 +177,14 @@ jib {
             }
         }
     }
+    extraDirectories {
+        paths {
+            path {
+                setFrom(thirdPartyNoticesDir.get().asFile)
+                into = "/app"
+            }
+        }
+    }
     container {
         // Mitigation of CVE-2026-114938 (#2158): remove once the base image is on JDK 25.0.5.1 or later
         jvmFlags = listOf("-XX:-UseBASE64Intrinsics")
@@ -166,6 +198,10 @@ jib {
 
 tasks.named("jibDockerBuild") {
     shouldRunAfter("integrationTest")
+}
+
+listOf("jib", "jibDockerBuild", "jibBuildTar").forEach { name ->
+    tasks.named(name) { dependsOn(thirdPartyNotices) }
 }
 
 val jibDockerBuildYontrack = tasks.register<Exec>("jibDockerBuildYontrack") {

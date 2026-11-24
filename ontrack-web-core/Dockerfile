@@ -16,6 +16,17 @@ RUN \
   fi
 
 
+# The third-party notices of the image (#2182): the same packages as the SBOM of the UI
+# (`./gradlew :ontrack-web-core:sbom`), with the license, notice and copying files they package.
+# See notices/third-party-notices.js. Only the installed dependencies are needed, not the build.
+FROM deps AS notices
+ARG VERSION=dev
+COPY notices ./notices
+RUN npm sbom --sbom-format cyclonedx --sbom-type application --omit dev --omit optional > /tmp/sbom.cdx.json \
+ && node notices/third-party-notices.js /tmp/sbom.cdx.json node_modules notices/licenses \
+      "Yontrack ${VERSION} - UI image" > THIRD-PARTY-NOTICES.txt
+
+
 # Rebuild the source code only when needed
 FROM base AS builder
 WORKDIR /app
@@ -68,6 +79,7 @@ RUN chown nextjs:nodejs .next
 # https://nextjs.org/docs/advanced-features/output-file-tracing
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+COPY --from=notices /app/THIRD-PARTY-NOTICES.txt ./
 
 # `sharp` and its LGPL-3.0 native build stay out of the image, and out of its SBOM - see the
 # `outputFileTracingExcludes` of next.config.js.

@@ -54,7 +54,8 @@ the way the CLI does.
   optional` in `ontrack-web-core` - so test, build and lint tooling stays out, as long as the UI
   keeps it in `devDependencies`, and so do the optional dependencies, none of which the image ships:
   `sharp` and its LGPL-3.0 native build are kept out of the standalone output by `next.config.js`,
-  and the `sbom` task fails if the SBOM lists them. The same three files are the run's `sbom` artefact. The stamp records only: no
+  and the `sbom` task fails if the SBOM lists them. The same libraries are in the
+  [third-party notices](third-party-notices.md) of the images. The same three files are the run's `sbom` artefact. The stamp records only: no
   license policy yet.
 
 Out of scope, deliberately: `COVERAGE.*` (`coverage-reports` is over the 50 MB limit, and these are
