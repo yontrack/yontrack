@@ -40,7 +40,7 @@
     "react-icons": "^5.5.0",
     "reactflow": "^11.11.4",
     "recharts": "^2.15.1",
-    "uuid": "^11.1.0",
+    "uuid": "^14.0.0",
     "web-worker": "^1.5.0"
   },
   "devDependencies": {
