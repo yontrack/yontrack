@@ -20,17 +20,17 @@ buildscript {
     // >= 33.7.2.
     dependencies {
         constraints {
-            classpath("com.google.guava:guava:33.7.2-jre")
+            classpath("com.google.guava:guava:33.8.0-jre")
         }
     }
 }
 
 plugins {
-    kotlin("jvm") version "2.3.21"
-    kotlin("plugin.spring") version "2.3.21"
+    kotlin("jvm") version "2.4.21"
+    kotlin("plugin.spring") version "2.4.21"
     id("org.springframework.boot") version "4.1.3" apply false
-    id("com.avast.gradle.docker-compose") version "0.17.12"
-    id("com.google.cloud.tools.jib") version "3.5.1" apply false
+    id("com.avast.gradle.docker-compose") version "0.17.21"
+    id("com.google.cloud.tools.jib") version "3.5.4" apply false
     id("com.github.node-gradle.node") version "7.1.0" apply false
     // The SBOM of the application (#2179), applied by ontrack-ui only
     id("org.cyclonedx.bom") version "3.6.1" apply false
@@ -327,14 +327,14 @@ configure(javaProjects) {
 
     val kotlinVersion = "2.4.21"
     val kotlinCoroutinesVersion = "1.11.0"
-    val jjwtVersion = "0.12.6"
-    val greenMailVersion = "1.6.15"
-    val mockkVersion = "1.14.11"
-    val jgitVersion = "6.10.1.202505221210-r"
+    val jjwtVersion = "0.13.0"
+    val greenMailVersion = "2.1.15"
+    val mockkVersion = "1.14.12"
+    val jgitVersion = "7.8.1.202611041320-r"
     val msgpackCoreVersion = "0.9.12"
     val commonsBeanutilsVersion = "1.11.0"
-    val openTelemetryVersion = "1.67.0"
-    val fabric8Version = "7.9.0"
+    val openTelemetryVersion = "1.68.0"
+    val fabric8Version = "8.0.0"
 
     // The BOMs. The Spring Boot one is what io.spring.dependency-management imported; the other two
     // are the BOMs it imports itself, restated at the versions this build wants, in place of the
@@ -351,18 +351,18 @@ configure(javaProjects) {
 
     // The former `dependencyManagement { dependencies { ... } }` entries, one constraint each.
     val versionConstraints = listOf(
-        "commons-io:commons-io:2.18.0",
-        "org.jsoup:jsoup:1.23.2",
+        "commons-io:commons-io:2.22.0",
+        "org.jsoup:jsoup:1.24.1",
         "org.apache.commons:commons-math3:3.6.1",
-        "org.apache.commons:commons-text:1.13.0",
-        "org.jgrapht:jgrapht-core:1.5.2",
-        "com.opencsv:opencsv:5.10",
+        "org.apache.commons:commons-text:1.15.0",
+        "org.jgrapht:jgrapht-core:1.5.3",
+        "com.opencsv:opencsv:5.12.0",
         // Jackson 3 from 3.0 on (#1843); 3.0.6 is the last one on Jackson 3.1, as the Spring Boot BOM
-        "com.networknt:json-schema-validator:3.0.6",
+        "com.networknt:json-schema-validator:3.0.9",
         // Jackson 3 providers from 3.0 on; the Spring Boot BOM manages 2.10 (#1843)
         "com.jayway.jsonpath:json-path:3.0.0",
-        "com.slack.api:slack-api-client:1.38.0",
-        "org.springframework.vault:spring-vault-core:4.1.0",
+        "com.slack.api:slack-api-client:1.56.0",
+        "org.springframework.vault:spring-vault-core:4.1.2",
         // CEL, for the success and failure conditions of the `http` notification channel (#2154). It
         // brings protobuf-java and Guava, which nothing else of the build uses; its Guava is the one
         // pinned for the plugin classpath above.
@@ -385,7 +385,7 @@ configure(javaProjects) {
         "io.mockk:mockk-dsl-jvm:$mockkVersion",
 
         // Counting the SQL queries of the integration tests (QueryCounter in ontrack-it-utils, #2080)
-        "net.ttddyy:datasource-proxy:1.11.0",
+        "net.ttddyy:datasource-proxy:1.11.1",
 
         // Local clones of the Git repositories (ontrack-git). The pure-Git support is gone (#1924), but
         // GitHub, GitLab and Bitbucket still walk their commits and merge their branches on a clone.
@@ -402,7 +402,7 @@ configure(javaProjects) {
         // - graphql-java (Boot BOM 4.1.3 manages 25.1): CVE-2026-102554 in the Guava it shades
         //   (32.1.2-jre), fixed in 25.2 which shades Guava 33.8.0-jre (graphql-java#4554).
         //   Remove once the Spring Boot BOM manages >= 25.2.
-        "com.graphql-java:graphql-java:25.2",
+        "com.graphql-java:graphql-java:26.2",
     )
 
     // Declared on every dependency bucket of every source set -- main, test, and the testFixtures
