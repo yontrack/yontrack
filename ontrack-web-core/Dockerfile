@@ -80,6 +80,9 @@ RUN chown nextjs:nodejs .next
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=notices /app/THIRD-PARTY-NOTICES.txt ./
+# The licence of Yontrack, from the root of the repository, passed as the `root` build context
+# (`--build-context root=..`).
+COPY --from=root LICENSE ./
 
 # `sharp` and its LGPL-3.0 native build stay out of the image, and out of its SBOM - see the
 # `outputFileTracingExcludes` of next.config.js.

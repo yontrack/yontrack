@@ -8,11 +8,7 @@ import net.nemerosa.ontrack.extension.av.dispatcher.AutoVersioningOrder
 import net.nemerosa.ontrack.extension.av.postprocessing.PostProcessingFailureException
 import net.nemerosa.ontrack.extension.av.processing.AutoVersioningTemplateRenderer
 import net.nemerosa.ontrack.extension.av.retry.AutoVersioningRetryableException
-import net.nemerosa.ontrack.extension.github.client.GitHubWorkflowDispatchException
-import net.nemerosa.ontrack.extension.github.client.GitHubWorkflowRunFailedException
-import net.nemerosa.ontrack.extension.github.client.GitHubWorkflowRunNotFoundException
-import net.nemerosa.ontrack.extension.github.client.OntrackGitHubClient
-import net.nemerosa.ontrack.extension.github.client.OntrackGitHubClientFactory
+import net.nemerosa.ontrack.extension.github.client.*
 import net.nemerosa.ontrack.extension.github.model.GitHubEngineConfiguration
 import net.nemerosa.ontrack.extension.github.service.GitHubConfigurationService
 import net.nemerosa.ontrack.model.events.PlainEventRenderer
@@ -171,17 +167,19 @@ class GitHubPostProcessingTest {
     }
 
     @Test
-    fun `The retries of the settings apply to the wait for the completion of the workflow run`() {
+    fun `The wait for the workflow run uses the retries of the settings`() {
         val client = mockk<OntrackGitHubClient>(relaxed = true)
         every { client.launchWorkflowRun(any(), any(), any(), any(), any(), any(), any()) } returns RUN_ID
 
         runPostProcessing(client, retries = 90, retriesDelaySeconds = 20)
 
-        verify { client.waitUntilWorkflowRun("repository", RUN_ID, retries = 90, retriesDelaySeconds = 20) }
+        verify {
+            client.waitUntilWorkflowRun("repository", RUN_ID, retries = 90, retriesDelaySeconds = 20)
+        }
     }
 
     @Test
-    fun `The wait for the completion of the workflow run defaults to the default settings`() {
+    fun `The wait for the workflow run uses the default retries of the settings`() {
         val client = mockk<OntrackGitHubClient>(relaxed = true)
         every { client.launchWorkflowRun(any(), any(), any(), any(), any(), any(), any()) } returns RUN_ID
 

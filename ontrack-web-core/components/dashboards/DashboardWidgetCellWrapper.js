@@ -36,7 +36,6 @@ export default function DashboardWidgetCellWrapper({widget}) {
                         {
                             dashboardEdition &&
                             <>
-                                {/* The type of the widget, which its title may not tell */}
                                 {
                                     widgetTypeName &&
                                     <Tag data-testid="widget-type">{widgetTypeName}</Tag>

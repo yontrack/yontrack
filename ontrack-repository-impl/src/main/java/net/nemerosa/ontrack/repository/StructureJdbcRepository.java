@@ -1,6 +1,5 @@
 package net.nemerosa.ontrack.repository;
 
-import tools.jackson.databind.JsonNode;
 import net.nemerosa.ontrack.common.Document;
 import net.nemerosa.ontrack.common.Time;
 import net.nemerosa.ontrack.model.Ack;
@@ -16,17 +15,13 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.stereotype.Repository;
+import tools.jackson.databind.JsonNode;
 
 import javax.sql.DataSource;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.LocalDateTime;
-import java.util.HashMap;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
@@ -401,7 +396,6 @@ public class StructureJdbcRepository extends AbstractJdbcRepository implements S
             throw new BuildNotFoundException(buildId);
         }
     }
-
 
     @Override
     public Optional<Build> getBuildByName(String project, String branch, String build) {

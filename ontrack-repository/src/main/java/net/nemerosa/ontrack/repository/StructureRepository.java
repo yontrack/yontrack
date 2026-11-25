@@ -9,7 +9,6 @@ import org.jetbrains.annotations.Nullable;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
-import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
@@ -118,7 +117,6 @@ public interface StructureRepository {
     Build getBuild(ID buildId);
 
     Optional<Build> getBuildByName(String project, String branch, String build);
-
     Optional<Build> findBuildAfterUsingNumericForm(ID branchId, String buildName);
 
     int getBuildCount(Branch branch);

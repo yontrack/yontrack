@@ -8,7 +8,7 @@
 ### Track. Trust. Deliver.
 
 [![Release](https://img.shields.io/github/v/release/yontrack/yontrack?label=release)](https://github.com/yontrack/yontrack/releases)
-[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![License](https://img.shields.io/badge/license-commercial-blue.svg)](LICENSE)
 [![Documentation](https://img.shields.io/badge/docs-docs.yontrack.com-brightgreen.svg)](https://docs.yontrack.com)
 [![Slack chat](https://img.shields.io/badge/slack-yontrack-brightgreen.svg?logo=slack)](https://ontrack-run.slack.com/)
 
@@ -232,11 +232,6 @@ See [yontrack/yontrack-skills](https://github.com/yontrack/yontrack-skills).
 
 Full documentation lives at [docs.yontrack.com](https://docs.yontrack.com).
 
-## Contributing
-
-[Contributions](CONTRIBUTING.md) are welcome — see [DEVELOPMENT.md](DEVELOPMENT.md) to get a local
-environment running.
-
 ## Commercial support
 
 Yontrack is developed by [Nemerosa](https://yontrack.com), which also offers consultancy, training
@@ -244,4 +239,4 @@ and support around it — see [yontrack.com/services](https://yontrack.com/servi
 
 ## License
 
-[MIT](LICENSE)
+Commercial, see [LICENSE](LICENSE) and the [Yontrack Licence Terms](https://yontrack.com/conditions/yontrack-licence-terms-261124.pdf).

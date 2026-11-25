@@ -153,7 +153,7 @@ class OntrackValidationNotificationChannelIT : AbstractNotificationTestSupport()
     }
 
     @Test
-    fun `Validation status defaults to passed when not configured`() {
+    fun `Validation status defaults to passed`() {
         asAdmin {
             project {
                 branch {
@@ -176,8 +176,9 @@ class OntrackValidationNotificationChannelIT : AbstractNotificationTestSupport()
                     build {
                         promote(pl)
 
+                        // Checks the status of the validation
                         val run = structureService.getValidationRunsForValidationStamp(vs, 0, 10).firstOrNull()
-                        assertNotNull(run) {
+                        assertNotNull(run, "Build has been validated") {
                             assertEquals(
                                 ValidationRunStatusID.STATUS_PASSED,
                                 it.lastStatus.statusID,
@@ -190,7 +191,7 @@ class OntrackValidationNotificationChannelIT : AbstractNotificationTestSupport()
     }
 
     @Test
-    fun `Validation status using a fixed value`() {
+    fun `Validation status set in the configuration`() {
         asAdmin {
             project {
                 branch {
@@ -214,8 +215,9 @@ class OntrackValidationNotificationChannelIT : AbstractNotificationTestSupport()
                     build {
                         promote(pl)
 
+                        // Checks the status of the validation
                         val run = structureService.getValidationRunsForValidationStamp(vs, 0, 10).firstOrNull()
-                        assertNotNull(run) {
+                        assertNotNull(run, "Build has been validated") {
                             assertEquals(
                                 ValidationRunStatusID.STATUS_FAILED,
                                 it.lastStatus.statusID,
@@ -226,5 +228,4 @@ class OntrackValidationNotificationChannelIT : AbstractNotificationTestSupport()
             }
         }
     }
-
 }

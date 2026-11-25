@@ -26,7 +26,8 @@ From the **Dashboard** menu you can:
 - **Share current dashboard** — promote a private dashboard to shared (requires `DashboardSharing`)
 - **Delete current dashboard** — remove the active dashboard (built-in dashboards cannot be deleted)
 
-In edit mode, each widget shows its type next to its commands, since its title, especially a custom one, may not say what kind of widget it is.
+In edit mode, every widget displays the name of its type beside its commands, since its title, which may be custom,
+does not always tell what the widget is.
 
 ## Dashboards as Code
 

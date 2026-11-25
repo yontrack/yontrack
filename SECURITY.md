@@ -5,13 +5,14 @@ their infrastructure. Please report it privately, never in a public issue, discu
 
 ## Reporting a vulnerability
 
-Use GitHub's private vulnerability reporting:
+Report it privately, either:
 
-**[Report a vulnerability](https://github.com/yontrack/yontrack/security/advisories/new)**
+- by e-mail to **info@yontrack.com**, or
+- by a direct message to the maintainers on the Yontrack Slack -
+  never in a public channel.
 
-The form is also available from the repository's *Security* tab. The report and the conversation
-that follows stay visible to the maintainers only, until an advisory is published. There is no
-security e-mail address: the form is the only channel.
+The report and the conversation that follows stay between you and the maintainers until the fix is
+released.
 
 ## What to include
 

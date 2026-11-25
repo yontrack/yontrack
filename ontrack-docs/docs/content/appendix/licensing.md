@@ -1,9 +1,14 @@
 # Licensing
 
-Yontrack is open core: most of it needs no license, and a few features are under license. Each of
-them is a **licensed feature** of the license, identified by an ID, which the license enables or
-not. A development instance - the `dev` profile - enables them only with a development key, which a
-production instance refuses.
+From version 6.0.5, Yontrack is commercial software: its use is governed by the
+[Yontrack Licence Terms](https://yontrack.com/conditions/yontrack-licence-terms-261124.pdf), which
+the `LICENSE` file of the repository and of the images points to. Versions up to 6.0.4 were
+published under the MIT License, which still applies to them.
+
+The license of an instance is given by its **license key**. A few features are **licensed
+features**, each identified by an ID, which the license key enables or not; the other features do
+not depend on the key. A development instance - the `dev` profile - enables the licensed features
+only with a development key, which a production instance refuses.
 
 The page *License* of the user menu shows the license of the instance and, for each licensed
 feature, whether it is enabled. Through the API, the same is in `licenseInfo` in GraphQL:

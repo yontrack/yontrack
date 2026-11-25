@@ -1,6 +1,5 @@
 package net.nemerosa.ontrack.extension.notifications.core
 
-import tools.jackson.databind.JsonNode
 import net.nemerosa.ontrack.common.api.APIDescription
 import net.nemerosa.ontrack.extension.notifications.channels.AbstractNotificationChannel
 import net.nemerosa.ontrack.extension.notifications.channels.NotificationResult
@@ -19,6 +18,7 @@ import net.nemerosa.ontrack.model.security.SecurityService
 import net.nemerosa.ontrack.model.structure.*
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
+import tools.jackson.databind.JsonNode
 import kotlin.jvm.optionals.getOrNull
 
 @Component
@@ -40,16 +40,6 @@ class OntrackValidationNotificationChannel(
             throw EventSubscriptionConfigException("Validation stamp name cannot be blank.")
         }
         validateStatus(config.status)
-    }
-
-    internal fun validateStatus(status: String?) {
-        if (!status.isNullOrBlank() && !status.contains("\${")) {
-            try {
-                validationRunStatusService.getValidationRunStatus(status)
-            } catch (e: ValidationRunStatusNotFoundException) {
-                throw EventSubscriptionConfigException("Status [$status] is not a valid validation run status ID.")
-            }
-        }
     }
 
     override fun mergeConfig(
@@ -126,14 +116,36 @@ class OntrackValidationNotificationChannel(
         return rendered.takeIf { it.isNotBlank() }?.toIntOrNull()
     }
 
-    internal fun resolveStatus(status: String?, event: Event, context: Map<String, Any>): ValidationRunStatusID {
-        val id = if (status.isNullOrBlank()) {
-            ValidationRunStatusID.PASSED
-        } else {
-            eventTemplatingService.renderEvent(event, context, template = status).trim()
+    /**
+     * Checks the status of the configuration.
+     *
+     * A template (containing `${`) cannot be checked before it is rendered and is accepted as is.
+     * Any other value must be the ID of a validation run status.
+     */
+    internal fun validateStatus(status: String?) {
+        if (status.isNullOrBlank() || status.contains("${'$'}{")) {
+            return
         }
-        return validationRunStatusService.getValidationRunStatus(id)
+        try {
+            validationRunStatusService.getValidationRunStatus(status)
+        } catch (_: ValidationRunStatusNotFoundException) {
+            throw EventSubscriptionConfigException("Status [$status] is not a valid validation run status ID.")
+        }
     }
+
+    /**
+     * Gets the status of the validation run to create, by rendering the [status] of the configuration
+     * as a template. Without any status, the run is passed.
+     *
+     * @throws ValidationRunStatusNotFoundException When the rendered status is not a known status ID
+     */
+    internal fun resolveStatus(status: String?, event: Event, context: Map<String, Any>): ValidationRunStatusID =
+        if (status.isNullOrBlank()) {
+            validationRunStatusService.getValidationRunStatus(ValidationRunStatusID.PASSED)
+        } else {
+            val id = eventTemplatingService.renderEvent(event, context, template = status).trim()
+            validationRunStatusService.getValidationRunStatus(id)
+        }
 
     internal fun getTargetBuild(
         config: OntrackValidationNotificationChannelConfig,

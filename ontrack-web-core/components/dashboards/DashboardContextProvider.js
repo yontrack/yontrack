@@ -90,7 +90,7 @@ export const DashboardContext = createContext({
     registerWidget: (widget) => {
     },
     /**
-     * Human-readable name of a type of widget, from its key
+     * Gets the human-readable name of a widget type from its key
      */
     widgetTypeName: (key) => undefined,
 })
@@ -322,7 +322,6 @@ export default function DashboardContextProvider({children}) {
         }
     }
 
-    // Shown on each widget in edition mode, where its title may say nothing of what it is
     const widgetTypeName = (key) => data?.dashboardWidgets?.find(it => it.key === key)?.name
 
     const [widgets, setWidgets] = useState([])

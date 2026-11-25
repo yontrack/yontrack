@@ -2,6 +2,10 @@
 
 To start developing with Yontrack, follow these instructions.
 
+> This guide is for the developers of Yontrack at Nemerosa and its contractors.
+Access to this repository grants no right to use, build or modify Yontrack
+beyond the Yontrack Licence Terms (see [LICENSE](LICENSE)).
+
 ## Prerequisites
 
 You need:
@@ -11,7 +15,7 @@ You need:
 
 ## Getting the code
 
-Get a clean working copy of the Yntrack GitHub repository:
+Get a clean working copy of the Yontrack GitHub repository:
 
 ```bash
 git clone git@github.com:yontrack/yontrack.git yontrack

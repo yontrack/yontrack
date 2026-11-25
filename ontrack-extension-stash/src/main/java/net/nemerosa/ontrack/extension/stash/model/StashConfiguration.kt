@@ -7,7 +7,7 @@ import net.nemerosa.ontrack.model.support.UserPasswordConfiguration
 
 /**
  * @property name Name of this configuration
- * @property url Bitbucket URL
+ * @property url URL of the Bitbucket (Server or Data Center) instance
  * @property user User name
  * @property password User password
  * @property autoMergeToken Token used for approving pull requests for the auto merge operations

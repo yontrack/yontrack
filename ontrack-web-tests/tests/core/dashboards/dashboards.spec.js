@@ -340,12 +340,13 @@ test('a chart widget whose promotion level was deleted says so instead of loadin
 })
 
 test('in edition mode, every widget shows its type', async ({page, ontrack}) => {
-    const dashboardName = `widget-type-${Date.now()}`
+    const dashboardName = `widget-types-${Date.now()}`
 
     const project = await ontrack.createProject()
     const branch = await project.createBranch()
+    const validationStamp = await branch.createValidationStamp()
 
-    // Custom titles, which say nothing of what the widgets are
+    // Custom titles, which say nothing of the type of the widgets
     const yaml = [
         `- name: "${dashboardName}"`,
         `  widgets:`,
@@ -355,6 +356,8 @@ test('in edition mode, every widget shows its type', async ({page, ontrack}) => 
         `        title: "My validations"`,
         `        project: "${project.name}"`,
         `        branch: "${branch.name}"`,
+        `        validations:`,
+        `          - "${validationStamp.name}"`,
         `    - key: "home/BranchStatuses"`,
         `      layout: {x: 6, y: 0, w: 6, h: 25}`,
         `      config:`,
@@ -373,29 +376,37 @@ test('in edition mode, every widget shows its type', async ({page, ontrack}) => 
     const dashboardUuid = data.applyDashboards.dashboards[0].uuid
 
     await login(page, ontrack)
+    // Displaying the dashboard using its URL, so that it does not become the
+    // dashboard of the user for the next tests
     await page.goto(`${ontrack.connection.ui}/?dashboard=${dashboardUuid}`)
     await expect(page.getByText('My validations')).toBeVisible()
 
-    // Outside of the edition mode, the types are not displayed
-    const types = page.getByTestId('widget-type')
-    await expect(types).toHaveCount(0)
+    // Outside of the edition mode, the type of the widgets is not displayed
+    const widgetTypes = page.getByTestId('widget-type')
+    await expect(widgetTypes).toHaveCount(0)
 
-    // In edition mode, each widget shows its type
+    // Entering the edition mode: each widget displays its type
     await page.getByRole('button', {name: 'Dashboard', exact: true}).click()
     await page.getByText('Edit current dashboard').click()
     await expect(page.getByText('Dashboard in edition mode')).toBeVisible()
-    await expect(types).toHaveText(['Last validations for a branch', 'Branch statuses'])
+    await expect(widgetTypes).toHaveText([
+        'Last validations for a branch',
+        'Branch statuses',
+    ])
 
-    // Still there while a widget is being configured
+    // Configuring a widget does not hide the types
     // The first command of the header is "Configure this widget"
     await page.locator('.ant-card-head').filter({hasText: 'My validations'}).getByRole('button').first().click()
     await expect(page.getByText('List of validations to display')).toBeVisible()
-    await expect(types).toHaveText(['Last validations for a branch', 'Branch statuses'])
+    await expect(widgetTypes).toHaveText([
+        'Last validations for a branch',
+        'Branch statuses',
+    ])
 
     // Leaving the edition mode: the types are gone again
     await page.getByRole('button', {name: 'Cancel changes'}).click()
     await expect(page.getByText('Dashboard in edition mode')).not.toBeVisible()
-    await expect(types).toHaveCount(0)
+    await expect(widgetTypes).toHaveCount(0)
 })
 
 test('the branch statuses widget form has no refresh interval field', async ({page, ontrack}) => {

@@ -1,12 +1,19 @@
 package net.nemerosa.ontrack.demo.seed
 
-import net.nemerosa.ontrack.demo.seed.BuildCreation.At
-import net.nemerosa.ontrack.demo.seed.BuildCreation.DaysAgo
-import net.nemerosa.ontrack.demo.seed.BuildCreation.HoursAgo
-import net.nemerosa.ontrack.demo.seed.ValidationStatus.FAILED
-import net.nemerosa.ontrack.demo.seed.ValidationStatus.FIXED
-import net.nemerosa.ontrack.demo.seed.ValidationStatus.PASSED
-import net.nemerosa.ontrack.demo.seed.ValidationStatus.WARNING
+import net.nemerosa.ontrack.demo.seed.BuildCreation.*
+import net.nemerosa.ontrack.demo.seed.DemoContent.E2E_FAILING_SUITE
+import net.nemerosa.ontrack.demo.seed.DemoContent.bronze
+import net.nemerosa.ontrack.demo.seed.DemoContent.bronzeAuto
+import net.nemerosa.ontrack.demo.seed.DemoContent.canaryWorkflow
+import net.nemerosa.ontrack.demo.seed.DemoContent.fullPromotions
+import net.nemerosa.ontrack.demo.seed.DemoContent.goldAfterSilver
+import net.nemerosa.ontrack.demo.seed.DemoContent.securityScan
+import net.nemerosa.ontrack.demo.seed.DemoContent.silver
+import net.nemerosa.ontrack.demo.seed.DemoContent.silverAfterBronze
+import net.nemerosa.ontrack.demo.seed.DemoContent.silverAuto
+import net.nemerosa.ontrack.demo.seed.DemoContent.tolerantSecurityScan
+import net.nemerosa.ontrack.demo.seed.DemoContent.visitsSilver
+import net.nemerosa.ontrack.demo.seed.ValidationStatus.*
 import net.nemerosa.ontrack.json.asJson
 
 /**
@@ -2968,8 +2975,8 @@ object DemoContent {
                 ).asJson(),
                 layout = DemoWidgetLayout(x = 0, y = 144, w = 6, h = 16),
             ),
-            // The last builds of the main branch of the service, as its branch page shows them, but
-            // restricted to the promotions and validations worth a glance from a dashboard
+            // The main branch of the service as its branch page shows it, narrowed to the promotions
+            // and the validations worth a glance on a dashboard
             DemoWidget(
                 uuid = LAST_BUILDS_WIDGET_UUID,
                 key = "home/LastBuildsForBranch",

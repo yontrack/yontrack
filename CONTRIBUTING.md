@@ -1,11 +1,11 @@
-# Contribution Guidelines
+# Contributing
 
-To start a discussion, simply create an issue.
+Yontrack is commercial software, licensed under the Yontrack Licence Terms (see
+[LICENSE](LICENSE)). It does not accept outside contributions: pull requests from
+outside Nemerosa are closed without review.
 
-You can submit new features/bug fixes by forking this repository and submitting a pull request. Ensure your pull request adheres to the following guidelines:
-- Search previous suggestions before making a new one, as yours may be a duplicate.
-- Make an individual pull request for each suggestion.
-- Check your spelling and grammar.
-- Update the documentation at need.
+- **Customers**: report bugs and requests through Yontrack support, info@yontrack.com or in Slack.
+- **Questions and feedback**: info@yontrack.com or in Slack.
+- **Security vulnerabilities**: see [SECURITY.md](SECURITY.md).
 
-See the [development quick start documentation](DEVELOPMENT.md) for starting the development of Ontrack locally.
+The developers of Yontrack will find how to set up the code in [DEVELOPMENT.md](DEVELOPMENT.md).

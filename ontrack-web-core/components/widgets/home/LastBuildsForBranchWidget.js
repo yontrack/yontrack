@@ -18,34 +18,42 @@ import {branchUri} from "@components/common/Links";
 
 const {Column} = Table;
 
+// Stable references, so that an absent list does not change on every render
 const NO_BUILDS = []
+const NO_NAMES = []
 
 /**
- * The last builds of a branch, as the branch page shows them: one row per build, its promotions,
- * and one column per validation stamp.
+ * Keeps an item when no names are configured, or when its name is one of them.
+ */
+const acceptName = (names, name) => !names || names.length === 0 || names.includes(name)
+
+/**
+ * Last builds of a branch, shown like the builds grid of the branch page: one row per build, its
+ * promotions, and one column per validation stamp.
  *
- * @param title Overrides the default title
+ * @param title Overriding title
  * @param project Name of the project
  * @param branch Name of the branch
  * @param count Number of builds to display
- * @param promotions Names of the promotions to display - all of them if empty
- * @param validations Names of the validations to display - all of them if empty
+ * @param promotions Names of the promotion levels to display, all of them if empty
+ * @param validations Names of the validation stamps to display as columns, all of them if empty
  */
 export default function LastBuildsForBranchWidget({
                                                       title,
                                                       project,
                                                       branch,
                                                       count = 10,
-                                                      promotions = [],
-                                                      validations = [],
+                                                      promotions = NO_NAMES,
+                                                      validations = NO_NAMES,
                                                   }) {
 
-    // Incremented when a user action on a validation needs the builds to be reloaded
-    const [reloadCount, setReloadCount] = useState(0)
-
-    const {data: loadedBranch, loading: loadingBranch, finished: finishedBranch} = useQuery(
+    // The branch and its validation stamps
+    const {data: loadedBranch, loading: loadingBranch, finished: branchFinished} = useQuery(
         gql`
-            query LastBuildsForBranchWidget($project: String!, $branch: String!) {
+            query LastBuildsForBranchWidgetBranch(
+                $project: String!,
+                $branch: String!,
+            ) {
                 branch: branchByName(project: $project, name: $branch) {
                     id
                     name
@@ -79,29 +87,34 @@ export default function LastBuildsForBranchWidget({
         }
     )
 
+    // Bumped after a user action in a validation cell, to reload the builds
+    const [reloadCount, setReloadCount] = useState(0)
+    const onChange = () => setReloadCount(value => value + 1)
+
+    // The last builds of the branch
+    const branchId = loadedBranch?.id
     const {data: loadedBuilds, loading: loadingBuilds} = useQuery(
         gqlBuilds,
         {
             variables: {
-                branchId: Number(loadedBranch?.id),
+                branchId: Number(branchId),
                 offset: 0,
                 size: count,
             },
-            deps: [loadedBranch?.id, count, reloadCount],
-            condition: !!loadedBranch,
-            dataFn: data => data.branches[0].buildsPaginated.pageItems,
+            deps: [branchId, count, reloadCount],
+            condition: !!branchId,
+            dataFn: data => data.branches[0]?.buildsPaginated?.pageItems,
         }
     )
     const builds = loadedBuilds ?? NO_BUILDS
 
+    // Columns and promotions, restricted to the configured names
     const validationStamps = (loadedBranch?.validationStamps ?? [])
-        .filter(stamp => validations.length === 0 || validations.includes(stamp.name))
+        .filter(validationStamp => acceptName(validations, validationStamp.name))
+    const promotionRunsOf = build => (build.promotionRuns ?? [])
+        .filter(run => acceptName(promotions, run.promotionLevel.name))
 
-    const displayedPromotionRuns = (build) => build.promotionRuns
-        .filter(run => promotions.length === 0 || promotions.includes(run.promotionLevel.name))
-
-    const onChange = () => setReloadCount(value => value + 1)
-
+    // Title of the widget
     const {setTitle} = useContext(DashboardWidgetCellContext)
     useEffect(() => {
         if (title) {
@@ -125,67 +138,62 @@ export default function LastBuildsForBranchWidget({
                     <ProjectLink project={loadedBranch.project}/>
                 </>
             )
-        } else if (project && branch && !finishedBranch) {
-            // Not "no branch found" before the branch has been looked up at all
+        } else if (project && branch && !branchFinished) {
             setTitle("Last builds of branch")
         } else {
             setTitle("Last builds of branch (no branch found)")
         }
-    }, [title, project, branch, loadedBranch, finishedBranch])
+    }, [title, project, branch, loadedBranch, branchFinished])
 
     return (
-        <>
-            <LoadingContainer loading={loadingBranch || loadingBuilds}>
-                <Table
-                    data-testid="last-builds-for-branch"
-                    size="small"
-                    dataSource={builds}
-                    pagination={false}
-                    scroll={{x: 'max-content'}}
-                >
-                    <Column
-                        key="build"
-                        title="Build"
-                        fixed="left"
-                        render={(_, build) =>
-                            <BuildBox build={build} displayDecorations={true}/>
-                        }
-                    />
-                    <Column
-                        key="promotions"
-                        title="Promotions"
-                        fixed="left"
-                        render={(_, build) =>
-                            <Space size={8}>
-                                {
-                                    displayedPromotionRuns(build).map(promotionRun =>
-                                        <PromotionRunStep
-                                            key={promotionRun.id}
-                                            run={promotionRun}
-                                        />
-                                    )
-                                }
-                            </Space>
-                        }
-                    />
-                    {
-                        validationStamps.map(validationStamp => (
-                            <Column
-                                key={validationStamp.name}
-                                className="ot-validation-stamp"
-                                title={<ValidationStampHeader validationStamp={validationStamp}/>}
-                                render={(_, build) =>
-                                    <ValidationRunCell
-                                        build={build}
-                                        validationStamp={validationStamp}
-                                        onChange={onChange}
-                                    />
-                                }
-                            />
-                        ))
+        <LoadingContainer loading={loadingBranch || loadingBuilds}>
+            <Table
+                data-testid="last-builds-for-branch"
+                size="small"
+                dataSource={builds}
+                pagination={false}
+                scroll={{x: 'max-content'}}
+            >
+                <Column
+                    key="build"
+                    title="Build"
+                    fixed="left"
+                    render={(_, build) =>
+                        <BuildBox build={build} displayDecorations={true}/>
                     }
-                </Table>
-            </LoadingContainer>
-        </>
+                />
+                <Column
+                    key="promotions"
+                    title="Promotions"
+                    fixed="left"
+                    render={(_, build) =>
+                        <Space size={8}>
+                            {
+                                promotionRunsOf(build).map(run =>
+                                    <PromotionRunStep key={run.id} run={run}/>
+                                )
+                            }
+                        </Space>
+                    }
+                />
+                {/* One column per validation stamp */}
+                {
+                    validationStamps.map(validationStamp =>
+                        <Column
+                            key={validationStamp.name}
+                            className="ot-validation-stamp"
+                            title={<ValidationStampHeader validationStamp={validationStamp}/>}
+                            render={(_, build) =>
+                                <ValidationRunCell
+                                    build={build}
+                                    validationStamp={validationStamp}
+                                    onChange={onChange}
+                                />
+                            }
+                        />
+                    )
+                }
+            </Table>
+        </LoadingContainer>
     )
 }

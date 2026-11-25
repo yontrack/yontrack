@@ -36,10 +36,8 @@ class OntrackValidationNotificationChannelTest {
         }
 
         validationRunStatusService = mockk()
-        every {
-            validationRunStatusService.getValidationRunStatus(any())
-        } answers {
-            when (val id = it.invocation.args[0] as String) {
+        every { validationRunStatusService.getValidationRunStatus(any()) } answers {
+            when (val id = firstArg<String>()) {
                 ValidationRunStatusID.PASSED -> ValidationRunStatusID.STATUS_PASSED
                 ValidationRunStatusID.FAILED -> ValidationRunStatusID.STATUS_FAILED
                 else -> throw ValidationRunStatusNotFoundException(id)
@@ -298,83 +296,77 @@ class OntrackValidationNotificationChannelTest {
     }
 
     @Test
-    fun `Resolving the status when not configured defaults to passed`() {
-        val event = mockk<Event>()
+    fun `Resolving a null status gives the passed status`() {
         assertEquals(
             ValidationRunStatusID.STATUS_PASSED,
-            channel.resolveStatus(status = null, event = event, context = emptyMap()),
+            channel.resolveStatus(null, mockk<Event>(), emptyMap())
         )
     }
 
     @Test
-    fun `Resolving the status when blank defaults to passed`() {
-        val event = mockk<Event>()
+    fun `Resolving a blank status gives the passed status`() {
         assertEquals(
             ValidationRunStatusID.STATUS_PASSED,
-            channel.resolveStatus(status = "", event = event, context = emptyMap()),
+            channel.resolveStatus("", mockk<Event>(), emptyMap())
         )
     }
 
     @Test
-    fun `Resolving the status from a template`() {
-        val event = mockk<Event>()
+    fun `Resolving a plain status ID`() {
         assertEquals(
             ValidationRunStatusID.STATUS_FAILED,
-            channel.resolveStatus(status = "FAILED", event = event, context = emptyMap()),
+            channel.resolveStatus("FAILED", mockk<Event>(), emptyMap())
         )
     }
 
     @Test
-    fun `Resolving the status when a configured template renders blank fails`() {
+    fun `Resolving a template rendered as an empty string is an unknown status`() {
         val event = mockk<Event>()
-        every {
-            eventTemplatingService.renderEvent(event, emptyMap(), "\${blank}")
-        } returns ""
+        val template = "${'$'}{workflow.status}"
+        every { eventTemplatingService.renderEvent(event, emptyMap(), template) } returns ""
         assertFailsWith<ValidationRunStatusNotFoundException> {
-            channel.resolveStatus(status = "\${blank}", event = event, context = emptyMap())
+            channel.resolveStatus(template, event, emptyMap())
         }
     }
 
     @Test
-    fun `Resolving the status trims whitespace from the rendered template`() {
+    fun `Resolving a template trims its rendering`() {
         val event = mockk<Event>()
-        every {
-            eventTemplatingService.renderEvent(event, emptyMap(), "\${status}")
-        } returns "  FAILED  "
+        val template = "${'$'}{workflow.status}"
+        every { eventTemplatingService.renderEvent(event, emptyMap(), template) } returns "  FAILED  "
         assertEquals(
             ValidationRunStatusID.STATUS_FAILED,
-            channel.resolveStatus(status = "\${status}", event = event, context = emptyMap()),
+            channel.resolveStatus(template, event, emptyMap())
         )
     }
 
     @Test
-    fun `Resolving an invalid status fails`() {
-        val event = mockk<Event>()
+    fun `Resolving an unknown status ID`() {
         assertFailsWith<ValidationRunStatusNotFoundException> {
-            channel.resolveStatus(status = "NOT_A_STATUS", event = event, context = emptyMap())
+            channel.resolveStatus("NOT_A_STATUS", mockk<Event>(), emptyMap())
         }
     }
 
     @Test
-    fun `Validating the status accepts none`() {
+    fun `Validating a null status`() {
         channel.validateStatus(null)
     }
 
     @Test
-    fun `Validating the status accepts a valid literal`() {
+    fun `Validating a valid status ID`() {
         channel.validateStatus("FAILED")
     }
 
     @Test
-    fun `Validating the status accepts a template without checking it`() {
-        channel.validateStatus("\${STATUS}")
+    fun `Validating a template status is not checked`() {
+        channel.validateStatus("${'$'}{STATUS}")
     }
 
     @Test
-    fun `Validating the status rejects an invalid literal`() {
-        assertFailsWith<EventSubscriptionConfigException> {
+    fun `Validating an unknown status ID`() {
+        val ex = assertFailsWith<EventSubscriptionConfigException> {
             channel.validateStatus("NOT_A_STATUS")
         }
+        assertEquals("Status [NOT_A_STATUS] is not a valid validation run status ID.", ex.innerMessage)
     }
-
 }

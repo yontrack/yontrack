@@ -1,7 +1,6 @@
 import net.nemerosa.ontrack.build.BuildInfoVersion
 import net.nemerosa.ontrack.build.notices.ThirdPartyNoticesTask
 import org.cyclonedx.gradle.CyclonedxDirectTask
-import org.gradle.api.artifacts.component.ModuleComponentIdentifier
 import org.springframework.boot.gradle.dsl.SpringBootExtension
 
 plugins {
@@ -154,6 +153,16 @@ val thirdPartyNotices = tasks.register<ThirdPartyNoticesTask>("thirdPartyNotices
     output.set(thirdPartyNoticesDir.map { it.file("THIRD-PARTY-NOTICES.txt") })
 }
 
+// The licence of Yontrack, from the root of the repository. Shipped by Jib as /app/LICENSE.
+val licenseFilesDir = layout.buildDirectory.dir("license")
+
+val licenseFiles = tasks.register<Copy>("licenseFiles") {
+    from(rootProject.layout.projectDirectory) {
+        include("LICENSE")
+    }
+    into(licenseFilesDir)
+}
+
 val isMacOS = System.getProperty("os.name").lowercase().contains("mac")
 
 jib {
@@ -183,6 +192,10 @@ jib {
                 setFrom(thirdPartyNoticesDir.get().asFile)
                 into = "/app"
             }
+            path {
+                setFrom(licenseFilesDir.get().asFile)
+                into = "/app"
+            }
         }
     }
     container {
@@ -201,7 +214,7 @@ tasks.named("jibDockerBuild") {
 }
 
 listOf("jib", "jibDockerBuild", "jibBuildTar").forEach { name ->
-    tasks.named(name) { dependsOn(thirdPartyNotices) }
+    tasks.named(name) { dependsOn(thirdPartyNotices, licenseFiles) }
 }
 
 val jibDockerBuildYontrack = tasks.register<Exec>("jibDockerBuildYontrack") {

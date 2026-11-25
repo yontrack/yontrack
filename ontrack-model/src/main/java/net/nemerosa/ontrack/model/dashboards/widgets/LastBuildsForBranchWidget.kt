@@ -3,6 +3,10 @@ package net.nemerosa.ontrack.model.dashboards.widgets
 import net.nemerosa.ontrack.common.api.APIDescription
 import org.springframework.stereotype.Component
 
+/**
+ * Displays the last builds of a branch, the way the branch page shows them: one row per build,
+ * its promotions, and one column per validation stamp.
+ */
 @Component
 class LastBuildsForBranchWidget : AbstractWidget<LastBuildsForBranchWidgetConfig>(
     key = "home/LastBuildsForBranch",
@@ -12,6 +16,9 @@ class LastBuildsForBranchWidget : AbstractWidget<LastBuildsForBranchWidgetConfig
     preferredHeight = 30,
 )
 
+/**
+ * Configuration of the [LastBuildsForBranchWidget].
+ */
 data class LastBuildsForBranchWidgetConfig(
     @APIDescription("Overriding the title of the widget")
     val title: String? = null,

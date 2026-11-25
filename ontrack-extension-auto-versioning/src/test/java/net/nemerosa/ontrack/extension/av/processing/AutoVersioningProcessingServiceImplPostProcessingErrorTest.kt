@@ -1,17 +1,12 @@
 package net.nemerosa.ontrack.extension.av.processing
 
-import tools.jackson.databind.node.NullNode
-import io.mockk.Runs
 import io.mockk.every
-import io.mockk.just
 import io.mockk.mockk
 import io.mockk.verify
 import net.nemerosa.ontrack.extension.av.AutoVersioningTestFixtures.createOrder
-import net.nemerosa.ontrack.extension.av.audit.AutoVersioningAuditService
 import net.nemerosa.ontrack.extension.av.config.AutoVersioningPushMode
 import net.nemerosa.ontrack.extension.av.config.AutoVersioningTargetFileService
 import net.nemerosa.ontrack.extension.av.dispatcher.AutoVersioningOrder
-import net.nemerosa.ontrack.extension.av.dispatcher.VersionSourceFactory
 import net.nemerosa.ontrack.extension.av.event.AutoVersioningEventService
 import net.nemerosa.ontrack.extension.av.metrics.AutoVersioningMetricsService
 import net.nemerosa.ontrack.extension.av.postprocessing.PostProcessing
@@ -20,203 +15,187 @@ import net.nemerosa.ontrack.extension.av.queue.AutoVersioningProcessingLock
 import net.nemerosa.ontrack.extension.av.retry.AutoVersioningDeferredErrorException
 import net.nemerosa.ontrack.extension.av.retry.AutoVersioningRetryService
 import net.nemerosa.ontrack.extension.av.retry.AutoVersioningRetryableException
-import net.nemerosa.ontrack.extension.av.versionrules.AutoVersioningVersionRuleRegistry
+import net.nemerosa.ontrack.extension.scm.changelog.SCMCommit
 import net.nemerosa.ontrack.extension.scm.service.SCM
 import net.nemerosa.ontrack.extension.scm.service.SCMDetector
 import net.nemerosa.ontrack.model.structure.BranchFixtures
-import net.nemerosa.ontrack.model.structure.StructureService
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import tools.jackson.databind.node.NullNode
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertSame
 
 /**
- * Regression test for the post-processing failure notification gap introduced by
- * `e9e6b1e9` (#1343): a post-processing failure must still call [AutoVersioningEventService.sendError],
- * not just propagate silently past it.
+ * A failure of the post-processing of an auto-versioning order sends an error event, like the
+ * failures of the other steps of the processing, before being rethrown.
  */
 class AutoVersioningProcessingServiceImplPostProcessingErrorTest {
 
-    @Test
-    fun `A post-processing failure sends an error event before being rethrown`() {
-        val branch = BranchFixtures.testBranch()
-        val order = branch.createOrder(
-            sourceProject = "source-project",
-        ).copy(
-            postProcessing = "mock-post-processing",
-            postProcessingConfig = NullNode.instance,
-        )
+    /**
+     * A transient failure, which may be retried automatically.
+     */
+    private class TransientPostProcessingFailure(message: String) :
+        RuntimeException(message), AutoVersioningRetryableException
 
+    private lateinit var eventService: AutoVersioningEventService
+    private lateinit var retryService: AutoVersioningRetryService
+    private lateinit var postProcessing: PostProcessing<Any>
+    private lateinit var service: AutoVersioningProcessingServiceImpl
+
+    private val branch = BranchFixtures.testBranch()
+
+    @BeforeEach
+    fun init() {
         val scm = mockk<SCM>(relaxed = true)
         every { scm.getSCMBranch(branch) } returns "main"
         every { scm.repositoryURI } returns "git@example.test:org/repo.git"
         every { scm.repository } returns "org/repo"
         every { scm.createBranch(any(), any()) } returns "commit-id"
         every { scm.download(any(), any(), any()) } returns "version=1.0.0".toByteArray()
+        every { scm.mergeBranch(any(), any()) } returns mockk<SCMCommit>(relaxed = true)
 
         val scmDetector = mockk<SCMDetector>()
         every { scmDetector.getSCM(branch.project) } returns scm
 
-        val autoVersioningTargetFileService = mockk<AutoVersioningTargetFileService>(relaxed = true)
-        every { autoVersioningTargetFileService.readVersion(any(), any()) } returns "1.0.0"
+        val targetFileService = mockk<AutoVersioningTargetFileService>(relaxed = true)
+        every { targetFileService.readVersion(any(), any()) } returns "1.0.0"
 
-        // Simulates a GitHub-style failure to launch/await the post-processing workflow,
-        // the same shape as the real TimeoutException/503 seen in production
-        val postProcessingFailure = RuntimeException("Could not get result in time")
-        val postProcessing = mockk<PostProcessing<Any>>()
-        every { postProcessing.parseAndValidate(any()) } returns Any()
-        every {
-            postProcessing.postProcessing(any(), any(), any(), any(), any(), any(), any(), any())
-        } throws postProcessingFailure
+        postProcessing = mockk(relaxed = true)
+        every { postProcessing.id } returns POST_PROCESSING_ID
+        every { postProcessing.parseAndValidate(any()) } returns Unit
 
-        val postProcessingRegistry = mockk<PostProcessingRegistry>()
-        every { postProcessingRegistry.getPostProcessingById<Any>("mock-post-processing") } returns postProcessing
+        val registry = mockk<PostProcessingRegistry>()
+        every { registry.getPostProcessingById<Any>(POST_PROCESSING_ID) } returns postProcessing
 
         val metrics = mockk<AutoVersioningMetricsService>(relaxed = true)
         every { metrics.postProcessingTiming(any(), any(), any()) } answers {
             thirdArg<() -> Unit>().invoke()
         }
 
-        val autoVersioningEventService = mockk<AutoVersioningEventService>(relaxed = true)
+        val lock = mockk<AutoVersioningProcessingLock>()
+        every { lock.withMergeLock(any(), any(), any<() -> Any?>()) } answers {
+            thirdArg<() -> Any?>().invoke()
+        }
 
-        val service = AutoVersioningProcessingServiceImpl(
+        eventService = mockk(relaxed = true)
+
+        retryService = mockk(relaxed = true)
+        every { retryService.getRetryAttempt(any()) } returns 0
+
+        service = AutoVersioningProcessingServiceImpl(
             scmDetector = scmDetector,
-            autoVersioningTargetFileService = autoVersioningTargetFileService,
-            postProcessingRegistry = postProcessingRegistry,
-            autoVersioningAuditService = mockk<AutoVersioningAuditService>(relaxed = true),
+            autoVersioningTargetFileService = targetFileService,
+            postProcessingRegistry = registry,
+            autoVersioningAuditService = mockk(relaxed = true),
             metrics = metrics,
-            autoVersioningEventService = autoVersioningEventService,
+            autoVersioningEventService = eventService,
             autoVersioningCompletionListeners = mutableListOf(),
             autoVersioningTemplatingService = mockk(relaxed = true),
-            versionSourceFactory = mockk<VersionSourceFactory>(relaxed = true),
-            structureService = mockk<StructureService>(relaxed = true),
-            autoVersioningVersionRuleRegistry = mockk<AutoVersioningVersionRuleRegistry>(relaxed = true),
-            autoVersioningRetryService = mockk<AutoVersioningRetryService>(relaxed = true),
-            autoVersioningProcessingLock = mergeLock(),
+            versionSourceFactory = mockk(relaxed = true),
+            structureService = mockk(relaxed = true),
+            autoVersioningVersionRuleRegistry = mockk(relaxed = true),
+            autoVersioningRetryService = retryService,
+            autoVersioningProcessingLock = lock,
+        )
+    }
+
+    private fun order(pushMode: AutoVersioningPushMode = AutoVersioningPushMode.PR): AutoVersioningOrder =
+        branch.createOrder(
+            sourceProject = "source-project",
+            pushMode = pushMode,
+        ).copy(
+            postProcessing = POST_PROCESSING_ID,
+            postProcessingConfig = NullNode.instance,
         )
 
-        assertFailsWith<RuntimeException> {
-            service.process(order)
-        }
-
-        verify(exactly = 1) {
-            autoVersioningEventService.sendError(order, "Could not get result in time", postProcessingFailure)
-        }
+    private fun postProcessingFailsWith(failure: Exception) {
+        every {
+            postProcessing.postProcessing(
+                config = any(),
+                autoVersioningOrder = any(),
+                repositoryURI = any(),
+                repository = any(),
+                upgradeBranch = any(),
+                scm = any(),
+                avTemplateRenderer = any(),
+                onPostProcessingInfo = any(),
+            )
+        } throws failure
     }
 
     @Test
-    fun `A successful post-processing does not send any error event`() {
-        val branch = BranchFixtures.testBranch()
-        val order = branch.createOrder(
-            sourceProject = "source-project",
-        ).copy(
-            postProcessing = "mock-post-processing",
-            postProcessingConfig = NullNode.instance,
-            pushMode = AutoVersioningPushMode.PUSH,
-        )
+    fun `A failing post-processing sends an error event and the failure is rethrown`() {
+        val failure = RuntimeException("Post-processing has failed")
+        postProcessingFailsWith(failure)
+        val order = order()
 
-        val scm = mockk<SCM>(relaxed = true)
-        every { scm.getSCMBranch(branch) } returns "main"
-        every { scm.repositoryURI } returns "git@example.test:org/repo.git"
-        every { scm.repository } returns "org/repo"
-        every { scm.createBranch(any(), any()) } returns "commit-id"
-        every { scm.download(any(), any(), any()) } returns "version=1.0.0".toByteArray()
-
-        val scmDetector = mockk<SCMDetector>()
-        every { scmDetector.getSCM(branch.project) } returns scm
-
-        val autoVersioningTargetFileService = mockk<AutoVersioningTargetFileService>(relaxed = true)
-        every { autoVersioningTargetFileService.readVersion(any(), any()) } returns "1.0.0"
-
-        // Same post-processing plugin as the failure test, except this time it succeeds
-        val postProcessing = mockk<PostProcessing<Any>>()
-        every { postProcessing.parseAndValidate(any()) } returns Any()
-        every {
-            postProcessing.postProcessing(any(), any(), any(), any(), any(), any(), any(), any())
-        } just Runs
-
-        val postProcessingRegistry = mockk<PostProcessingRegistry>()
-        every { postProcessingRegistry.getPostProcessingById<Any>("mock-post-processing") } returns postProcessing
-
-        val metrics = mockk<AutoVersioningMetricsService>(relaxed = true)
-        every { metrics.postProcessingTiming(any(), any(), any()) } answers {
-            thirdArg<() -> Unit>().invoke()
+        val thrown = assertFailsWith<RuntimeException> {
+            service.process(order)
         }
 
-        val autoVersioningEventService = mockk<AutoVersioningEventService>(relaxed = true)
+        assertSame(failure, thrown)
+        verify(exactly = 1) { eventService.sendError(order, "Post-processing has failed", failure) }
+    }
 
-        val service = AutoVersioningProcessingServiceImpl(
-            scmDetector = scmDetector,
-            autoVersioningTargetFileService = autoVersioningTargetFileService,
-            postProcessingRegistry = postProcessingRegistry,
-            autoVersioningAuditService = mockk<AutoVersioningAuditService>(relaxed = true),
-            metrics = metrics,
-            autoVersioningEventService = autoVersioningEventService,
-            autoVersioningCompletionListeners = mutableListOf(),
-            autoVersioningTemplatingService = mockk(relaxed = true),
-            versionSourceFactory = mockk<VersionSourceFactory>(relaxed = true),
-            structureService = mockk<StructureService>(relaxed = true),
-            autoVersioningVersionRuleRegistry = mockk<AutoVersioningVersionRuleRegistry>(relaxed = true),
-            autoVersioningRetryService = mockk<AutoVersioningRetryService>(relaxed = true),
-            autoVersioningProcessingLock = mergeLock(),
-        )
+    @Test
+    fun `A successful post-processing sends no error event`() {
+        val order = order(pushMode = AutoVersioningPushMode.PUSH)
 
         val outcome = service.process(order)
 
         assertEquals(AutoVersioningProcessingOutcome.CREATED, outcome)
-        verify(exactly = 0) {
-            autoVersioningEventService.sendError(any(), any(), any())
-        }
+        verify(exactly = 0) { eventService.sendError(any(), any(), any()) }
     }
 
     @Test
-    fun `A transient post-processing failure defers its error event when the caller handles the retries`() {
-        val failure = TransientFailure()
-        val (order, service, autoVersioningEventService, _) = failingPostProcessing(failure)
+    fun `A transient post-processing failure has its error event deferred when the caller handles the retries`() {
+        val failure = TransientPostProcessingFailure("Post-processing timed out")
+        postProcessingFailsWith(failure)
+        val order = order()
 
-        val ex = assertFailsWith<AutoVersioningDeferredErrorException> {
+        val deferred = assertFailsWith<AutoVersioningDeferredErrorException> {
             service.process(order, automaticRetries = true)
         }
 
-        assertEquals("GitHub is down", ex.notificationMessage)
-        assertSame(failure, ex.cause)
-        verify(exactly = 0) {
-            autoVersioningEventService.sendError(any(), any(), any())
-        }
+        assertEquals("Post-processing timed out", deferred.notificationMessage)
+        assertSame(failure, deferred.cause)
+        verify(exactly = 0) { eventService.sendError(any(), any(), any()) }
     }
 
     @Test
-    fun `A transient post-processing failure sends its error event when the caller does not handle the retries`() {
-        val failure = TransientFailure()
-        val (order, service, autoVersioningEventService, _) = failingPostProcessing(failure)
+    fun `A transient post-processing failure sends an error event when the caller does not handle the retries`() {
+        val failure = TransientPostProcessingFailure("Post-processing timed out")
+        postProcessingFailsWith(failure)
+        val order = order()
 
-        assertFailsWith<TransientFailure> {
+        val thrown = assertFailsWith<TransientPostProcessingFailure> {
             service.process(order)
         }
 
-        verify(exactly = 1) {
-            autoVersioningEventService.sendError(order, "GitHub is down", failure)
-        }
+        assertSame(failure, thrown)
+        verify(exactly = 1) { eventService.sendError(order, "Post-processing timed out", failure) }
     }
 
     @Test
-    fun `A non transient failure sends its error event even when the caller handles the retries`() {
-        val failure = RuntimeException("Workflow failed")
-        val (order, service, autoVersioningEventService, _) = failingPostProcessing(failure)
+    fun `A non-transient post-processing failure sends an error event even when the caller handles the retries`() {
+        val failure = RuntimeException("Post-processing has failed")
+        postProcessingFailsWith(failure)
+        val order = order()
 
-        assertFailsWith<RuntimeException> {
+        val thrown = assertFailsWith<RuntimeException> {
             service.process(order, automaticRetries = true)
         }
 
-        verify(exactly = 1) {
-            autoVersioningEventService.sendError(order, "Workflow failed", failure)
-        }
+        assertSame(failure, thrown)
+        verify(exactly = 1) { eventService.sendError(order, "Post-processing has failed", failure) }
     }
 
     @Test
-    fun `The failure of an automatic retry mentions the number of retries`() {
-        val failure = RuntimeException("Workflow failed")
-        val (order, service, autoVersioningEventService, retryService) = failingPostProcessing(failure)
+    fun `The error event of a post-processing failure mentions the automatic retries`() {
+        val failure = RuntimeException("Post-processing has failed")
+        postProcessingFailsWith(failure)
+        val order = order()
         every { retryService.getRetryAttempt(order) } returns 3
 
         assertFailsWith<RuntimeException> {
@@ -224,14 +203,15 @@ class AutoVersioningProcessingServiceImplPostProcessingErrorTest {
         }
 
         verify(exactly = 1) {
-            autoVersioningEventService.sendError(order, "Workflow failed (failed after 3 automatic retries)", failure)
+            eventService.sendError(order, "Post-processing has failed (failed after 3 automatic retries)", failure)
         }
     }
 
     @Test
-    fun `The failure of a single automatic retry mentions it`() {
-        val failure = RuntimeException("Workflow failed")
-        val (order, service, autoVersioningEventService, retryService) = failingPostProcessing(failure)
+    fun `The error event of a post-processing failure mentions the only automatic retry`() {
+        val failure = RuntimeException("Post-processing has failed")
+        postProcessingFailsWith(failure)
+        val order = order()
         every { retryService.getRetryAttempt(order) } returns 1
 
         assertFailsWith<RuntimeException> {
@@ -239,86 +219,11 @@ class AutoVersioningProcessingServiceImplPostProcessingErrorTest {
         }
 
         verify(exactly = 1) {
-            autoVersioningEventService.sendError(order, "Workflow failed (failed after 1 automatic retry)", failure)
+            eventService.sendError(order, "Post-processing has failed (failed after 1 automatic retry)", failure)
         }
     }
 
-    private class TransientFailure : RuntimeException("GitHub is down"), AutoVersioningRetryableException
-
-    private data class FailingPostProcessingContext(
-        val order: AutoVersioningOrder,
-        val service: AutoVersioningProcessingServiceImpl,
-        val autoVersioningEventService: AutoVersioningEventService,
-        val retryService: AutoVersioningRetryService,
-    )
-
-    private fun failingPostProcessing(failure: Exception): FailingPostProcessingContext {
-        val branch = BranchFixtures.testBranch()
-        val order = branch.createOrder(
-            sourceProject = "source-project",
-        ).copy(
-            postProcessing = "mock-post-processing",
-            postProcessingConfig = NullNode.instance,
-        )
-
-        val scm = mockk<SCM>(relaxed = true)
-        every { scm.getSCMBranch(branch) } returns "main"
-        every { scm.repositoryURI } returns "git@example.test:org/repo.git"
-        every { scm.repository } returns "org/repo"
-        every { scm.createBranch(any(), any()) } returns "commit-id"
-        every { scm.download(any(), any(), any()) } returns "version=1.0.0".toByteArray()
-
-        val scmDetector = mockk<SCMDetector>()
-        every { scmDetector.getSCM(branch.project) } returns scm
-
-        val autoVersioningTargetFileService = mockk<AutoVersioningTargetFileService>(relaxed = true)
-        every { autoVersioningTargetFileService.readVersion(any(), any()) } returns "1.0.0"
-
-        val postProcessing = mockk<PostProcessing<Any>>()
-        every { postProcessing.parseAndValidate(any()) } returns Any()
-        every {
-            postProcessing.postProcessing(any(), any(), any(), any(), any(), any(), any(), any())
-        } throws failure
-
-        val postProcessingRegistry = mockk<PostProcessingRegistry>()
-        every { postProcessingRegistry.getPostProcessingById<Any>("mock-post-processing") } returns postProcessing
-
-        val metrics = mockk<AutoVersioningMetricsService>(relaxed = true)
-        every { metrics.postProcessingTiming(any(), any(), any()) } answers {
-            thirdArg<() -> Unit>().invoke()
-        }
-
-        val autoVersioningEventService = mockk<AutoVersioningEventService>(relaxed = true)
-        val retryService = mockk<AutoVersioningRetryService>(relaxed = true)
-
-        val service = AutoVersioningProcessingServiceImpl(
-            scmDetector = scmDetector,
-            autoVersioningTargetFileService = autoVersioningTargetFileService,
-            postProcessingRegistry = postProcessingRegistry,
-            autoVersioningAuditService = mockk<AutoVersioningAuditService>(relaxed = true),
-            metrics = metrics,
-            autoVersioningEventService = autoVersioningEventService,
-            autoVersioningCompletionListeners = mutableListOf(),
-            autoVersioningTemplatingService = mockk(relaxed = true),
-            versionSourceFactory = mockk<VersionSourceFactory>(relaxed = true),
-            structureService = mockk<StructureService>(relaxed = true),
-            autoVersioningVersionRuleRegistry = mockk<AutoVersioningVersionRuleRegistry>(relaxed = true),
-            autoVersioningRetryService = retryService,
-            autoVersioningProcessingLock = mergeLock(),
-        )
-
-        return FailingPostProcessingContext(order, service, autoVersioningEventService, retryService)
+    companion object {
+        private const val POST_PROCESSING_ID = "test-post-processing"
     }
-
-    /**
-     * Lock which runs the merges at once.
-     */
-    private fun mergeLock(): AutoVersioningProcessingLock {
-        val lock = mockk<AutoVersioningProcessingLock>()
-        every { lock.withMergeLock(any(), any(), any<() -> Any?>()) } answers {
-            thirdArg<() -> Any?>().invoke()
-        }
-        return lock
-    }
-
 }

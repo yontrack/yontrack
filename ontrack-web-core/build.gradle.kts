@@ -116,7 +116,7 @@ val dockerBuild = tasks.register<Exec>("dockerBuild") {
     dependsOn(test)
     workingDir = projectDir
     commandLine("sh", "-c", """
-        docker image build --build-arg VERSION=${project.version} -t nemerosa/ontrack-ui:${project.version} . && \
+        docker image build --build-context root=.. --build-arg VERSION=${project.version} -t nemerosa/ontrack-ui:${project.version} . && \
         docker image tag nemerosa/ontrack-ui:${project.version} nemerosa/ontrack-ui:latest && \
         docker image tag nemerosa/ontrack-ui:${project.version} yontrack/yontrack-ui:${project.version} && \
         docker image tag nemerosa/ontrack-ui:${project.version} yontrack/yontrack-ui:latest
