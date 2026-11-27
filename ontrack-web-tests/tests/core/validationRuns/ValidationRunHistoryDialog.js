@@ -11,9 +11,13 @@ export class ValidationRunHistoryDialog {
     }
 
     async selectStatus(status) {
+        // The mouse still hovers the run status which opened this dialog, and its quick-transition
+        // popover lists the same status names as the select: the mouse is moved away first, and
+        // the click is limited to the options of the select (#2185)
+        await this.page.mouse.move(0, 0)
         const id = `validation-run-status-${this.run.id}`
         await this.page.locator(`#${id}`).click()
-        await this.page.getByText(status, {exact: true}).click()
+        await this.page.locator('.ant-select-item-option').getByText(status, {exact: true}).click()
     }
 
     async setDescription(text) {

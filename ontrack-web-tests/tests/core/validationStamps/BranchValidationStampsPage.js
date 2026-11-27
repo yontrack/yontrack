@@ -80,6 +80,13 @@ export class BranchValidationStampsPage {
         const toX = toBox.x + toBox.width / 2
         const toY = toBox.y + toBox.height / 2
 
+        // The Chromium of Playwright 1.63 starts a native drag of the stamp's link on the first
+        // move, which swallows the mouse events react-easy-sort listens to: the native drag is
+        // cancelled for this gesture (#2185).
+        await this.page.evaluate(() =>
+            document.addEventListener('dragstart', e => e.preventDefault(), {once: true})
+        )
+
         await this.page.mouse.move(fromX, fromY)
         await this.page.mouse.down()
         await this.page.mouse.move(toX, toY, {steps: 10})
