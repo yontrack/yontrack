@@ -8,6 +8,7 @@ import net.nemerosa.ontrack.extension.stash.model.BitbucketRepository
 import net.nemerosa.ontrack.extension.stash.model.StashConfiguration
 import net.nemerosa.ontrack.extension.stash.scm.BitbucketServerPR
 import net.nemerosa.ontrack.json.parse
+import net.nemerosa.ontrack.json.parseAsJson
 import org.springframework.boot.web.client.RestTemplateBuilder
 import org.springframework.core.io.ByteArrayResource
 import org.springframework.http.HttpEntity
@@ -16,8 +17,10 @@ import org.springframework.http.HttpMethod
 import org.springframework.http.MediaType
 import org.springframework.util.LinkedMultiValueMap
 import org.springframework.util.MultiValueMap
+import org.springframework.web.client.HttpClientErrorException.Conflict
 import org.springframework.web.client.HttpClientErrorException.NotFound
 import org.springframework.web.client.RequestCallback
+import org.springframework.web.client.RestTemplate
 import org.springframework.web.client.getForObject
 import org.springframework.web.client.postForObject
 import java.time.LocalDateTime
@@ -29,6 +32,7 @@ import java.time.LocalDateTime
 class BitbucketClientImpl(
     private val configuration: StashConfiguration,
     private val maxCommits: Int,
+    private val template: RestTemplate = basicAuthTemplate(configuration),
 ) : BitbucketClient {
 
     override val projects: List<BitbucketProject>
@@ -227,15 +231,31 @@ class BitbucketClientImpl(
         val pr = template.getForObject<PRResponse>(
             "/rest/api/latest/projects/${repo.project}/repos/${repo.repository}/pull-requests/${prId}"
         )
-        template.postForObject(
-            "/rest/api/latest/projects/${repo.project}/repos/${repo.repository}/pull-requests/${prId}/merge",
-            mapOf(
-                "message" to message,
-                "version" to pr.version,
-            ),
-            JsonNode::class.java
-        )
+        try {
+            template.postForObject(
+                "/rest/api/latest/projects/${repo.project}/repos/${repo.repository}/pull-requests/${prId}/merge",
+                mapOf(
+                    "message" to message,
+                    "version" to pr.version,
+                ),
+                JsonNode::class.java
+            )
+        } catch (ex: Conflict) {
+            throw BitbucketServerPRMergeRejectedException(prId, conflictReason(ex))
+        }
     }
+
+    /**
+     * Reason given by Bitbucket Server for a `409`, from the messages of its error body.
+     */
+    private fun conflictReason(ex: Conflict): String =
+        runCatching {
+            ex.responseBodyAsString.parseAsJson()
+                .path("errors")
+                .map { error -> error.path("message").asText() }
+                .filter { it.isNotBlank() }
+                .joinToString("; ")
+        }.getOrNull()?.takeIf { it.isNotBlank() } ?: ex.statusText
 
     override fun getCommits(
         repo: BitbucketRepository,
@@ -276,14 +296,6 @@ class BitbucketClientImpl(
             }
         }
     }
-
-    private val template = RestTemplateBuilder()
-        .rootUri(configuration.url)
-        .basicAuthentication(
-            configuration.user,
-            configuration.password
-        )
-        .build()
 
     private fun tokenTemplate(token: String) = RestTemplateBuilder()
         .rootUri(configuration.url)
@@ -360,3 +372,12 @@ class BitbucketClientImpl(
     private class BitbucketServerCannotCreatePRException : BaseException("Cannot create PR in Bitbucket Server")
 
 }
+
+private fun basicAuthTemplate(configuration: StashConfiguration): RestTemplate =
+    RestTemplateBuilder()
+        .rootUri(configuration.url)
+        .basicAuthentication(
+            configuration.user,
+            configuration.password
+        )
+        .build()

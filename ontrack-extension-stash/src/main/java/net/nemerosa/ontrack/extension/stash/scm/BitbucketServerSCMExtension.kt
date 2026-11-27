@@ -1,8 +1,5 @@
 package net.nemerosa.ontrack.extension.stash.scm
 
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withTimeoutOrNull
 import net.nemerosa.ontrack.extension.git.casc.GitConfigService
 import net.nemerosa.ontrack.extension.git.model.getCommitLink
 import net.nemerosa.ontrack.extension.git.model.gitRepository
@@ -308,26 +305,20 @@ class BitbucketServerSCMExtension(
         }
 
         private fun waitAndMerge(prId: Int, from: String, message: String): SCMPullRequestStatus {
-            // Waits for the PR checks to be OK
-            val autoApprovalTimeoutMillis = settings.autoMergeTimeout
-            val autoApprovalIntervalMillis = settings.autoMergeInterval
-            val merged = runBlocking {
-                withTimeoutOrNull(timeMillis = autoApprovalTimeoutMillis) {
-                    while (!client.isPRMergeable(repo, prId)) {
-                        delay(autoApprovalIntervalMillis)
-                    }
-                    true // PR has become mergeable
-                }
-            }
-            if (merged == null || !merged) {
+            // Waits for the PR checks to be OK and merges it, checking it again
+            // if the target branch moved in the meantime
+            val merged = mergeWhenMergeable(
+                timeoutMillis = settings.autoMergeTimeout,
+                intervalMillis = settings.autoMergeInterval,
+                isMergeable = { client.isPRMergeable(repo, prId) },
+                merge = { client.mergePR(repo, prId, message) },
+                onRejected = { ex ->
+                    logger.info("${ex.message} Checking the PR again before a new merge attempt.")
+                },
+            )
+            if (!merged) {
                 return client.getPR(repo, prId)?.status ?: SCMPullRequestStatus.UNKNOWN
             }
-            // Merges the PR
-            client.mergePR(
-                repo,
-                prId,
-                message
-            )
             // Deleting the source branch
             if (settings.autoDeleteBranch) {
                 client.deleteBranch(repo, from)

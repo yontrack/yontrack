@@ -102,6 +102,8 @@ interface BitbucketClient {
      * @param repo Repository where the PR is
      * @param prId ID of the PR
      * @param message Merge message
+     * @throws BitbucketServerPRMergeRejectedException When Bitbucket Server rejects the merge with a `409`,
+     * typically because the target branch moved since the PR was found mergeable
      */
     fun mergePR(repo: BitbucketRepository, prId: Int, message: String)
 
